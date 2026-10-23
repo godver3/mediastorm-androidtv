@@ -1,0 +1,117 @@
+package com.strmr.tv.player
+
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.annotation.OptIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
+import com.strmr.tv.api.ApiClient
+import com.strmr.tv.api.playbackSettings
+import com.strmr.tv.ui.StrmrTheme
+
+/**
+ * Full-screen playback, its own activity so the system handles it as a player: the window's
+ * display mode follows the video's frame rate, and leaving it (Home, sleep) saves progress and
+ * returns to the details page, as the tvOS app does after a sleep.
+ */
+@OptIn(UnstableApi::class)
+class PlayerActivity : ComponentActivity() {
+    private var controller: PlayerController? = null
+    private var frameRate: FrameRateMatcher? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val session = PlaybackCoordinator.pending
+        if (session == null) {
+            finish()
+            return
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        PlaybackCoordinator.playerOpen = true
+        val matcher = FrameRateMatcher(window, display)
+        frameRate = matcher
+        val c = PlayerController(this, session) { format -> matcher.match(format.frameRate) }
+        controller = c
+        setContent {
+            StrmrTheme {
+                val ended by c.ended.collectAsState()
+                val next by c.advanceTo.collectAsState()
+                val switch by c.switchTo.collectAsState()
+                LaunchedEffect(ended) { if (ended) finish() }
+                LaunchedEffect(Unit) { SubtitleStyleStore.adopt(ApiClient.playbackSettings().subtitleStyle) }
+                // Up Next: close this episode (saved as finished) and start the next over its loading art.
+                LaunchedEffect(next) {
+                    next?.let {
+                        finish()
+                        PlaybackCoordinator.play(it)
+                    }
+                }
+                // Switch Source: close this stream (saved at its position) and resume on the other.
+                LaunchedEffect(switch) {
+                    switch?.let {
+                        finish()
+                        PlaybackCoordinator.play(it.request, it.source, carried = it.carried)
+                    }
+                }
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    AndroidView(
+                        factory = { context ->
+                            PlayerView(context).apply {
+                                useController = false
+                                // Only the Compose chrome takes focus; the stock controller's
+                                // hidden buttons would otherwise swallow D-pad keys.
+                                isFocusable = false
+                                descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                                player = c.player
+                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                setShutterBackgroundColor(android.graphics.Color.BLACK)
+                                // Subtitles are drawn by SubtitleOverlay, as the tvOS overlay draws them.
+                                subtitleView?.visibility = android.view.View.GONE
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize().focusProperties { canFocus = false },
+                    )
+                    val cues by c.cues.collectAsState()
+                    val aspect by c.videoAspect.collectAsState()
+                    // The device's subtitle style (Settings, or the Subtitles menu's Style picks), live.
+                    SubtitleOverlay(cues, SubtitleStyleStore.style, aspect, Modifier.fillMaxSize())
+                    PlayerChrome(c, onExit = { finish() })
+                    SubtitleStatusToast(c, Modifier.align(androidx.compose.ui.Alignment.TopEnd))
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        PlaybackCoordinator.playerStarted()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Home, sleep or another app: keep the position and go back to details.
+        if (!isFinishing) finish()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        controller?.release()
+        controller = null
+        frameRate?.reset()
+        PlaybackCoordinator.playerOpen = false
+        if (isFinishing) PlaybackCoordinator.playerClosed()
+    }
+}

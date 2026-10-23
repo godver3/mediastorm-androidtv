@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The encrypted secrets can't be read on another device (their Keystore key stays here). -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="strmr.secure.xml" />
+</full-backup-content>
