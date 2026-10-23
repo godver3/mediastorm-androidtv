@@ -8,12 +8,14 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.strmr.tv.api.DetailsTarget
+import com.strmr.tv.api.LibraryEntry
 import com.strmr.tv.api.PersonRef
 import com.strmr.tv.home.BrowseList
 import com.strmr.tv.library.CustomListsStore
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.details.DetailsScreen
 import com.strmr.tv.ui.details.PersonScreen
+import com.strmr.tv.ui.library.LibraryShowScreen
 import com.strmr.tv.ui.lists.AddToListDialog
 import com.strmr.tv.ui.lists.ListGridScreen
 import com.strmr.tv.ui.recordings.RecordingsScreen
@@ -52,6 +54,8 @@ sealed interface Page {
     data class SportsCompetition(val sport: String, val league: String) : Page
     /** Sports › Customize: followed competitions. */
     data object SportsPreferences : Page
+    /** An unmatched show's library episodes (it has no details page). */
+    data class LibraryShow(val entry: LibraryEntry) : Page
 }
 
 /** Opens pages over the current screen. */
@@ -118,6 +122,7 @@ fun PageStack(content: @Composable () -> Unit) {
                     is Page.SportsCycling -> SportsCyclingScreen(page.raceId, page.stageId)
                     is Page.SportsCompetition -> SportsCompetitionScreen(page.sport, page.league)
                     Page.SportsPreferences -> SportsPreferencesScreen()
+                    is Page.LibraryShow -> LibraryShowScreen(page.entry)
                 }
                 if (index == stack.lastIndex) PickingHost()
             }

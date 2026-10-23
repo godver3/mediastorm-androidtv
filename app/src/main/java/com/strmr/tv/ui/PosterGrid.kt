@@ -44,6 +44,7 @@ import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
 import com.strmr.tv.ui.home.Badge
 import com.strmr.tv.ui.home.ProgressLine
+import com.strmr.tv.ui.library.rememberLibraryOpener
 
 /**
  * A grid of poster cards that open details (or a person's page), as the tvOS Search, Watchlist and list grids
@@ -67,6 +68,7 @@ fun PosterGrid(
     footer: LazyGridScope.() -> Unit = {},
 ) {
     val navigator = LocalNavigator.current
+    val openLibrary = rememberLibraryOpener()
     var menuFor by remember { mutableStateOf<HomeCard?>(null) }
     var menuError by remember { mutableStateOf<String?>(null) }
     // The grid's scope, not the menu's: the menu is gone before its action's request finishes.
@@ -103,6 +105,7 @@ fun PosterGrid(
                     when (val link = card.link) {
                         is HomeLink.Details -> navigator.openDetails(link.target)
                         is HomeLink.Person -> navigator.open(Page.Person(link.person))
+                        is HomeLink.Library -> openLibrary(link.entry)
                         else -> Unit
                     }
                 },

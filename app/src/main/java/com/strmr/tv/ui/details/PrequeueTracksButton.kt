@@ -47,6 +47,7 @@ class PrequeueTracks(val model: DetailsModel) {
 
     /** The page's prequeue while it resolves, or once it lists tracks for the episode Play targets; null hides the button. */
     fun visible(warm: WarmPrequeue?): WarmPrequeue? {
+        if (model.primaryVersions.isNotEmpty()) return null // Play uses a library copy
         if (warm == null || warm.titleId != model.target.titleId || warm.profile != ApiClient.profileId) return null
         return when (warm.phase) {
             WarmPrequeue.Phase.RESOLVING -> warm
@@ -177,7 +178,7 @@ fun PrequeueTracksPanel(state: PrequeueTracks, warm: WarmPrequeue?, onPlay: () -
 }
 
 /** Laid out at no size, centred under its parent's bottom edge, so the caption doesn't move the row. */
-private fun Modifier.floatingBelow(): Modifier = layout { measurable, _ ->
+internal fun Modifier.floatingBelow(): Modifier = layout { measurable, _ ->
     val placeable = measurable.measure(Constraints())
     layout(0, 0) { placeable.place(-placeable.width / 2, 6.dp.roundToPx()) }
 }

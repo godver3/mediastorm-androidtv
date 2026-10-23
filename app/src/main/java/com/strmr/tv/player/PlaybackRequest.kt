@@ -3,6 +3,8 @@ package com.strmr.tv.player
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.StartPoint
 import com.strmr.tv.api.episodeCode
+import com.strmr.tv.library.LibraryVersion
+import com.strmr.tv.library.LibraryVersions
 import java.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -19,6 +21,13 @@ data class PlaybackRequest(
     val logoUrl: String? = null,
     /** The aired episodes after [episode], in order; the player offers the first as Up Next. */
     val following: List<EpisodeInfo> = emptyList(),
+    /**
+     * The title's copies in the profile's libraries: Play and Up Next play a movie's or an
+     * episode's copy when it has one, without the prequeue.
+     */
+    val library: LibraryVersions? = null,
+    /** The copy this playback uses (picked in the Versions list, or set as it starts). */
+    val libraryVersion: LibraryVersion? = null,
 ) {
     data class EpisodeInfo(
         val season: Int,
@@ -35,6 +44,16 @@ data class PlaybackRequest(
 
     val isEpisode: Boolean get() = episode != null
     val progressMediaType: String get() = if (isEpisode) "episode" else "movie"
+
+    /** The copy to play: the one picked, else this movie's or episode's best. */
+    val preferredLibraryVersion: LibraryVersion?
+        get() = libraryVersion ?: library?.best(episode?.season, episode?.episode)
+
+    /**
+     * An unmatched library file (a home video): its progress is keyed by its stream path, as in
+     * the Expo app, since no catalog id names it.
+     */
+    val isUnmatchedLibraryFile: Boolean get() = libraryVersion != null && !title.hasCatalogIds
 
     /** Exact start position in seconds (a percentage resume is applied once the duration is known). */
     val startPosition: Double? get() = (start as? StartPoint.Seconds)?.value
@@ -54,7 +73,8 @@ data class PlaybackRequest(
         get() {
             val next = following.firstOrNull() ?: return null
             val art = listOfNotNull(next.imageUrl) + backdrops.filter { it != episode?.imageUrl && it != next.imageUrl }
-            return copy(episode = next, start = null, following = following.drop(1), backdrops = art)
+            // It plays its own library copy, if it has one.
+            return copy(episode = next, start = null, following = following.drop(1), backdrops = art, libraryVersion = null)
         }
 
     val displayTitle: String get() = episode?.let { "${title.name} · ${it.code}" } ?: title.name
@@ -74,7 +94,8 @@ data class PlaybackRequest(
             t.imdbId?.let { put("imdb", it) }
             t.tvdbId?.let { put("tvdb", it) }
             t.year?.let { put("year", it.toString()) }
-            t.posterUrl?.takeIf { it.isNotEmpty() }?.let { put("posterUrl", it) }
+            // Absolute art only: a library poster's server path means nothing in a notification.
+            t.posterUrl?.takeIf { it.startsWith("http") }?.let { put("posterUrl", it) }
             put("title", t.name)
             if (episode != null) {
                 put("itemId", episode.itemId ?: "${t.titleId}:${episode.code}")
@@ -89,8 +110,15 @@ data class PlaybackRequest(
             }
         }
 
-    /** The `/history/progress` body for a position in this playback. */
-    fun progressReport(position: Double, duration: Double, paused: Boolean, ended: Boolean): JsonObject = buildJsonObject {
+    /** [streamMetadataQuery] for the stream at `path`: an unmatched library file goes by its path. */
+    fun streamMetadata(path: String): Map<String, String> =
+        if (isUnmatchedLibraryFile) streamMetadataQuery - setOf("seriesId", "titleId") + ("itemId" to path) else streamMetadataQuery
+
+    /**
+     * The `/history/progress` body for a position in this playback. A library file names its
+     * `sourcePath`, which is how the server knows to report the playback to Plex or Jellyfin.
+     */
+    fun progressReport(position: Double, duration: Double, paused: Boolean, ended: Boolean, sourcePath: String? = null): JsonObject = buildJsonObject {
         val t = title
         put("mediaType", progressMediaType)
         put("position", position)
@@ -98,6 +126,20 @@ data class PlaybackRequest(
         put("timestamp", Instant.now().toString())
         put("isPaused", paused)
         put("playbackEnded", ended)
+        if (libraryVersion != null && sourcePath != null) put("sourcePath", sourcePath)
+        if (isUnmatchedLibraryFile && sourcePath != null) {
+            // Keyed by the stream path, with no catalog ids (the Expo app's rule).
+            put("itemId", sourcePath)
+            if (episode != null) {
+                put("seasonNumber", episode.season)
+                put("episodeNumber", episode.episode)
+                put("seriesName", t.name)
+                episode.name?.let { put("episodeName", it) }
+            } else {
+                put("movieName", t.name)
+            }
+            return@buildJsonObject
+        }
         put("externalIds", buildJsonObject {
             put("titleId", t.titleId)
             t.tmdbId?.let { put("tmdb", it) }
@@ -116,6 +158,6 @@ data class PlaybackRequest(
         } else {
             put("movieName", t.name)
         }
-        t.posterUrl?.let { put("posterUrl", it) }
+        t.posterUrl?.takeIf { it.startsWith("http") }?.let { put("posterUrl", it) }
     }
 }

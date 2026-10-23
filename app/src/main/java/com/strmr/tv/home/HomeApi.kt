@@ -1,6 +1,7 @@
 package com.strmr.tv.home
 
 import com.strmr.tv.api.ApiClient
+import com.strmr.tv.api.libraryPage
 import com.strmr.tv.api.ContinueWatchingItem
 import com.strmr.tv.api.DisplayListPage
 import com.strmr.tv.api.ListedTitle
@@ -159,6 +160,7 @@ suspend fun ApiClient.browsePage(
     list: BrowseList, limit: Int, offset: Int = 0, extra: Map<String, String> = emptyMap(), phase: ShelfPhase? = null,
     options: BrowseOptions? = null,
 ): BrowsePage {
+    if (list is BrowseList.Library) return libraryPage(list.library, options, limit, offset)
     // Continue Watching's own shape: the whole feed, paged here.
     if (list == BrowseList.ContinueWatching) {
         // Opened from a Home view: only that view's kind, as its row shows.

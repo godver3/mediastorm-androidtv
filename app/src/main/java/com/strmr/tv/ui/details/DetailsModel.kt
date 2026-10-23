@@ -18,14 +18,22 @@ import com.strmr.tv.api.Title
 import com.strmr.tv.api.TrailerList
 import com.strmr.tv.api.collectionMovies
 import com.strmr.tv.api.detailsBundle
+import com.strmr.tv.api.libraryMatches
 import com.strmr.tv.api.setWatched
 import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.ReleaseBadge
+import com.strmr.tv.library.LibraryVersion
+import com.strmr.tv.library.LibraryVersions
 import com.strmr.tv.player.ManualSourceTracks
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.player.PrequeuePick
 import com.strmr.tv.player.PlaybackRequest
+import com.strmr.tv.player.playLibrary
 import kotlin.random.Random
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * A details page's data and decisions, from one `/details-bundle` call: metadata, seasons
@@ -67,6 +75,32 @@ class DetailsModel(val target: DetailsTarget) {
     private var resume: ResumeState? = null
     /** Fixed per page, so the stream-start art order doesn't reshuffle between plays. */
     private val artSeed = Random.nextLong()
+    /**
+     * The title's copies in the profile's local, Plex and Jellyfin libraries (null: none, or not
+     * looked up yet). Play uses the best copy of the movie or episode (local first, by user
+     * decision); Versions lists them all, and Choose Source still searches for streams.
+     */
+    var library by mutableStateOf<LibraryVersions?>(null)
+        private set
+    /** Completes once the libraries have been asked (with the copies, or null). */
+    private val libraryLookup = CompletableDeferred<LibraryVersions?>()
+
+    /** Looks the title up in the libraries, once per page (not on every reload after playback). */
+    suspend fun loadLibrary() {
+        if (libraryLookup.isCompleted) return
+        val versions = runCatching { LibraryVersions.of(ApiClient.libraryMatches(target)) }.getOrNull()?.takeUnless { it.isEmpty }
+        library = versions
+        libraryLookup.complete(versions)
+    }
+
+    /** The copies of a movie (no episode) or of one episode, best first. */
+    fun libraryVersions(episode: Episode?): List<LibraryVersion> {
+        val all = library ?: return emptyList()
+        return if (episode == null) { if (target.isMovie) all.movie else emptyList() } else all.versions(episode.seasonNumber, episode.episodeNumber)
+    }
+
+    /** The copies of what the primary button plays. */
+    val primaryVersions: List<LibraryVersion> get() = libraryVersions(if (target.isMovie) null else primaryEpisode)
 
     /** Specials last, so the season chips open on real seasons. */
     val visibleSeasons: List<Season> get() = seasons.filter { it.number > 0 } + seasons.filter { it.number == 0 }
@@ -169,8 +203,21 @@ class DetailsModel(val target: DetailsTarget) {
             return if (at != null) Primary(ep, at, "Resume ${ep.code} · ${at.label}") else Primary(ep, null, "Play ${ep.code}")
         }
 
-    fun play(episode: Episode?, start: StartPoint?, picks: PrequeuePick? = null) =
-        PlaybackCoordinator.play(request(episode, start), picks)
+    /**
+     * Play, through the library when it has the movie or episode. A press while the lookup is still
+     * running waits for it, so a library title never starts a search by mistake.
+     */
+    fun play(episode: Episode?, start: StartPoint?, picks: PrequeuePick? = null) {
+        if (libraryLookup.isCompleted) return PlaybackCoordinator.play(request(episode, start), picks)
+        MainScope().launch {
+            val versions = withTimeoutOrNull(8_000) { libraryLookup.await() }
+            PlaybackCoordinator.play(request(episode, start).copy(library = versions), picks)
+        }
+    }
+
+    /** A copy picked in Versions. */
+    fun playVersion(version: LibraryVersion, episode: Episode?, start: StartPoint?) =
+        PlaybackCoordinator.playLibrary(request(episode, start), version)
 
     fun play(source: SourceResult, episode: Episode?, start: StartPoint?, manual: ManualSourceTracks? = null) =
         PlaybackCoordinator.play(request(episode, start), source, manual)
@@ -186,6 +233,7 @@ class DetailsModel(val target: DetailsTarget) {
             backdrops = listOfNotNull(episode?.image?.url) + art,
             logoUrl = title?.logo?.url ?: target.logoUrl,
             following = episode?.let { airedEpisodes(it) }.orEmpty(),
+            library = library,
         )
     }
 

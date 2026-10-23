@@ -37,6 +37,8 @@ data class PlayerSession(
     val manualTracks: Boolean = false,
     /** Switch Source: the languages that were playing, applied over this stream's choice. */
     val carried: CarriedTracks? = null,
+    /** A library file: no server track choice, so the profile's languages pick the tracks here. */
+    val pickTracksOnDevice: Boolean = false,
     /** A recording still recording, over a growing HLS session: opens another one if its playlist ends early. */
     val growingRestart: (suspend () -> LiveStream)? = null,
     /** A live channel: tunes it again when its source drops ([LiveRetune]). */
@@ -50,4 +52,5 @@ data class ResolvedStream(
     val releaseName: String? = null,
     val subtitleStreams: List<SubtitleStreamInfo> = emptyList(),
     val manualTracks: Boolean = false,
+    val pickTracksOnDevice: Boolean = false,
 )

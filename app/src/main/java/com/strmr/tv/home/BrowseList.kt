@@ -1,5 +1,7 @@
 package com.strmr.tv.home
 
+import com.strmr.tv.api.LibraryEntry
+import com.strmr.tv.api.LibraryRef
 import com.strmr.tv.api.Title
 import kotlinx.serialization.Serializable
 
@@ -31,6 +33,8 @@ sealed class BrowseList {
     data class Service(val service: StreamingService, val part: Int = 0) : BrowseList()
     /** "Because You Watched": titles like a Continue Watching title, with its backdrop for the tile. */
     data class Similar(val tmdbId: String, val kind: BrowseKind, val seed: String, val backdrop: String?) : BrowseList()
+    /** A local, Plex or Jellyfin library, paged from `/api/library` ([com.strmr.tv.api.libraryPage]). */
+    data class Library(val library: LibraryRef) : BrowseList()
 
     val title: String
         get() = when (this) {
@@ -48,6 +52,7 @@ sealed class BrowseList {
             is Remote -> name
             is Service -> service.name + (service.lists.getOrNull(part)?.title?.let { " · $it" } ?: "")
             is Similar -> "Because You Watched $seed"
+            is Library -> library.name
         }
 
     /** Remote lists the server can page without reading the whole source first. */
@@ -81,6 +86,7 @@ sealed class BrowseList {
             is Remote -> params
             is Service -> mapOf("source" to "mdblist", "name" to service.name, "url" to (service.lists.getOrNull(part)?.url ?: ""))
             is Similar -> mapOf("source" to "similar", "tmdbId" to tmdbId, "mediaType" to kind.mediaType)
+            is Library -> emptyMap()
         }
 
     companion object {
@@ -144,6 +150,7 @@ sealed interface BrowseEntry {
     data class TitleEntry(val title: Title) : BrowseEntry
     data class ItemEntry(val item: WatchlistItem) : BrowseEntry
     data class WatchingEntry(val item: com.strmr.tv.api.ContinueWatchingItem) : BrowseEntry
+    data class LibraryItemEntry(val entry: LibraryEntry) : BrowseEntry
 }
 
 /** A page of a list, with the genre facets and first letters present when the source filters server-side. */

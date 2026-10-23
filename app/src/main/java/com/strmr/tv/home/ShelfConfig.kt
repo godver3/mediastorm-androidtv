@@ -18,6 +18,8 @@ data class ShelfConfig(
     /** Which calendar sources a recently-aired shelf takes (watchlist only when unset). */
     val calendarSources: CalendarSources? = null,
     val listUrl: String? = null,
+    /** A library shelf's library (`type: library`). */
+    val libraryId: String? = null,
     val addonManifestUrl: String? = null,
     val addonCatalogType: String? = null,
     val addonCatalogId: String? = null,
@@ -50,6 +52,17 @@ data class ShelfConfig(
     )
 
     val title: String get() = name?.takeIf { it.isNotEmpty() } ?: id
+
+    /**
+     * A library shelf's library: `type: library` with `libraryId`, or the legacy
+     * `local-library-<id>` shelf (as the Expo app reads them). Null for other shelves.
+     */
+    val libraryID: String?
+        get() {
+            if (type != "library" && type != "local-library") return null
+            libraryId?.trim()?.ifEmpty { null }?.let { return it }
+            return id.removePrefix("local-library-").takeIf { it != id && it.isNotEmpty() }
+        }
 
     /**
      * The `display-list` query for a remote list shelf, as the server builds it for Home

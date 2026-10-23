@@ -4,6 +4,7 @@ import com.strmr.tv.R
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ContinueWatchingItem
 import com.strmr.tv.api.Profile
+import com.strmr.tv.api.libraryGroups
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -134,6 +135,15 @@ data class PlannedShelf(
                 },
             )
             HomeSource.LiveFavorites -> HomeShelf(id, config.title, api.favoriteChannelCards(cap), cap)
+            is HomeSource.Library -> {
+                // Newest first for every source (Plex and Jellyfin default to A–Z), in the view's media type.
+                val page = api.libraryGroups(s.library.id, wanted, sort = "created", mediaType = settings.filter.mediaType)
+                HomeShelf(
+                    id, s.library.name, page.groups.map { HomeCard.from(com.strmr.tv.api.LibraryEntry(s.library, it)) }, cap = cap,
+                    list = if (limited) null else BrowseList.Library(s.library), exploreFirst = exploreFirst,
+                    reportedTotal = if (limited) minOf(page.groups.size, cap) else page.total,
+                )
+            }
         }
     }
 
@@ -144,8 +154,8 @@ data class PlannedShelf(
         const val FIRST_PAGE = 30
 
         /**
-         * The enabled shelves in order, minus those the app can't show yet (watch rooms,
-         * libraries) and those a kids profile doesn't get. A curated kids profile gets a row
+         * The enabled shelves in order, minus those the app can't show yet (watch rooms) and
+         * those a kids profile doesn't get. A curated kids profile gets a row
          * per allowed list instead of the open-ended ones (trending, Top 10, services).
          */
         fun plan(settings: HomeSettings, profile: Profile?): List<PlannedShelf> {

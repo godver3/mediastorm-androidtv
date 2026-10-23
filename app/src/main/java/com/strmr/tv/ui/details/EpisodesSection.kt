@@ -53,6 +53,7 @@ import com.strmr.tv.home.ReleaseBadge
 import com.strmr.tv.ui.CardFocusScale
 import com.strmr.tv.ui.captionGap
 import com.strmr.tv.ui.Accent
+import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.ContentMargin
 import com.strmr.tv.ui.DialogChoice
@@ -71,6 +72,7 @@ fun EpisodesSection(
     model: DetailsModel,
     onPlay: (Episode) -> Unit,
     onChooseSource: (Episode) -> Unit,
+    onChooseVersion: (Episode) -> Unit,
     onToggleWatched: (Episode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -78,7 +80,8 @@ fun EpisodesSection(
     menuFor?.let { ep ->
         ChoiceDialog(
             title = "${ep.code} · ${ep.name}",
-            choices = listOf(
+            choices = listOfNotNull(
+                DialogChoice("Choose Version") { onChooseVersion(ep) }.takeIf { model.libraryVersions(ep).isNotEmpty() },
                 DialogChoice("Choose Source") { onChooseSource(ep) },
                 DialogChoice(if (model.isWatched(ep)) "Mark as Unwatched" else "Mark as Watched") { onToggleWatched(ep) },
                 DialogChoice("Cancel") {},
@@ -130,6 +133,7 @@ fun EpisodesSection(
                         ep,
                         fallbackImage = model.title?.backdrop?.url ?: model.target.backdropUrl,
                         watched = model.isWatched(ep),
+                        inLibrary = model.libraryVersions(ep).isNotEmpty(),
                         // Marking an episode watched or unwatched clears its progress on the server.
                         progress = if (model.isWatched(ep) == (ep.watched == true)) ep.resume?.takeIf { it.eligible }?.fraction ?: 0f else 0f,
                         onClick = { onPlay(ep) },
@@ -149,6 +153,8 @@ private fun EpisodeCard(
     episode: Episode,
     fallbackImage: String?,
     watched: Boolean,
+    /** The episode has a copy in the profile's libraries (Play uses it). */
+    inLibrary: Boolean,
     progress: Float,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -181,6 +187,12 @@ private fun EpisodeCard(
                         modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = if (progress > 0.01f) 16.dp else 8.dp)
                             .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
                     )
+                }
+                if (inLibrary) {
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = if (progress > 0.01f) 16.dp else 8.dp)
+                            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
+                    ) { Icon(AppIcons.Library, contentDescription = "In your library", tint = Color.White, modifier = Modifier.size(13.dp)) }
                 }
                 if (progress > 0.01f) ProgressLine(progress, Modifier.align(Alignment.BottomStart).padding(8.dp))
             }

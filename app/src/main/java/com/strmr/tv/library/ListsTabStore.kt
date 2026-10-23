@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ContinueWatchingItem
+import com.strmr.tv.api.LibraryInfo
+import com.strmr.tv.api.libraries
 import com.strmr.tv.home.ShelfConfig
 import com.strmr.tv.home.continueWatching
 import com.strmr.tv.home.homeSettings
@@ -25,9 +27,12 @@ object ListsTabStore {
     /** null until the first load. */
     var continueWatching by mutableStateOf<List<ContinueWatchingItem>?>(null)
         private set
+    /** The local, Plex and Jellyfin libraries the profile may browse (empty until loaded). */
+    var libraries by mutableStateOf<List<LibraryInfo>>(emptyList())
+        private set
     private var refreshing: CompletableDeferred<Unit>? = null
 
-    /** Loads both; concurrent callers share one request, and a failure keeps what was shown. */
+    /** Loads them all; concurrent callers share one request, and a failure keeps what was shown. */
     suspend fun refresh() {
         refreshing?.let { return it.await() }
         val done = CompletableDeferred<Unit>()
@@ -37,12 +42,15 @@ object ListsTabStore {
             coroutineScope {
                 val loadedShelves = async { runCatching { ApiClient.homeSettings().shelves }.getOrNull() }
                 val loadedItems = async { runCatching { ApiClient.continueWatching() }.getOrNull() }
+                val loadedLibraries = async { runCatching { ApiClient.libraries() }.getOrNull() }
                 val newShelves = loadedShelves.await()
                 val newItems = loadedItems.await()
+                val newLibraries = loadedLibraries.await()
                 // A profile switch mid-load: the old profile's rows mustn't land on the new one.
                 if (profile != ApiClient.profileId) return@coroutineScope
                 newShelves?.let { shelves = it }
                 newItems?.let { continueWatching = it }
+                newLibraries?.let { libraries = it }
             }
         } finally {
             refreshing = null
@@ -54,5 +62,6 @@ object ListsTabStore {
     fun reset() {
         shelves = null
         continueWatching = null
+        libraries = emptyList()
     }
 }

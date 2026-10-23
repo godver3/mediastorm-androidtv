@@ -74,8 +74,12 @@ val BrowseList.sorts: List<BrowseSort>
         is BrowseList.Custom, BrowseList.Watchlist, BrowseList.PermanentPrequeue -> BrowseSort.entries
         is BrowseList.Genre, is BrowseList.Decade, is BrowseList.Remote, is BrowseList.Service, is BrowseList.Trending ->
             listOf(BrowseSort.DEFAULT, BrowseSort.NAME, BrowseSort.YEAR, BrowseSort.RATING)
+        is BrowseList.Library -> listOf(BrowseSort.DEFAULT, BrowseSort.ADDED, BrowseSort.NAME, BrowseSort.YEAR)
         else -> emptyList()
     }
+
+/** The A–Z index under a Name sort: the profile's own lists and libraries. */
+val BrowseList.indexesLetters: Boolean get() = filters || this is BrowseList.Library
 
 /** Movies / Shows, watch status, genre facets and the A–Z index: the profile's own lists. */
 val BrowseList.filters: Boolean

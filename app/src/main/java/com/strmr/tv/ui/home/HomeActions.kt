@@ -43,6 +43,7 @@ import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.LocalNavigator
 import com.strmr.tv.ui.MessageDialog
 import com.strmr.tv.ui.Page
+import com.strmr.tv.ui.library.rememberLibraryOpener
 import com.strmr.tv.ui.onboarding.FormField
 import kotlinx.coroutines.launch
 
@@ -58,6 +59,7 @@ fun rememberCardHandler(settings: () -> HomeSettings? = { null }): (HomeCard) ->
     var asking by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var finding by remember { mutableStateOf(false) }
+    val openLibrary = rememberLibraryOpener()
 
     if (asking) AskAIDialog(onAsk = { navigator.openList(BrowseList.askAI(it)) }, onDismiss = { asking = false })
     error?.let { MessageDialog("Couldn't Pick a Title", it) { error = null } }
@@ -68,6 +70,7 @@ fun rememberCardHandler(settings: () -> HomeSettings? = { null }): (HomeCard) ->
             is HomeLink.OpenList -> navigator.openList(link.list, settings()?.viewQuery)
             is HomeLink.Channel -> PlaybackCoordinator.playLive(link.channel, link.program?.title)
             is HomeLink.Person -> navigator.open(Page.Person(link.person))
+            is HomeLink.Library -> openLibrary(link.entry)
             is HomeLink.Action -> when (link.action) {
                 HomeAction.ASK_AI -> asking = true
                 HomeAction.SURPRISE -> if (!finding) {

@@ -62,10 +62,15 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** The video's display aspect (0 until known), so subtitles sit on the picture. */
     val videoAspect = MutableStateFlow(0f)
 
-    /** The track preferences after this device's overrides (Settings › Playback). */
-    val effectiveTracks = if (session.manualTracks) {
-        EffectiveTracks.resolve(session.tracks, session.playback, null, null, null)
-    } else EffectiveTracks.current(session.tracks, session.playback)
+    /**
+     * The track preferences after this device's overrides (Settings › Playback). A library file
+     * has no server choice to map: the profile's languages pick both kinds here.
+     */
+    val effectiveTracks = when {
+        session.manualTracks -> EffectiveTracks.resolve(session.tracks, session.playback, null, null, null)
+        session.pickTracksOnDevice -> EffectiveTracks.current(null, session.playback).copy(clientAudio = true, clientSubtitles = true)
+        else -> EffectiveTracks.current(session.tracks, session.playback)
+    }
     private val prefs = TrackPreferences(session.tracks, effectiveTracks)
     private var prefsApplied = false
     private var startApplied = false
@@ -257,7 +262,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     fun report(paused: Boolean = false, ended: Boolean = false) {
         if (!session.reportsProgress) return
         val (position, duration) = times() ?: return
-        val body = request.progressReport(position, duration, paused, ended)
+        val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath)
         scope.launch { withContext(NonCancellable) { ApiClient.reportProgress(body) } }
     }
 

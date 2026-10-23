@@ -71,9 +71,15 @@ object PlaybackCoordinator {
 
     /**
      * Plays through the prequeue. [picks], made on details for the stream its prequeue resolved,
-     * replace the server's choice when Play resolves that same stream.
+     * replace the server's choice when Play resolves that same stream. A movie or episode with a
+     * library copy plays that instead ([playLibrary]).
      */
-    fun play(request: PlaybackRequest, picks: PrequeuePick? = null) = begin(request, "Searching…", resolve = {
+    fun play(request: PlaybackRequest, picks: PrequeuePick? = null) {
+        request.preferredLibraryVersion?.let { return playLibrary(request, it) }
+        playThroughPrequeue(request, picks)
+    }
+
+    private fun playThroughPrequeue(request: PlaybackRequest, picks: PrequeuePick?) = begin(request, "Searching…", resolve = {
         val status = resolveStream(request)
         val subtitles = status.subtitleTracks.orEmpty()
         when {
@@ -99,7 +105,8 @@ object PlaybackCoordinator {
      * [carried] (Switch Source) re-applies the languages that were playing.
      */
     fun play(request: PlaybackRequest, source: SourceResult, manual: ManualSourceTracks? = null, carried: CarriedTracks? = null) =
-        begin(request, "Preparing…", carried = carried, resolve = {
+        // A stream picked over a library copy (Switch Source) is no longer that copy.
+        begin(request.copy(libraryVersion = null), "Preparing…", carried = carried, resolve = {
             val (path, tracks) = ApiClient.resolveSource(source, request.title.titleId, request.startPosition)
             if (manual == null || manual.choice.isEmpty) {
                 ResolvedStream(path, tracks, source.title)
@@ -157,7 +164,7 @@ object PlaybackCoordinator {
         detail.value = null
     }
 
-    private fun begin(
+    internal fun begin(
         request: PlaybackRequest,
         firstStage: String,
         live: (suspend () -> LiveStream)? = null,
@@ -180,9 +187,10 @@ object PlaybackCoordinator {
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
                     val r = resolve()
-                    PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadataQuery), r.tracks, streamPath = r.path,
+                    PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path)), r.tracks, streamPath = r.path,
                                   releaseName = r.releaseName?.ifEmpty { null } ?: releaseFileName(r.path), subtitleStreams = r.subtitleStreams,
-                                  playback = settings.await(), manualTracks = r.manualTracks, carried = carried)
+                                  playback = settings.await(), manualTracks = r.manualTracks, carried = carried,
+                                  pickTracksOnDevice = r.pickTracksOnDevice)
                 }
                 stage.value = "Starting…"
                 detail.value = null
@@ -223,6 +231,7 @@ object PlaybackCoordinator {
      * profile every ten minutes.
      */
     fun prewarm(target: DetailsTarget) {
+        if (target.fromLibrary) return // Play uses the library's copy
         val profile = ApiClient.profileId
         warmed?.let { if (it.titleId == target.titleId && it.profile == profile && System.currentTimeMillis() - it.started < 600_000) return }
         // No episode or start point: the server targets the series' next-up episode.
@@ -273,6 +282,7 @@ object PlaybackCoordinator {
      * [play] adopts it like a details-page prewarm.
      */
     fun prefetch(request: PlaybackRequest) {
+        if (request.preferredLibraryVersion != null) return // plays its library copy
         val profile = ApiClient.profileId
         val body = prequeueBody(request)
         val task = scope.async {

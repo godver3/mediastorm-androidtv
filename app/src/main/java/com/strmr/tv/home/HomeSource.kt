@@ -19,6 +19,8 @@ sealed interface HomeSource {
     data class Hub(val links: kotlin.collections.List<HubLink>) : HomeSource
     /** The profile's favorite live channels. */
     data object LiveFavorites : HomeSource
+    /** A local, Plex or Jellyfin library's newest titles. */
+    data class Library(val library: com.strmr.tv.api.LibraryRef) : HomeSource
 
     data class HubLink(val id: String, val name: String, val list: BrowseList, val art: String?, val logo: String?)
 
@@ -50,6 +52,9 @@ sealed interface HomeSource {
                 List(BrowseList.Remote(config.id, config.title, q), ranked = false)
             }
             else -> when {
+                config.libraryID != null -> Library(
+                    com.strmr.tv.api.LibraryRef(config.libraryID!!, if (config.name.isNullOrEmpty()) "Recently Added" else config.title),
+                )
                 config.type == "collection-hub" -> {
                     val byId = all.associateBy { it.id }
                     val links = (config.collectionItems ?: emptyList())

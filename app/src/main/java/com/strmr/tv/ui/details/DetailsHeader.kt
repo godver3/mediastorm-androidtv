@@ -62,6 +62,7 @@ fun BoxScope.DetailsHeader(
     trailer: TrailerController,
     onPlay: (DetailsModel.Primary) -> Unit,
     onStartOver: (DetailsModel.Primary) -> Unit,
+    onVersions: () -> Unit,
     onChooseSource: () -> Unit,
     prequeueTracks: PrequeueTracks,
     warm: WarmPrequeue?,
@@ -130,6 +131,7 @@ fun BoxScope.DetailsHeader(
                     Text("Start Over")
                 }
             }
+            VersionsButton(model, onVersions)
             // Secondary actions are icon-only, as on the Expo details page.
             IconButton(onClick = onChooseSource, enabled = target.isMovie || model.primaryEpisode != null) {
                 Icon(Icons.Filled.Search, contentDescription = "Choose Source")
@@ -150,6 +152,29 @@ fun BoxScope.DetailsHeader(
             }
             WatchedButton(model, onWatchState)
             IconButton(onClick = onMore) { Icon(AppIcons.MoreHoriz, contentDescription = "More") }
+        }
+    }
+}
+
+/**
+ * The library copies of what Play plays (icon-only, like Choose Source); focused, its caption names
+ * the copy Play uses. Hidden when the libraries have none.
+ */
+@Composable
+private fun VersionsButton(model: DetailsModel, onVersions: () -> Unit) {
+    val versions = model.primaryVersions
+    val best = versions.firstOrNull() ?: return
+    var focused by remember { mutableStateOf(false) }
+    Box(contentAlignment = Alignment.BottomCenter) {
+        IconButton(onClick = onVersions, modifier = Modifier.onFocusChanged { focused = it.isFocused }) {
+            Icon(AppIcons.Library, contentDescription = "Versions")
+        }
+        if (focused) {
+            Text(
+                (if (versions.size > 1) "${versions.size} versions · " else "") + "${best.source.label} · ${best.quality}",
+                fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f), maxLines = 1,
+                modifier = Modifier.floatingBelow(),
+            )
         }
     }
 }

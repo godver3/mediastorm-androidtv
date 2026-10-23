@@ -2,6 +2,7 @@ package com.strmr.tv.home
 
 import com.strmr.tv.api.ContinueWatchingItem
 import com.strmr.tv.api.DetailsTarget
+import com.strmr.tv.api.LibraryEntry
 import com.strmr.tv.api.PersonRef
 import com.strmr.tv.api.Title
 import com.strmr.tv.live.EpgProgram
@@ -18,6 +19,11 @@ sealed interface HomeLink {
     data class Channel(val channel: LiveChannel, val program: EpgProgram?) : HomeLink
     /** A person (a Search result): opens their page. */
     data class Person(val person: PersonRef) : HomeLink
+    /**
+     * An unmatched library title, which has no details page: plays the file, or opens the show's
+     * library episodes ([com.strmr.tv.ui.library.rememberLibraryOpener]). Matched ones open [Details].
+     */
+    data class Library(val entry: LibraryEntry) : HomeLink
 }
 
 enum class HomeAction { SURPRISE, ASK_AI }
@@ -128,6 +134,22 @@ data class HomeCard(
             is BrowseEntry.TitleEntry -> from(entry.title)
             is BrowseEntry.ItemEntry -> from(entry.item)
             is BrowseEntry.WatchingEntry -> from(entry.item)
+            is BrowseEntry.LibraryItemEntry -> from(entry.entry)
+        }
+
+        /** A library title (Home library rows, library grids). */
+        fun from(entry: LibraryEntry): HomeCard {
+            val group = entry.group
+            return HomeCard(
+                id = entry.id,
+                link = entry.detailsTarget?.let { HomeLink.Details(it) } ?: HomeLink.Library(entry),
+                title = group.title,
+                subtitle = kindLine(group.year, !group.isShow),
+                overview = group.overview,
+                backdropUrl = group.backdropUrl,
+                artworkUrl = group.backdropUrl ?: group.posterUrl,
+                posterUrl = group.posterUrl,
+            )
         }
     }
 }

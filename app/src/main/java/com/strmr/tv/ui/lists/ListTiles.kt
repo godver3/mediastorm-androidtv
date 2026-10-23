@@ -69,6 +69,8 @@ data class TileSpec(
     val count: Int? = null,
     val art: TileArt? = null,
     val logo: String? = null,
+    /** Under the name when there is no count (a library's source and kind). */
+    val subtitle: String? = null,
 )
 
 /** A titled row of list tiles; focus returns to the tile last focused in it, as on Home. */
@@ -123,20 +125,21 @@ private fun ListTile(tile: TileSpec, position: Int, onClick: () -> Unit) {
                     if (backdrop != null) AsyncImage(Artwork.url(backdrop, "w780"), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 }
             }
-            if (tile.logo == null) Label(name, tile.count, Modifier.align(Alignment.BottomStart))
+            if (tile.logo == null) Label(name, tile.count, tile.subtitle, Modifier.align(Alignment.BottomStart))
         }
     }
 }
 
 @Composable
-private fun Label(name: String, count: Int?, modifier: Modifier) {
+private fun Label(name: String, count: Int?, subtitle: String?, modifier: Modifier) {
     Column(
         modifier.fillMaxWidth()
             .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.85f)))
             .padding(start = 11.dp, end = 11.dp, top = 20.dp, bottom = 8.dp),
     ) {
         Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        count?.let { Text(if (it == 1) "1 title" else "$it titles", fontSize = 12.5.sp, color = Color.White.copy(alpha = 0.6f)) }
+        val line = count?.let { if (it == 1) "1 title" else "$it titles" } ?: subtitle
+        line?.let { Text(it, fontSize = 12.5.sp, color = Color.White.copy(alpha = 0.6f)) }
     }
 }
 
@@ -195,11 +198,13 @@ private object BrowsePreviews {
         is BrowseEntry.TitleEntry -> (e.title.textPoster ?: e.title.poster)?.url
         is BrowseEntry.ItemEntry -> e.item.textPosterUrl ?: e.item.posterUrl
         is BrowseEntry.WatchingEntry -> e.item.textPosterUrl ?: e.item.posterUrl
+        is BrowseEntry.LibraryItemEntry -> e.entry.group.posterUrl
     }
 
     private fun backdropOf(e: BrowseEntry): String? = when (e) {
         is BrowseEntry.TitleEntry -> e.title.backdrop?.url
         is BrowseEntry.ItemEntry -> e.item.backdropUrl
         is BrowseEntry.WatchingEntry -> e.item.backdropUrl
+        is BrowseEntry.LibraryItemEntry -> e.entry.group.backdropUrl
     }
 }

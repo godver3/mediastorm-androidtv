@@ -69,6 +69,11 @@ fun ListsScreen() {
                 naming = true
             }
         }
+        // The profile's local, Plex and Jellyfin libraries, each opening its titles.
+        val libraries = ListsTabStore.libraries
+        if (libraries.isNotEmpty()) item("libraries") {
+            TileRow("Libraries", libraries.map { TileSpec(BrowseList.Library(it.ref), subtitle = it.tileSubtitle) })
+        }
         // Rows from the shelf config wait for it, rather than showing the default services and then swapping them.
         if (loadedShelves != null) item("services") {
             val services = StreamingService.resolved(shelves.firstOrNull { it.id == "streaming-services" }?.streamingServices)

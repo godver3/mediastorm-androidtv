@@ -34,8 +34,10 @@ import com.strmr.tv.home.BrowseOptions
 import com.strmr.tv.home.BrowseSort
 import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.HomeCard
+import com.strmr.tv.home.HomeLink
 import com.strmr.tv.home.browsePage
 import com.strmr.tv.home.filters
+import com.strmr.tv.home.indexesLetters
 import com.strmr.tv.home.offersRandom
 import com.strmr.tv.home.sorts
 import com.strmr.tv.library.CustomListsStore
@@ -44,6 +46,7 @@ import com.strmr.tv.library.TitleActions
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.LocalNavigator
+import com.strmr.tv.ui.Page
 import com.strmr.tv.ui.pageBackground
 import com.strmr.tv.ui.PageMargin
 import com.strmr.tv.ui.PosterGrid
@@ -184,10 +187,18 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
         picking = true
         scope.launch {
             try {
-                val offset = (0 until count).random()
-                val entry = if (offset < entries.size && fetched == entries.size) entries[offset]
-                else runCatching { ApiClient.browsePage(shown, limit = 1, offset = offset, extra = query, options = options).entries.firstOrNull() }.getOrNull()
-                entry?.let { HomeCard.from(it).target }?.let(navigator::openDetails)
+                // A library's unmatched files have no page to open: try a few other picks.
+                repeat(6) {
+                    val offset = (0 until count).random()
+                    val entry = if (offset < entries.size && fetched == entries.size) entries[offset]
+                    else runCatching { ApiClient.browsePage(shown, limit = 1, offset = offset, extra = query, options = options).entries.firstOrNull() }.getOrNull()
+                        ?: return@launch
+                    val link = HomeCard.from(entry).link
+                    when {
+                        link is HomeLink.Details -> return@launch navigator.openDetails(link.target)
+                        link is HomeLink.Library && link.entry.group.isShow -> return@launch navigator.open(Page.LibraryShow(link.entry))
+                    }
+                }
             } finally {
                 picking = false
             }
@@ -220,7 +231,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                             )
                         }
                         actionError?.let { Text(it, color = Color(0xFFFF6B6B)) }
-                        if (list.filters && options.sort == BrowseSort.NAME && letters.isNotEmpty()) {
+                        if (list.indexesLetters && options.sort == BrowseSort.NAME && letters.isNotEmpty()) {
                             LetterIndex(letters, options.letter) { options = options.copy(letter = it) }
                         }
                     }

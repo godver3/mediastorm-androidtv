@@ -48,12 +48,14 @@ import com.strmr.tv.api.Episode
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.StartPoint
 import com.strmr.tv.library.CustomListsStore
+import com.strmr.tv.library.LibraryVersion
 import com.strmr.tv.player.ManualSourceTracks
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.WithDefaultScroll
 import com.strmr.tv.ui.WithFoldScroll
+import com.strmr.tv.ui.library.LibraryVersionsDialog
 import kotlinx.coroutines.launch
 
 /** The picker's subject: the movie, or one episode. */
@@ -61,6 +63,9 @@ private data class PickerTarget(val episode: Episode?)
 
 /** A picked source waiting on the Resume / Start Over choice. */
 private data class PendingSource(val source: SourceResult, val episode: Episode?, val resumeAt: StartPoint, val manual: ManualSourceTracks?)
+
+/** A library copy picked in Versions, waiting on the Resume / Start Over choice. */
+private data class PendingVersion(val version: LibraryVersion, val episode: Episode?, val resumeAt: StartPoint)
 
 /**
  * A title's page, as on tvOS: a full-bleed backdrop (the trailer plays over it), the header
@@ -78,6 +83,9 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     val prequeueTracks = remember(model) { PrequeueTracks(model) }
     var picker by remember { mutableStateOf<PickerTarget?>(null) }
     var pendingSource by remember { mutableStateOf<PendingSource?>(null) }
+    /** The Versions list (movie, or a specific episode) and a copy picked there. */
+    var versionsFor by remember { mutableStateOf<PickerTarget?>(null) }
+    var pendingVersion by remember { mutableStateOf<PendingVersion?>(null) }
     var headerFocused by remember { mutableStateOf(true) }
     var watchState by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
@@ -91,6 +99,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
             watchState = true
         }
     }
+    LaunchedEffect(model) { model.loadLibrary() }
     // A title action taken elsewhere (a menu over this page, another page): show its new state.
     LaunchedEffect(actions) { if (actions > 0) model.load() }
 
@@ -118,8 +127,14 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     // prompt, Audio & Subtitles, Add to List…, the watch-state screen, or More. They are dialog windows, so the
     // header keeps its focus state under them; this one flag stops the trailer for the visit
     // instead (as the Expo page's dismissTrailerAutoPlay; it doesn't restart when they close).
-    val menuOpen = picker != null || pendingSource != null || prequeueTracks.open || watchState || more || CustomListsStore.picking != null
+    val menuOpen = picker != null || pendingSource != null || versionsFor != null || pendingVersion != null ||
+        prequeueTracks.open || watchState || more || CustomListsStore.picking != null
     LaunchedEffect(menuOpen) { if (menuOpen) trailer.dismiss("menu open") }
+
+    fun chooseVersion(version: LibraryVersion, episode: Episode?) {
+        val resumeAt = model.resumePoint(episode)
+        if (resumeAt != null) pendingVersion = PendingVersion(version, episode, resumeAt) else model.playVersion(version, episode, null)
+    }
 
     fun choose(source: SourceResult, episode: Episode?, manual: ManualSourceTracks?) {
         val resumeAt = model.resumePoint(episode)
@@ -155,6 +170,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
                     model, trailer,
                     onPlay = { p -> model.play(p.episode, p.start, prequeueTracks.pick(warm)) },
                     onStartOver = { p -> model.play(p.episode, null, prequeueTracks.pick(warm)) },
+                    onVersions = { versionsFor = PickerTarget(if (target.isMovie) null else model.primaryEpisode) },
                     onChooseSource = { picker = PickerTarget(if (target.isMovie) null else model.primaryEpisode) },
                     prequeueTracks = prequeueTracks,
                     warm = warm,
@@ -169,6 +185,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
                         model,
                         onPlay = { ep -> model.play(ep, model.resumePoint(ep), prequeueTracks.pick(warm)) },
                         onChooseSource = { ep -> picker = PickerTarget(ep) },
+                        onChooseVersion = { ep -> versionsFor = PickerTarget(ep) },
                         onToggleWatched = { ep -> scope.launch { model.toggleWatched(ep) } },
                         modifier = Modifier.padding(top = 24.dp),
                     )
@@ -186,6 +203,23 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     if (more) DetailsMoreMenu(target, scope, onHidden = { navigator.close() }, onDismiss = { more = false })
     picker?.let { p ->
         SourcePicker(target, p.episode, onPick = { source, manual -> choose(source, p.episode, manual) }, onDismiss = { picker = null })
+    }
+    versionsFor?.let { v ->
+        LibraryVersionsDialog(
+            v.episode?.let { "${target.name} · ${it.code}" } ?: target.name, model.libraryVersions(v.episode),
+            onPick = { chooseVersion(it, v.episode) }, onDismiss = { versionsFor = null },
+        )
+    }
+    pendingVersion?.let { pending ->
+        ChoiceDialog(
+            title = pending.episode?.let { "${target.name} · ${it.code}" } ?: target.name,
+            choices = listOf(
+                DialogChoice("Resume from ${pending.resumeAt.label}") { model.playVersion(pending.version, pending.episode, pending.resumeAt) },
+                DialogChoice("Start Over") { model.playVersion(pending.version, pending.episode, null) },
+                DialogChoice("Cancel") {},
+            ),
+            onDismiss = { pendingVersion = null },
+        )
     }
     pendingSource?.let { pending ->
         ChoiceDialog(
