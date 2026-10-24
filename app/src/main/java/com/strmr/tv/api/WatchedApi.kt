@@ -30,19 +30,28 @@ suspend fun ApiClient.setWatched(watched: Boolean, movie: DetailsTarget) {
 suspend fun ApiClient.setWatched(watched: Boolean, episodes: List<Episode>, series: DetailsTarget, scope: WatchedScope? = null) {
     if (episodes.isEmpty()) return
     val updates = buildJsonArray {
-        for (ep in episodes) add(buildJsonObject {
-            watchedBase(series, watched)
-            put("mediaType", "episode")
-            ep.itemId?.let { put("itemId", it) }
-            put("name", ep.name)
-            put("seriesId", series.titleId)
-            put("seriesName", series.name)
-            put("seasonNumber", ep.seasonNumber)
-            put("episodeNumber", ep.episodeNumber)
-        })
+        for (ep in episodes) add(episodeUpdate(series, watched, ep.itemId, ep.name, ep.seasonNumber, ep.episodeNumber))
     }
     sendRaw("POST", "$profilePath/history/watched/bulk", scope?.let { mapOf("scope" to it.value) } ?: emptyMap(), body = updates)
 }
+
+/** One card's episode (Continue Watching, the calendar), from a long press. */
+suspend fun ApiClient.setWatched(watched: Boolean, episode: CardEpisode, series: DetailsTarget) {
+    val update = episodeUpdate(series, watched, episode.itemId, episode.name, episode.seasonNumber, episode.episodeNumber)
+    sendRaw("POST", "$profilePath/history/watched/bulk", body = buildJsonArray { add(update) })
+}
+
+private fun episodeUpdate(series: DetailsTarget, watched: Boolean, itemId: String?, name: String?, season: Int, episode: Int) =
+    buildJsonObject {
+        watchedBase(series, watched)
+        put("mediaType", "episode")
+        itemId?.let { put("itemId", it) }
+        name?.let { put("name", it) }
+        put("seriesId", series.titleId)
+        put("seriesName", series.name)
+        put("seasonNumber", season)
+        put("episodeNumber", episode)
+    }
 
 private fun JsonObjectBuilder.watchedBase(title: DetailsTarget, watched: Boolean) {
     put("watched", watched)
@@ -59,6 +68,19 @@ suspend fun ApiClient.isMovieWatched(movie: DetailsTarget): Boolean = try {
     send<WatchHistoryRow>("GET", "$profilePath/history/watched/movie/${segment(movie.titleId)}", promptOnLock = false, timeoutMs = 10_000).watched
 } catch (e: ApiError) {
     if (e.statusCode == 404) false else throw e
+}
+
+/**
+ * Whether a card's episode is marked watched (`GET /history/watched/episode/{id}`, by its item
+ * ID or the series ID plus `:sXXeYY`; not found is unwatched).
+ */
+suspend fun ApiClient.isEpisodeWatched(episode: CardEpisode, series: DetailsTarget): Boolean {
+    val id = episode.itemId ?: "${series.titleId}:s%02de%02d".format(episode.seasonNumber, episode.episodeNumber)
+    return try {
+        send<WatchHistoryRow>("GET", "$profilePath/history/watched/episode/${segment(id)}", promptOnLock = false, timeoutMs = 10_000).watched
+    } catch (e: ApiError) {
+        if (e.statusCode == 404) false else throw e
+    }
 }
 
 /** Drops a movie's playback progress (its resume point); none to drop counts as done. */

@@ -1,5 +1,6 @@
 package com.strmr.tv.home
 
+import com.strmr.tv.api.CardEpisode
 import com.strmr.tv.api.ContinueWatchingItem
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.LibraryEntry
@@ -55,6 +56,8 @@ data class HomeCard(
     val rank: Int? = null,
     val certification: String? = null,
     val genre: String? = null,
+    /** The one episode the card stands for, for its long press's Mark as watched. */
+    val episode: CardEpisode? = null,
 ) {
     val target: DetailsTarget? get() = (link as? HomeLink.Details)?.target
 
@@ -89,6 +92,7 @@ data class HomeCard(
                 newEpisode = if (!item.isMovie && ep != null) {
                     NewEpisodeBadge.from(ep.airDate, ep.airDateTimeUTC, item.prequeueStatus)
                 } else null,
+                episode = if (!item.isMovie && ep != null) CardEpisode.from(ep) else null,
             )
         }
 

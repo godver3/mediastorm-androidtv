@@ -62,6 +62,18 @@ data class EpisodeRef(
     val code: String get() = episodeCode(seasonNumber, episodeNumber)
 }
 
+/**
+ * The one episode a card stands for (Continue Watching's next episode, a calendar release),
+ * for its long press's single-episode Mark as watched. [itemId] is the server's, when sent.
+ */
+data class CardEpisode(val seasonNumber: Int, val episodeNumber: Int, val name: String?, val itemId: String?) {
+    val code: String get() = episodeCode(seasonNumber, episodeNumber)
+
+    companion object {
+        fun from(ref: EpisodeRef) = CardEpisode(ref.seasonNumber, ref.episodeNumber, ref.title, ref.itemId)
+    }
+}
+
 /** Title metadata as returned by search, lists and the details endpoints. */
 @Serializable
 data class Title(

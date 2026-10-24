@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.strmr.tv.api.ApiClient
+import com.strmr.tv.api.isEpisodeWatched
 import com.strmr.tv.api.isMovieWatched
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.library.CustomListsStore
@@ -19,10 +20,10 @@ import kotlinx.coroutines.launch
 
 /**
  * A title's long-press menu, in the Expo app's order: on a Continue Watching card Hide from
- * Continue Watching and Set Aside; Remove from Set Aside for a set-aside title; Add to List…;
+ * Continue Watching and Set Aside; Remove from Set Aside for a set-aside title; Manage Lists…;
  * the watchlist toggle; Hide from this profile (Unhide when it is hidden); Mark as watched /
- * unwatched for a movie (its current state read when the menu opens), the bulk watch-state
- * sheet for a series; then any `extra` choices. Actions run in `scope` (the caller's, which
+ * unwatched for a movie or the card's one episode (its current state read when the menu
+ * opens), the bulk watch-state sheet for a series; then any `extra` choices. Actions run in `scope` (the caller's, which
  * outlives the menu) and report failures to `onError`.
  */
 @Composable
@@ -38,8 +39,14 @@ fun TitleMenu(
     val navigator = LocalNavigator.current
     val inWatchlist = WatchlistStore.contains(target)
     var watched by remember { mutableStateOf<Boolean?>(null) }
+    val episode = card.episode
     LaunchedEffect(target.titleId) {
-        if (target.isMovie) watched = runCatching { ApiClient.isMovieWatched(target) }.getOrNull()
+        // Continue Watching's next episode is unwatched by definition.
+        watched = when {
+            target.isMovie -> runCatching { ApiClient.isMovieWatched(target) }.getOrNull()
+            episode != null && !continueWatching -> runCatching { ApiClient.isEpisodeWatched(episode, target) }.getOrNull()
+            else -> null
+        }
         SetAsideStore.refresh()
     }
     fun act(action: suspend () -> Unit) = scope.launch { action() }
@@ -50,7 +57,7 @@ fun TitleMenu(
             add(DialogChoice("Set Aside") { act { TitleActions.setAside(target) } })
         }
         if (SetAsideStore.contains(target)) add(DialogChoice("Remove from Set Aside") { act { TitleActions.removeFromSetAside(target) } })
-        add(DialogChoice("Add to List…") { CustomListsStore.picking = target })
+        add(DialogChoice("Manage Lists…") { CustomListsStore.picking = target })
         add(DialogChoice(if (inWatchlist) "Remove from Watchlist" else "Add to Watchlist") {
             scope.launch { runCatching { WatchlistStore.toggle(target) }.onFailure { onError(it.message ?: "Unknown error") } }
         })
@@ -64,7 +71,13 @@ fun TitleMenu(
             val isWatched = watched == true
             add(DialogChoice(if (isWatched) "Mark as unwatched" else "Mark as watched") { act { TitleActions.setMovieWatched(target, !isWatched) } })
         } else {
-            add(DialogChoice("Mark as watched/unwatched (bulk)") { navigator.openDetails(target, openWatchState = true) })
+            if (episode != null) {
+                val isWatched = watched == true
+                add(DialogChoice(if (isWatched) "Mark ${episode.code} as unwatched" else "Mark ${episode.code} as watched") {
+                    act { TitleActions.setEpisodeWatched(target, episode, !isWatched) }
+                })
+            }
+            add(DialogChoice("Bulk mark as watched…") { navigator.openDetails(target, openWatchState = true) })
         }
         addAll(extra)
         add(DialogChoice("Cancel") {})

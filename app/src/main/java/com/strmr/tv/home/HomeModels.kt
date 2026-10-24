@@ -1,5 +1,6 @@
 package com.strmr.tv.home
 
+import com.strmr.tv.api.CardEpisode
 import com.strmr.tv.api.ImageRef
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -78,6 +79,11 @@ data class CalendarItem(
     val source: String? = null,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
+
+    /** The release's episode, for a card's Mark as watched; null for a movie or without its numbers. */
+    val cardEpisode: CardEpisode?
+        get() = if (isMovie || seasonNumber == null || episodeNumber == null) null
+        else CardEpisode(seasonNumber, episodeNumber, episodeTitle, itemId = null)
 
     /** When it airs, in the viewer's time zone; midnight when the time is unknown. */
     val airs: Long?

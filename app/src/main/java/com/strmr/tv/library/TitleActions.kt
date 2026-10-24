@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import com.strmr.tv.api.ApiClient
+import com.strmr.tv.api.CardEpisode
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.deleteMovieProgress
 import com.strmr.tv.api.setWatched
@@ -63,6 +64,11 @@ object TitleActions {
         ApiClient.setWatched(watched, movie)
         if (!watched) ApiClient.deleteMovieProgress(movie)
     }
+
+    suspend fun setEpisodeWatched(series: DetailsTarget, episode: CardEpisode, watched: Boolean) = run(
+        if (watched) "mark-watched ${episode.code}" else "mark-unwatched ${episode.code}", series,
+        if (watched) "Marked as watched" else "Marked as unwatched", "Failed to update watched state",
+    ) { ApiClient.setWatched(watched, episode, series) }
 
     /** Something else changed a title's state (a details page's watched button): refresh what shows it. */
     fun changed() { changes++ }

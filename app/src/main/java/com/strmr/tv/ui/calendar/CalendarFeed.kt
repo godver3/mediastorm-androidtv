@@ -145,6 +145,7 @@ private fun CalendarItem.card(key: String) = HomeCard(
     title = title,
     subtitle = CalendarModel.posterMetadata(this),
     posterUrl = textPosterUrl ?: posterUrl,
+    episode = cardEpisode,
 )
 
 /** Keeps the focused day centred, as the Expo TV feed's centre snap does. */

@@ -61,6 +61,8 @@ data class CalendarGroup(val first: CalendarItem, val count: Int = 1) {
                 logoUrl = item.logo?.url,
                 artworkUrl = item.backdropUrl ?: item.posterUrl,
                 posterUrl = target.displayPosterUrl,
+                // A day's several episodes keep only the bulk sheet.
+                episode = if (count == 1) item.cardEpisode else null,
             )
         }
 
