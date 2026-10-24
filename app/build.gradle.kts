@@ -24,7 +24,8 @@ android {
     defaultConfig {
         // Its own ID, so it installs beside the React Native TV build (com.strmr.app).
         applicationId = "com.strmr.tv"
-        minSdk = 28
+        // Android 7.1: Fire OS 6, the first Fire TV Stick 4K.
+        minSdk = 25
         targetSdk = 36
         // The release script passes the published build + 1 (scripts/build-release.sh), so the
         // repo stays clean; local builds are 1 and never look newer than a published one.
@@ -68,6 +69,8 @@ android {
         buildConfig = true
     }
     compileOptions {
+        // java.time on Fire OS 6 (Android 7.1), which predates it.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -86,6 +89,7 @@ val checkFileSize by tasks.registering(Exec::class) {
 tasks.named("preBuild") { dependsOn(checkFileSize) }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(platform("androidx.compose:compose-bom:2025.05.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")

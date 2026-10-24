@@ -3,6 +3,7 @@ package com.strmr.tv.ui.live.multiscreen
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -40,16 +41,32 @@ class MultiscreenActivity : ComponentActivity() {
         super.onDestroy()
         model?.dispose()
         model = null
-        focusRequest?.let { getSystemService(AudioManager::class.java).abandonAudioFocusRequest(it) }
+        val audio = getSystemService(AudioManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest?.let { audio.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audio.abandonAudioFocus(focusListener)
+        }
         focusRequest = null
     }
 
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change -> AppLog.i("Multiscreen", "audio focus change $change") }
+
     private fun requestAudioFocus() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            // Android 7 (Fire OS 6) has no AudioFocusRequest.
+            @Suppress("DEPRECATION")
+            val result = getSystemService(AudioManager::class.java)
+                .requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+            AppLog.i("Multiscreen", "audio focus ${if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) "granted" else "refused ($result)"}")
+            return
+        }
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MOVIE).build(),
             )
-            .setOnAudioFocusChangeListener { change -> AppLog.i("Multiscreen", "audio focus change $change") }
+            .setOnAudioFocusChangeListener(focusListener)
             .build()
         val result = getSystemService(AudioManager::class.java).requestAudioFocus(request)
         AppLog.i("Multiscreen", "audio focus ${if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) "granted" else "refused ($result)"}")

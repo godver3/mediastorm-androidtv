@@ -21,7 +21,7 @@ import java.security.MessageDigest
  * sideloading client, with one exception it can use: from Android 12, an app that installed
  * the current build itself (its own installer of record) may update itself without a prompt.
  * The first self-update after an adb or Downloader install therefore asks; later ones on
- * Android 12+ need no prompt. Fire OS 7 and 8 (Android 9 and 11) always ask.
+ * Android 12+ need no prompt. Fire OS 6, 7 and 8 (Android 7.1, 9 and 11) always ask.
  */
 object UpdateInstaller {
     private val context get() = App.context
@@ -33,14 +33,23 @@ object UpdateInstaller {
                 .getOrNull() == context.packageName
 
     /** Whether the user allowed this app to install apps ("Install unknown apps"). */
-    val allowed: Boolean get() = context.packageManager.canRequestPackageInstalls()
+    val allowed: Boolean
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            // Before Android 8 it's the one system-wide "Unknown sources" switch.
+            @Suppress("DEPRECATION")
+            Settings.Secure.getInt(context.contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS, 0) == 1
+        }
 
     /** Opens the "Install unknown apps" switch for this app; false where the TV has no such screen. */
     fun requestPermission(): Boolean = runCatching {
-        context.startActivity(
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        } else {
+            Intent(Settings.ACTION_SECURITY_SETTINGS)
+        }
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }.isSuccess
 
     /** SHA-256 of the file, lowercase hex. */
@@ -64,13 +73,17 @@ object UpdateInstaller {
     fun problem(apk: File, versionCode: Int): String? {
         val pm = context.packageManager
         // Android 9 reads an archive's certificates only for GET_SIGNATURES, leaving signingInfo
-        // null under GET_SIGNING_CERTIFICATES alone; ask for both.
+        // null under GET_SIGNING_CERTIFICATES alone; ask for both. Before 9 there is only GET_SIGNATURES.
         @Suppress("DEPRECATION")
-        val flags = PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
         val archive = pm.getPackageArchiveInfo(apk.path, flags)
             ?: return "The download isn't a valid app"
         if (archive.packageName != context.packageName) return "The download is another app (${archive.packageName})"
-        if (archive.longVersionCode < versionCode) return "The download is an older build"
+        if (archive.versionCodeLong < versionCode) return "The download is an older build"
         val installed = pm.getPackageInfo(context.packageName, flags)
         val archiveSigners = signers(archive)
         val installedSigners = signers(installed)
@@ -87,10 +100,10 @@ object UpdateInstaller {
 
     /** SHA-256 of each signing certificate, from signingInfo or else the legacy signatures. */
     private fun signers(info: PackageInfo): Set<String> {
-        val signing = info.signingInfo
+        val signing = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.signingInfo else null
         @Suppress("DEPRECATION")
         val certs = when {
-            signing == null -> info.signatures
+            signing == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P -> info.signatures
             signing.hasMultipleSigners() -> signing.apkContentsSigners
             else -> signing.signingCertificateHistory
         }
@@ -126,6 +139,10 @@ object UpdateInstaller {
             throw e
         }
     }
+
+    @Suppress("DEPRECATION")
+    private val PackageInfo.versionCodeLong: Long
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) longVersionCode else versionCode.toLong()
 
     private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
 }

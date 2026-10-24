@@ -1,6 +1,8 @@
 package com.strmr.tv.player
 
+import android.os.Build
 import android.os.Bundle
+import android.view.Display
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,7 +48,7 @@ class PlayerActivity : ComponentActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         PlaybackCoordinator.playerOpen = true
-        val matcher = FrameRateMatcher(window, display)
+        val matcher = FrameRateMatcher(window, currentDisplay())
         frameRate = matcher
         val c = PlayerController(this, session) { format -> matcher.match(format.frameRate) }
         controller = c
@@ -136,4 +138,8 @@ class PlayerActivity : ComponentActivity() {
         handover?.let { MultiscreenLauncher.open(it) }
         handover = null
     }
+
+    private fun currentDisplay(): Display? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
+        else @Suppress("DEPRECATION") windowManager.defaultDisplay
 }
