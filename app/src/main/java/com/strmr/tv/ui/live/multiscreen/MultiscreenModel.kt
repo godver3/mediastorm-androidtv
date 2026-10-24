@@ -63,8 +63,10 @@ class MultiscreenModel(handover: MultiscreenHandover?, private val finish: () ->
     var picker by mutableStateOf(false)
     /** The picker adds a screen (rather than changing the focused one's channel). */
     private var adding by mutableStateOf(false)
-    /** Opened from the Live tab and not yet showing two channels: the picker chooses both. */
+    /** Not yet showing two channels: closing the picker leaves multiscreen (from the Live tab it chooses both). */
     private var initialSetup by mutableStateOf(false)
+    /** Opened from the player, whose channel is screen 1: the picker adds the second. */
+    private val fromPlayer = handover != null
     var pickerError by mutableStateOf<String?>(null)
     var exitError by mutableStateOf<String?>(null)
     var exiting by mutableStateOf(false)
@@ -89,6 +91,7 @@ class MultiscreenModel(handover: MultiscreenHandover?, private val finish: () ->
             AppLog.i("Multiscreen", "from the player: ${handover.channel.name} (${if (handover.stream != null) "session kept" else "retuned"})")
             session.focus(1)
             adding = true
+            initialSetup = true
             picker = true
         } else {
             adding = true
@@ -105,7 +108,7 @@ class MultiscreenModel(handover: MultiscreenHandover?, private val finish: () ->
 
     /** The picker's title, for the screen `focused`. */
     fun pickerTitle(focused: Int): String = when {
-        adding && !initialSetup -> "Add channel"
+        adding && (fromPlayer || !initialSetup) -> "Add channel"
         adding -> if (focused == 0) "Choose first channel" else "Choose second channel"
         else -> "Choose channel · Screen ${focused + 1}"
     }
