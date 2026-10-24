@@ -197,7 +197,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             .build()
         player.addListener(listener)
         recordingHls = session.growingRestart?.let { RecordingHls(player, scope, session.liveSessionId, it) }
-        liveRetune = session.retuneLive?.let { LiveRetune(player, scope, session.liveSessionId, it, ::liveGaveUp) }
+        liveRetune = session.retuneLive?.let { LiveRetune(player, scope, session.liveSessionId, session.liveChannel, it, ::liveGaveUp) }
         // Debug builds log every player event under the EventLogger tag.
         if (com.strmr.tv.BuildConfig.DEBUG) player.addAnalyticsListener(androidx.media3.exoplayer.util.EventLogger())
         // A growing recording's playlist plays from its start (0), not its live edge.

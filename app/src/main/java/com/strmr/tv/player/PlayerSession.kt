@@ -42,8 +42,8 @@ data class PlayerSession(
     val pickTracksOnDevice: Boolean = false,
     /** A recording still recording, over a growing HLS session: opens another one if its playlist ends early. */
     val growingRestart: (suspend () -> LiveStream)? = null,
-    /** A live channel: tunes it again when its source drops ([LiveRetune]). */
-    val retuneLive: (suspend () -> LiveStream)? = null,
+    /** A live channel: tunes it again when its source drops ([LiveRetune]); `true` asks for HLS. */
+    val retuneLive: (suspend (forceHls: Boolean) -> LiveStream)? = null,
     /** The live channel playing, which Add Screen hands to the multiscreen. */
     val liveChannel: LiveChannel? = null,
     /** Where the stream comes from, for Info ("Debrid · Real-Debrid", "Live TV · BBC One"); null for trailers. */

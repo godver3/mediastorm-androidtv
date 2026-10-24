@@ -194,6 +194,7 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 trailingContent = { Text(if (enabled) "On" else "Off") },
             )
         }
+        liveHlsResetRow()
         item { Header("Updates") }
         updateRows()
         item { Header("Account") }
