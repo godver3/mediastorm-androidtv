@@ -52,6 +52,7 @@ import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.LocalNavigator
+import com.strmr.tv.ui.MultiPickerDialog
 import com.strmr.tv.ui.Page
 import com.strmr.tv.ui.PageMargin
 import com.strmr.tv.ui.PickerDialog
@@ -71,7 +72,7 @@ class LivePick(val title: String, val marked: LiveChannel?, val error: String?, 
 
 /**
  * The Live tab: the channel guide (when the server has EPG data) or a grid of channel cards,
- * under one row of controls: Guide / Channels, Favorites or a category, a Favorites star, the
+ * under one row of controls: Guide / Channels, Favorites or categories, a Favorites star, the
  * source, search and More. Back inside the guide or grid moves focus up to the control it was last on, as up does
  * and as Menu does on tvOS.
  */
@@ -182,10 +183,20 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
 
     when (picker) {
         Picker.FILTER -> {
-            val options = listOf<LiveFilter>(LiveFilter.All, LiveFilter.Favorites) + store.categories.map { LiveFilter.Category(it) }
-            // Focus stays on the category control; down enters the new list at its top.
-            PickerDialog("Channels", options.map { it.label }, options.indexOf(store.filter), onPick = { i ->
-                if (options[i] != store.filter) store.filter = options[i]
+            // All Channels and Favorites pick and close; categories toggle with the panel left up,
+            // and All Channels clears them. Focus stays on the filter control; down enters the new
+            // list at its top.
+            val fixed = listOf(LiveFilter.All, LiveFilter.Favorites)
+            val names = fixed.map { it.label } + store.categories
+            val selected = (fixed.indexOf(store.filter).takeIf { it >= 0 }?.let { setOf(it) }
+                ?: store.categories.indices.filter { store.categories[it] in store.filter.categories }.map { it + fixed.size }.toSet())
+            MultiPickerDialog("Channels", names, selected, onToggle = { i ->
+                if (i < fixed.size) {
+                    picker = null
+                    if (fixed[i] != store.filter) store.filter = fixed[i]
+                } else {
+                    store.toggleCategory(store.categories[i - fixed.size])
+                }
             }, onDismiss = { picker = null })
         }
         Picker.SOURCE -> {

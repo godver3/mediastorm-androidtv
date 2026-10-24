@@ -9,13 +9,22 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** What the Live tab lists: every channel, the favorites, or one category. */
+/** What the Live tab lists: every channel, the favorites, or one or more categories. */
 sealed interface LiveFilter {
     val label: String
+    val categories: Set<String> get() = emptySet()
 
     data object All : LiveFilter { override val label = "All Channels" }
     data object Favorites : LiveFilter { override val label = "Favorites" }
-    data class Category(val name: String) : LiveFilter { override val label get() = name }
+    /** Never empty: no categories is [All] (see [selecting]). */
+    data class Categories(override val categories: Set<String>) : LiveFilter {
+        override val label get() = if (categories.size == 1) categories.first() else "${categories.size} Categories"
+    }
+
+    companion object {
+        /** [names] as a filter: [All] when there are none. */
+        fun selecting(names: Set<String>): LiveFilter = if (names.isEmpty()) All else Categories(names)
+    }
 }
 
 /**
@@ -23,15 +32,23 @@ sealed interface LiveFilter {
  * time from the server, which applies the source, category and search filters; hidden channels
  * are dropped here. Favorites are listed only under the Favorites filter, not pinned to the top
  * of the others. Favorites and hidden channels live in the
- * profile's settings (`liveTV`), shared with the Expo app. Now / next and guide schedules are
- * fetched in batches for the channels on screen. Main thread only.
+ * profile's settings (`liveTV`), shared with the Expo app; the category selection is kept on
+ * this device, per profile, and restored on return. Now / next and guide schedules are fetched
+ * in batches for the channels on screen. Main thread only.
  */
 class LiveStore(private val scope: CoroutineScope) {
     data class Query(val filter: LiveFilter, val sourceId: String?, val search: String)
 
-    var filter by mutableStateOf<LiveFilter>(LiveFilter.All)
+    private val profileId = ApiClient.profileId
+    private var filterState = mutableStateOf(LiveFilter.selecting(LivePrefs.categories(profileId)))
+    var filter: LiveFilter
+        get() = filterState.value
+        set(value) {
+            filterState.value = value
+            if (value != LiveFilter.Favorites) LivePrefs.saveCategories(profileId, value.categories)
+        }
     /** Where the header's star goes back to when Favorites is turned off. */
-    private var filterBeforeFavorites: LiveFilter = LiveFilter.All
+    private var filterBeforeFavorites: LiveFilter = filter
     var sourceId by mutableStateOf<String?>(null)
     var search by mutableStateOf("")
         private set
@@ -134,7 +151,7 @@ class LiveStore(private val scope: CoroutineScope) {
                 // in every category and search), so they go only with Favorites.
                 favoriteIds = if (favoritesOnly) favorites.toList() else emptyList(), favoritesOnly = favoritesOnly,
                 offset = offset, limit = PAGE, sourceId = requested.sourceId,
-                categories = (requested.filter as? LiveFilter.Category)?.let { listOf(it.name) } ?: emptyList(),
+                categories = requested.filter.categories.sorted(),
                 search = requested.search,
             )
             if (requested != query) return
@@ -148,8 +165,11 @@ class LiveStore(private val scope: CoroutineScope) {
                 sources = srcs
                 if (sourceId != null && srcs.none { it.id == sourceId }) sourceId = null
             }
-            val f = requested.filter
-            if (f is LiveFilter.Category && categories.isNotEmpty() && f.name !in categories) filter = LiveFilter.All
+            // Categories the server no longer lists drop out of the selection.
+            val selected = requested.filter.categories
+            if (selected.isNotEmpty() && categories.isNotEmpty() && !categories.containsAll(selected)) {
+                filter = LiveFilter.selecting(selected.intersect(categories.toSet()))
+            }
             loadedFor = requested
             loadError = null
         } catch (e: Exception) {
@@ -169,6 +189,15 @@ class LiveStore(private val scope: CoroutineScope) {
             filterBeforeFavorites = filter
             filter = LiveFilter.Favorites
         }
+    }
+
+    /**
+     * Adds or removes [name] from the selected categories (from Favorites, starts a new
+     * selection); none left lists every channel.
+     */
+    fun toggleCategory(name: String) {
+        val names = filter.categories
+        filter = LiveFilter.selecting(if (name in names) names - name else names + name)
     }
 
     fun toggleFavorite(channel: LiveChannel) {
