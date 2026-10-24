@@ -17,6 +17,8 @@ enum class MenuTab(val key: String, val label: String) {
     LIVE("live", "Live"),
     /** Live TV recordings, next to Live as in Expo's menu; off unless the profile or this device turns it on. */
     RECORDINGS("recordings", "Recordings"),
+    /** The Sports hub; off unless the profile or this device turns it on, as in Expo's menu. */
+    SPORTS("sports", "Sports"),
     WATCHLIST("watchlist", "Watchlist"),
     LISTS("lists", "Lists"),
     /** Off unless the profile or this device turns it on, as in the Expo app. */

@@ -44,6 +44,7 @@ import com.strmr.tv.ui.home.HomeScreen
 import com.strmr.tv.ui.lists.ListsScreen
 import com.strmr.tv.ui.live.LiveScreen
 import com.strmr.tv.ui.recordings.RecordingsScreen
+import com.strmr.tv.ui.sports.SportsScreen
 import com.strmr.tv.ui.search.SearchScreen
 import com.strmr.tv.ui.settings.SettingsScreen
 import com.strmr.tv.ui.watchlist.WatchlistScreen
@@ -151,6 +152,7 @@ fun MainShell() {
                 MainTab.LISTS -> ListsScreen()
                 MainTab.CALENDAR -> CalendarScreen()
                 MainTab.RECORDINGS -> RecordingsScreen()
+                MainTab.SPORTS -> SportsScreen()
                 MainTab.SEARCH -> SearchScreen()
                 MainTab.SETTINGS -> SettingsScreen()
             }

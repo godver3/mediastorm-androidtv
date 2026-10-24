@@ -18,6 +18,11 @@ import com.strmr.tv.ui.lists.AddToListDialog
 import com.strmr.tv.ui.lists.ListGridScreen
 import com.strmr.tv.ui.recordings.RecordingsScreen
 import com.strmr.tv.ui.settings.HomeLayoutSettings
+import com.strmr.tv.ui.sports.SportsCompetitionScreen
+import com.strmr.tv.ui.sports.SportsPreferencesScreen
+import com.strmr.tv.ui.sports.cycling.SportsCyclingScreen
+import com.strmr.tv.ui.sports.game.SportsGameScreen
+import com.strmr.tv.ui.sports.race.SportsRaceScreen
 import com.strmr.tv.ui.settings.SubtitleSettings
 import com.strmr.tv.ui.settings.TopMenuSettings
 import com.strmr.tv.ui.settings.UpdatePrompt
@@ -37,6 +42,16 @@ sealed interface Page {
     data object SubtitleStyle : Page
     /** Live › More › Recordings (Expo's Live drawer entry); also a menu entry when Settings › Menu shows it. */
     data object Recordings : Page
+    /** A Sports hub game's page. */
+    data class SportsGame(val id: String) : Page
+    /** A race weekend's page, open on [sessionId] (null: the weekend's default session). */
+    data class SportsRace(val weekendId: String, val sessionId: String? = null) : Page
+    /** A cycling race's page, open on [stageId] (null: the race's latest stage). */
+    data class SportsCycling(val raceId: String, val stageId: String? = null) : Page
+    /** The hub's Competition Details for a sport or league: standings, race weekends or the cycling calendar. */
+    data class SportsCompetition(val sport: String, val league: String) : Page
+    /** Sports › Customize: followed competitions. */
+    data object SportsPreferences : Page
 }
 
 /** Opens pages over the current screen. */
@@ -98,6 +113,11 @@ fun PageStack(content: @Composable () -> Unit) {
                     Page.TopMenu -> TopMenuSettings()
                     Page.SubtitleStyle -> SubtitleSettings()
                     Page.Recordings -> RecordingsScreen(asPage = true)
+                    is Page.SportsGame -> SportsGameScreen(page.id)
+                    is Page.SportsRace -> SportsRaceScreen(page.weekendId, page.sessionId)
+                    is Page.SportsCycling -> SportsCyclingScreen(page.raceId, page.stageId)
+                    is Page.SportsCompetition -> SportsCompetitionScreen(page.sport, page.league)
+                    Page.SportsPreferences -> SportsPreferencesScreen()
                 }
                 if (index == stack.lastIndex) PickingHost()
             }

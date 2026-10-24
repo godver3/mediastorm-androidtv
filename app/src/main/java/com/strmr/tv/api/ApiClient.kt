@@ -173,6 +173,7 @@ object ApiClient {
         encodedQuery: String? = null,
         headers: Map<String, String> = emptyMap(),
     ): String {
+        if (method == "GET") SportsFixtures.response(path)?.let { return it }
         val prepared = Prepared(method, url(path, query, encodedQuery), body?.toString(), timeoutMs)
         prepared.headers.putAll(headers)
         prepared.headers["X-Client-ID"] = Config.clientId

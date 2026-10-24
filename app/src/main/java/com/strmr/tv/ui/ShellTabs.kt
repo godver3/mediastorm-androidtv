@@ -16,6 +16,7 @@ internal enum class MainTab(val title: String, val icon: ImageVector, val menu: 
     HOME("Home", Icons.Outlined.Home),
     LIVE("Live", AppIcons.LiveTv, MenuTab.LIVE),
     RECORDINGS("Recordings", AppIcons.Recordings, MenuTab.RECORDINGS),
+    SPORTS("Sports", AppIcons.Sports, MenuTab.SPORTS),
     WATCHLIST("Watchlist", AppIcons.BookmarkBorder, MenuTab.WATCHLIST),
     LISTS("Lists", Icons.AutoMirrored.Outlined.List, MenuTab.LISTS),
     CALENDAR("Calendar", AppIcons.Event, MenuTab.CALENDAR),
