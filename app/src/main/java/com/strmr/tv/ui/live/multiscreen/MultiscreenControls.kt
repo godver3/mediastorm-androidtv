@@ -82,7 +82,12 @@ fun MultiscreenControlBar(model: MultiscreenModel, state: MultiscreenSession.Sta
             ControlButton(AppIcons.SwapSource, if (slot?.channel != null) "Change channel" else "Add channel") { model.changeChannel() }
             if (slot?.channel != null && slot.error != null) ControlButton(Icons.Filled.Refresh, "Retry") { model.retry() }
             if (slot?.channel != null) ControlButton(AppIcons.Remove, "Remove") { model.remove() }
-            ControlButton(AppIcons.Multiscreen, "Equal tiles") { model.equalTiles() }
+            // Enlarge with every tile equal (only while the focused screen plays), else back to the grid.
+            if (model.expanded != null) {
+                ControlButton(AppIcons.Multiscreen, "Equal tiles") { model.toggleEnlarged() }
+            } else if (model.canEnlarge(state)) {
+                ControlButton(AppIcons.Fullscreen, "Enlarge") { model.toggleEnlarged() }
+            }
             ControlButton(Icons.AutoMirrored.Filled.ExitToApp, "Guide") { model.exit() }
         }
     }
@@ -126,12 +131,16 @@ private fun DockDetails(model: MultiscreenModel, slot: MultiscreenSlot?, index: 
     }
 }
 
-/** An icon over its label, as the live player's guide actions. */
+/**
+ * An icon over its label, as the live player's guide actions. Every button is the same size,
+ * with its icon in the same fixed box and its label on one line at one size, so icons and
+ * labels line up across the row ("Change channel" sets the width).
+ */
 @Composable
 private fun ControlButton(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = modifier.width(74.dp).height(66.dp),
+        modifier = modifier.width(92.dp).height(68.dp),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.06f),
         colors = ClickableSurfaceDefaults.colors(
@@ -141,11 +150,12 @@ private fun ControlButton(icon: ImageVector, label: String, modifier: Modifier =
             focusedContentColor = Color.Black,
         ),
     ) {
-        Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
-               verticalArrangement = Arrangement.Center) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-            Text(label, fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 2, lineHeight = 11.sp,
-                 modifier = Modifier.padding(top = 4.dp))
+        Column(Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            }
+            Text(label, fontSize = 10.sp, lineHeight = 14.sp, textAlign = TextAlign.Center, maxLines = 1, softWrap = false,
+                 overflow = TextOverflow.Clip, modifier = Modifier.padding(top = 6.dp).height(14.dp).fillMaxWidth())
         }
     }
 }

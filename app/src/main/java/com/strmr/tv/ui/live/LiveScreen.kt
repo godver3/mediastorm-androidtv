@@ -43,9 +43,11 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.tv.material3.MaterialTheme
+import com.strmr.tv.api.ApiClient
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveFilter
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.live.MultiscreenPrefs
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
@@ -191,17 +193,22 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
             PickerDialog("Source", listOf("All Sources") + store.sources.map { it.name }, ids.indexOf(store.sourceId),
                          onPick = { store.sourceId = ids[it] }, onDismiss = { picker = null })
         }
-        Picker.MORE -> ChoiceDialog(
-            title = "Live TV",
-            choices = listOf(
-                DialogChoice(if (store.showHidden) "Hide Hidden Channels" else "Show Hidden Channels") { store.showHidden = !store.showHidden },
-                DialogChoice("Refresh Channels") { scope.launch { store.refresh() } },
-                DialogChoice("Recordings") { navigator.open(Page.Recordings) },
-                DialogChoice("Multiscreen") { MultiscreenLauncher.open() },
-                DialogChoice("Cancel") {},
-            ),
-            onDismiss = { picker = null },
-        )
+        Picker.MORE -> {
+            // The last multiscreen on this device, for this profile.
+            val saved = remember { MultiscreenPrefs.saved(ApiClient.profileId) }
+            ChoiceDialog(
+                title = "Live TV",
+                choices = listOfNotNull(
+                    DialogChoice(if (store.showHidden) "Hide Hidden Channels" else "Show Hidden Channels") { store.showHidden = !store.showHidden },
+                    DialogChoice("Refresh Channels") { scope.launch { store.refresh() } },
+                    DialogChoice("Recordings") { navigator.open(Page.Recordings) },
+                    saved?.let { DialogChoice("Resume multiscreen") { MultiscreenLauncher.resume(it) } },
+                    DialogChoice("Multiscreen") { MultiscreenLauncher.open() },
+                    DialogChoice("Cancel") {},
+                ),
+                onDismiss = { picker = null },
+            )
+        }
         null -> Unit
     }
 }

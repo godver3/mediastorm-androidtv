@@ -24,7 +24,8 @@ class MultiscreenActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestAudioFocus()
-        val m = MultiscreenModel(MultiscreenLauncher.take(), finish = { finish() })
+        val (handover, resume) = MultiscreenLauncher.take()
+        val m = MultiscreenModel(handover, resume, finish = { finish() })
         model = m
         setContent { StrmrTheme { MultiscreenScreen(m) } }
     }
