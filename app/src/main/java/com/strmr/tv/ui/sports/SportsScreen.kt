@@ -78,9 +78,19 @@ fun SportsScreen() {
     LaunchedEffect(state.cyclingEnabled, state.retries) { if (state.cyclingEnabled) state.pollCycling() }
     LaunchedEffect(state.games) { state.loadRecords() }
 
+    // Back up in the controls, the page goes all the way to its top: focus alone brings only the
+    // chip into view, leaving the title above it scrolled away.
+    val listState = rememberLazyListState()
+    var controlsFocused by remember { mutableStateOf(false) }
+    var summaryFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(controlsFocused || summaryFocused) {
+        if (controlsFocused || summaryFocused) listState.animateScrollToItem(0)
+    }
+
     // Below the floating top bar and clipped there, so the title scrolls away under nothing.
     LazyColumn(
         Modifier.fillMaxSize().padding(top = 76.dp).clipToBounds(),
+        state = listState,
         contentPadding = PaddingValues(top = 4.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
@@ -91,8 +101,8 @@ fun SportsScreen() {
                 state.updatedAt?.let { Text(freshness(it), color = SportsMuted, fontSize = 13.sp) }
             }
         }
-        item { SportsHubControls(state, navigator) }
-        item { SportsFilterSummary(state, navigator) }
+        item { Box(Modifier.onFocusChanged { controlsFocused = it.hasFocus }) { SportsHubControls(state, navigator) } }
+        item { Box(Modifier.onFocusChanged { summaryFocused = it.hasFocus }) { SportsFilterSummary(state, navigator) } }
         val sections = state.sections
         val pending = state.racesPending || state.cyclingPending
         when {
