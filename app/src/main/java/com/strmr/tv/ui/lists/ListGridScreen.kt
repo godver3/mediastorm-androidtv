@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -98,9 +100,18 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
         if (loadingFor == requested || total?.let { fetched >= it } == true) return
         loadingFor = requested
         try {
-            val page = ApiClient.browsePage(shown, limit = PAGE, offset = fetched, extra = query, options = options)
+            val offset = fetched
+            val quick = shown.quickPageQuery
+            val page = ApiClient.browsePage(shown, limit = PAGE, offset = offset, extra = query + quick.orEmpty(), options = options)
             // The sort or a filter changed while this page was loading; that reload wins.
             if (requested != reloadKey) return
+            // Then the full page's cards (same titles, with their text posters) replace the quick ones in place.
+            if (quick != null) scope.launch {
+                val full = runCatching { ApiClient.browsePage(shown, limit = PAGE, offset = offset, extra = query, options = options) }.getOrNull()
+                if (full == null || requested != reloadKey) return@launch
+                val byId = full.entries.associateBy { HomeCard.from(it).id }
+                entries = entries.map { byId[HomeCard.from(it).id] ?: it }
+            }
             if (fetched == 0) {
                 genres = page.genres
                 letters = page.letters
@@ -211,6 +222,8 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
             first = first,
             contentPadding = PaddingValues(horizontal = PageMargin, vertical = 32.dp),
             onNearEnd = { scope.launch { loadPage() } },
+            // About half a page ahead, so a cold page (seconds) is usually in before the end.
+            nearEndCards = PAGE / 2,
             continueWatching = list == BrowseList.ContinueWatching,
             // Set Aside titles leave through the menu's Remove from Set Aside.
             extraActions = { card -> if (manageable) listOf(DialogChoice("Remove from List") { remove(card) }) else emptyList() },
@@ -238,6 +251,12 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                 }
             },
             footer = {
+                // The next page is on its way: the grid hasn't ended.
+                if (cards.isNotEmpty() && loadingFor == reloadKey) fullWidth("more") {
+                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                    }
+                }
                 if (cards.isEmpty()) fullWidth("status") {
                     Box(Modifier.focusRequester(status).focusable().padding(24.dp)) {
                         when {

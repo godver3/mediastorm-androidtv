@@ -19,7 +19,8 @@ internal suspend fun ApiClient.mergedServicePage(
     list: BrowseList.Service, limit: Int, offset: Int, extra: Map<String, String>, options: BrowseOptions?,
 ): BrowsePage = coroutineScope {
     val parts = list.service.lists.indices.map { list.copy(part = it + 1) }
-    val keys = parts.map { part -> (part.query + extra + (options?.query(part) ?: emptyMap())).toSortedMap().toString() }
+    // The quick-page flags change speed, not titles.
+    val keys = parts.map { part -> (part.query + extra - setOf("lite", "deferArtwork") + (options?.query(part) ?: emptyMap())).toSortedMap().toString() }
     var totals = keys.map { mergedTotals[it] }.takeIf { null !in it }?.map { it!! }
     var firstPages: List<BrowsePage>? = null
     if (offset == 0 || totals == null) {

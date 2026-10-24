@@ -58,6 +58,8 @@ fun PosterGrid(
     first: FocusRequester? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = PageMargin, vertical = 24.dp),
     onNearEnd: (() -> Unit)? = null,
+    /** How many of the last cards, once composed, call [onNearEnd]. */
+    nearEndCards: Int = 12,
     /** Long-press choices besides the shared ones (Remove from List in a custom list's grid). */
     extraActions: (HomeCard) -> List<DialogChoice> = { emptyList() },
     /** The cards are Continue Watching's (their menu adds Hide from Continue Watching and Set Aside). */
@@ -98,7 +100,7 @@ fun PosterGrid(
     ) {
         header()
         itemsIndexed(cards, key = { _, c -> c.id }) { index, card ->
-            if (onNearEnd != null && index >= cards.size - 12) androidx.compose.runtime.LaunchedEffect(cards.size) { onNearEnd() }
+            if (onNearEnd != null && index >= cards.size - nearEndCards) androidx.compose.runtime.LaunchedEffect(cards.size) { onNearEnd() }
             PosterCard(
                 card,
                 onClick = {

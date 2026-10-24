@@ -67,6 +67,18 @@ sealed class BrowseList {
             is Library -> library.name
         }
 
+    /**
+     * MDBList-backed lists, whose cold pages the server returns in about a second when it skips
+     * artwork analysis (`lite`, `deferArtwork`), as the Expo app asks for them. The grid shows
+     * that page, then fills its art (text posters) from the full one.
+     */
+    val quickPageQuery: Map<String, String>?
+        get() = when {
+            this is Service -> quickQuery
+            this is Remote && params["source"]?.lowercase() == "mdblist" -> quickQuery
+            else -> null
+        }
+
     /** Remote lists the server can page without reading the whole source first. */
     val loadsProgressively: Boolean
         get() = when (this) {
@@ -102,6 +114,7 @@ sealed class BrowseList {
         }
 
     companion object {
+        private val quickQuery = mapOf("lite" to "true", "deferArtwork" to "true")
         private val progressiveSources = setOf(
             "mdblist", "trakt-list", "stremio", "simkl-list", "letterboxd-list", "publicmetadb-list", "tmdb-list",
         )
