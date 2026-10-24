@@ -53,7 +53,7 @@ import kotlinx.coroutines.launch
 /**
  * The first screen's lower-left block: title logo (else the name), the metadata line, three
  * lines of overview and the actions, in the tvOS order: Play / Resume, Start Over, Choose
- * Source, Audio & Subtitles (the prequeued stream's tracks, [PrequeueTracksButton]), Trailer, Watchlist, Add to List, watched (a series opens [onWatchState]) and More
+ * Source, Audio & Subtitles (the prequeued stream's tracks, [PrequeueTracksButton]), Trailer, Watchlist, Manage Lists, watched (a series opens [onWatchState]) and More
  * (Set Aside, Continue Watching and Hide, [DetailsMoreMenu]).
  */
 @Composable
@@ -148,7 +148,7 @@ fun BoxScope.DetailsHeader(
             }
             WatchlistButton(model)
             IconButton(onClick = { CustomListsStore.picking = target }) {
-                Icon(AppIcons.PlaylistAdd, contentDescription = "Add to List")
+                Icon(AppIcons.PlaylistAdd, contentDescription = "Manage Lists")
             }
             WatchedButton(model, onWatchState)
             IconButton(onClick = onMore) { Icon(AppIcons.MoreHoriz, contentDescription = "More") }

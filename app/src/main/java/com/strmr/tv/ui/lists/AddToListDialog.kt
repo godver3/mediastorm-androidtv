@@ -51,7 +51,7 @@ import com.strmr.tv.ui.onboarding.FormField
 import kotlinx.coroutines.launch
 
 /**
- * "Add to List…": each of the profile's lists with a check on those that already hold the
+ * "Manage Lists…": each of the profile's lists with a check on those that already hold the
  * title. Selecting a list adds or removes the title in place; "New List…" creates one with
  * the title in it. Shown over everything while [CustomListsStore.picking] is set.
  */
@@ -102,7 +102,7 @@ fun AddToListDialog(target: DetailsTarget) {
                 Modifier.width(480.dp).background(Color(0xFF1C1C1E), RoundedCornerShape(20.dp)).padding(28.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text("Add to List", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Manage Lists", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(target.name, fontSize = 15.sp, color = Color.White.copy(alpha = 0.6f))
                 error?.let { Text(it, fontSize = 14.sp, color = Color(0xFFFF6B6B)) }
                 val loaded = memberships
