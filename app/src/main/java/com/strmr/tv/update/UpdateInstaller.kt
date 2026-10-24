@@ -63,21 +63,37 @@ object UpdateInstaller {
      */
     fun problem(apk: File, versionCode: Int): String? {
         val pm = context.packageManager
-        val archive = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES)
+        // Android 9 reads an archive's certificates only for GET_SIGNATURES, leaving signingInfo
+        // null under GET_SIGNING_CERTIFICATES alone; ask for both.
+        @Suppress("DEPRECATION")
+        val flags = PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES
+        val archive = pm.getPackageArchiveInfo(apk.path, flags)
             ?: return "The download isn't a valid app"
         if (archive.packageName != context.packageName) return "The download is another app (${archive.packageName})"
         if (archive.longVersionCode < versionCode) return "The download is an older build"
-        val installed = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-        if (signers(archive).intersect(signers(installed)).isEmpty()) {
+        val installed = pm.getPackageInfo(context.packageName, flags)
+        val archiveSigners = signers(archive)
+        val installedSigners = signers(installed)
+        // Only a key both sides report and that differs blocks the update; unreadable certificates
+        // leave the decision to the installer.
+        if (archiveSigners.isEmpty() || installedSigners.isEmpty()) {
+            AppLog.w("Update", "signing certificates unreadable (download ${archiveSigners.size}, installed ${installedSigners.size}); installing anyway")
+        } else if (archiveSigners.intersect(installedSigners).isEmpty()) {
+            AppLog.w("Update", "signer mismatch: download $archiveSigners, installed $installedSigners")
             return "The update is signed with a different key; reinstall the app from the release page"
         }
         return null
     }
 
-    /** SHA-256 of each signing certificate. */
+    /** SHA-256 of each signing certificate, from signingInfo or else the legacy signatures. */
     private fun signers(info: PackageInfo): Set<String> {
-        val signing = info.signingInfo ?: return emptySet()
-        val certs = if (signing.hasMultipleSigners()) signing.apkContentsSigners else signing.signingCertificateHistory
+        val signing = info.signingInfo
+        @Suppress("DEPRECATION")
+        val certs = when {
+            signing == null -> info.signatures
+            signing.hasMultipleSigners() -> signing.apkContentsSigners
+            else -> signing.signingCertificateHistory
+        }
         return certs.orEmpty().map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).hex() }.toSet()
     }
 
