@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -32,6 +33,7 @@ import com.strmr.tv.api.PersonRef
 import com.strmr.tv.api.person
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.ui.ExpandableText
+import com.strmr.tv.ui.GridCardSizeButton
 import com.strmr.tv.ui.pageBackground
 import com.strmr.tv.ui.PageMargin
 import com.strmr.tv.ui.PosterGrid
@@ -64,7 +66,10 @@ fun PersonScreen(person: PersonRef) {
             header = {
                 fullWidth("header") {
                     Column(Modifier.padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text(person.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(person.name, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                            GridCardSizeButton()
+                        }
                         details?.person?.let { Header(it, person) }
                         when {
                             loadError != null -> Text(loadError!!, color = Color(0xFFFF6B6B))

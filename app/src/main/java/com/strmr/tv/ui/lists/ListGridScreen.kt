@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,7 @@ import com.strmr.tv.library.HiddenItemsStore
 import com.strmr.tv.library.TitleActions
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
+import com.strmr.tv.ui.GridCardSizeButton
 import com.strmr.tv.ui.LocalNavigator
 import com.strmr.tv.ui.Page
 import com.strmr.tv.ui.pageBackground
@@ -235,13 +237,17 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                             total?.let { Text(if (it == 1) "1 title" else "$it titles", color = Color.White.copy(alpha = 0.6f)) }
                         }
                         val parts = (list as? BrowseList.Service)?.parts.orEmpty()
-                        if (list.sorts.isNotEmpty() || list.filters || list.offersRandom || parts.size > 1) {
-                            BrowseControls(
-                                list, options, { options = it }, genres, parts, part, { part = it }, picking,
-                                onRandom = if (list.offersRandom) ::pickRandom else null,
-                                onRename = if (manageable) { { renaming = true } } else null,
-                                onDelete = if (manageable) { { deleting = true } } else null,
-                            )
+                        // The card size button ends the controls row; a list without controls has it alone.
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (list.sorts.isNotEmpty() || list.filters || list.offersRandom || parts.size > 1) {
+                                BrowseControls(
+                                    list, options, { options = it }, genres, parts, part, { part = it }, picking,
+                                    onRandom = if (list.offersRandom) ::pickRandom else null,
+                                    onRename = if (manageable) { { renaming = true } } else null,
+                                    onDelete = if (manageable) { { deleting = true } } else null,
+                                )
+                            }
+                            GridCardSizeButton()
                         }
                         actionError?.let { Text(it, color = Color(0xFFFF6B6B)) }
                         if (list.indexesLetters && options.sort == BrowseSort.NAME && letters.isNotEmpty()) {

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Card
@@ -64,8 +65,8 @@ fun PosterGrid(
     extraActions: (HomeCard) -> List<DialogChoice> = { emptyList() },
     /** The cards are Continue Watching's (their menu adds Hide from Continue Watching and Set Aside). */
     continueWatching: Boolean = false,
-    /** Fixed column counts (Search: 4 beside its rail, 6 without); adaptive by default. */
-    columns: GridCells = GridCells.Adaptive(136.dp),
+    /** Fixed column counts (Search: 4 beside its rail, 6 without); by default, adaptive at the chosen [GridCardSize]. */
+    columns: GridCells? = null,
     header: LazyGridScope.() -> Unit = {},
     footer: LazyGridScope.() -> Unit = {},
 ) {
@@ -90,8 +91,10 @@ fun PosterGrid(
         withFrameNanos { }
         runCatching { refocus.requestFocus() }
     }
+    val cardSize = GridCardSizeStore.size
+    val captionGap = if (columns == null) captionGap(POSTER_MAX_HEIGHT * cardSize.scale) else POSTER_CAPTION_GAP
     LazyVerticalGrid(
-        columns = columns,
+        columns = columns ?: GridCells.Adaptive(cardSize.posterMinWidth),
         state = rememberLazyGridState(),
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -120,6 +123,7 @@ fun PosterGrid(
                 modifier = (if (index == 0 && first != null) Modifier.focusRequester(first) else Modifier)
                     .then(if (card.id == refocusKey) Modifier.focusRequester(refocus) else Modifier)
                     .onFocusChanged { if (it.isFocused && card.id != menuCard?.first) menuCard = null },
+                captionGap = captionGap,
             )
         }
         footer()
@@ -132,13 +136,23 @@ fun PosterGrid(
 fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) =
     item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
 
-/** Clear of the focus scale at the tallest a poster gets: a grid column's, about 152 × 228 dp. */
-private val POSTER_CAPTION_GAP = captionGap(228.dp)
+/** The tallest a poster gets in a Medium grid column: about 152 × 228 dp. */
+private val POSTER_MAX_HEIGHT = 228.dp
+
+/** Clear of the focus scale at [POSTER_MAX_HEIGHT]. */
+private val POSTER_CAPTION_GAP = captionGap(POSTER_MAX_HEIGHT)
 
 /** A 2:3 poster card: Compose for TV's Card, scaling on focus, title and line under it. */
 @Composable
-fun PosterCard(card: HomeCard, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(verticalArrangement = Arrangement.spacedBy(POSTER_CAPTION_GAP)) {
+fun PosterCard(
+    card: HomeCard,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Room for the focus scale over the title: more for a grid's bigger card sizes. */
+    captionGap: Dp = POSTER_CAPTION_GAP,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(captionGap)) {
         Card(
             onClick = onClick,
             onLongClick = onLongClick,

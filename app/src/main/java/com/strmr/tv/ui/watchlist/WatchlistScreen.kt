@@ -40,6 +40,7 @@ import com.strmr.tv.library.HiddenItemsStore
 import com.strmr.tv.library.TitleActions
 import com.strmr.tv.library.WatchlistStore
 import com.strmr.tv.ui.AppIcons
+import com.strmr.tv.ui.GridCardSizeButton
 import com.strmr.tv.ui.PageMargin
 import com.strmr.tv.ui.PosterGrid
 import com.strmr.tv.ui.fullWidth
@@ -91,16 +92,20 @@ fun WatchlistScreen() {
             contentPadding = PaddingValues(start = PageMargin, end = PageMargin, top = 8.dp, bottom = 32.dp),
             header = {
                 fullWidth("filter") {
-                    Row(
-                        Modifier.fillMaxWidth().padding(bottom = 4.dp).focusRestorer(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                    ) {
-                        Filter.entries.forEach { f ->
-                            FilterChip(
-                                selected = filter == f, onClick = { filter = f },
-                                modifier = if (filter == f) Modifier.focusRequester(chip) else Modifier,
-                            ) { Text(f.label) }
+                    // The filter centred, the card size button at the end.
+                    Box(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                        Row(
+                            Modifier.align(Alignment.Center).focusRestorer(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Filter.entries.forEach { f ->
+                                FilterChip(
+                                    selected = filter == f, onClick = { filter = f },
+                                    modifier = if (filter == f) Modifier.focusRequester(chip) else Modifier,
+                                ) { Text(f.label) }
+                            }
                         }
+                        Box(Modifier.align(Alignment.CenterEnd)) { GridCardSizeButton() }
                     }
                 }
                 when {
