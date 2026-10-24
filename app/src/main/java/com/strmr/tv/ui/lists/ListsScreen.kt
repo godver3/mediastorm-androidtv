@@ -35,11 +35,12 @@ import com.strmr.tv.ui.PickerDialog
  * The Lists tab: the profile's own titles (Continue Watching, Set Aside, Watchlist, Permanent
  * Prequeue), its custom lists, streaming services, connected lists and collection hubs from
  * the shelf config, the server's charts, recommendations, then TMDB genres and decades for
- * movies or shows. Each tile opens its whole list as a grid.
+ * movies, shows or both. Each tile opens its whole list as a grid.
  */
 @Composable
 fun ListsScreen() {
-    var kind by rememberSaveable { mutableStateOf(BrowseKind.MOVIES) }
+    // null is All: both kinds' rows.
+    var kind by rememberSaveable { mutableStateOf<BrowseKind?>(null) }
     var naming by remember { mutableStateOf(false) }
     var choosingKind by remember { mutableStateOf(false) }
     // On every visit: lists made or changed elsewhere show up. Everything here is loaded with
@@ -91,19 +92,24 @@ fun ListsScreen() {
         item("recommended") {
             TileRow("Recommended", (listOf(BrowseList.Personalized) + seeds(continueWatching.orEmpty())).map { TileSpec(it) })
         }
-        // Movies / Shows as a button opening a picker: a chip row would change the rows below just by moving past it.
+        // All / Movies / Shows as a button opening a picker: a chip row would change the rows below just by moving past it.
         item("kind") {
-            OutlinedButton(onClick = { choosingKind = true }, modifier = Modifier.padding(start = ContentMargin)) { Text("${kind.noun}  ▾") }
+            OutlinedButton(onClick = { choosingKind = true }, modifier = Modifier.padding(start = ContentMargin)) { Text("${kind?.noun ?: "All"}  ▾") }
         }
-        item("genres-$kind") { TileRow("Genres", kind.genres.map { TileSpec(BrowseList.Genre(it.id, it.name, kind)) }) }
-        item("decades-$kind") { TileRow("Decades", kind.decades.map { TileSpec(BrowseList.Decade(it, kind)) }) }
+        // All shows each kind's genres, then each kind's decades, as the Expo app does.
+        val kinds = kind?.let { listOf(it) } ?: BrowseKind.entries
+        fun rowTitle(title: String, rowKind: BrowseKind) =
+            if (kind != null) title else if (rowKind == BrowseKind.MOVIES) "Movie $title" else "Show $title"
+        for (k in kinds) item("genres-$k") { TileRow(rowTitle("Genres", k), k.genres.map { TileSpec(BrowseList.Genre(it.id, it.name, k)) }) }
+        for (k in kinds) item("decades-$k") { TileRow(rowTitle("Decades", k), k.decades.map { TileSpec(BrowseList.Decade(it, k)) }) }
     }
 
     if (choosingKind) {
-        PickerDialog("Browse", BrowseKind.entries.map { it.noun }, kind.ordinal, onPick = { kind = BrowseKind.entries[it] }, onDismiss = { choosingKind = false })
+        val kinds = listOf(null) + BrowseKind.entries
+        PickerDialog("Browse", kinds.map { it?.noun ?: "All" }, kinds.indexOf(kind), onPick = { kind = kinds[it] }, onDismiss = { choosingKind = false })
     }
     if (naming) {
-        ListNameDialog("New List", "Add titles to it with “Add to List…” on any title.", confirm = "Create", onDismiss = { naming = false }) { name ->
+        ListNameDialog("New List", "Add titles to it with “Manage Lists…” on any title.", confirm = "Create", onDismiss = { naming = false }) { name ->
             CustomListsStore.create(name)
         }
     }
