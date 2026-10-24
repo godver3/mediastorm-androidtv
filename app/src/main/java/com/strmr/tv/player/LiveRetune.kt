@@ -125,6 +125,20 @@ class LiveRetune(
         MainScope().launch { ApiClient.stopLiveSession(id) }
     }
 
+    /**
+     * Gives up the channel's HLS session to another owner (the multiscreen's first screen):
+     * no more keepalives or retunes, and [release] won't stop it. Null when the stream is direct
+     * or between sessions mid-retune.
+     */
+    fun handOver(): String? {
+        val id = sessionId?.takeIf { retuneJob?.isActive != true }
+        released = true
+        retuneJob?.cancel()
+        keepalive.cancel()
+        if (id != null) sessionId = null
+        return id
+    }
+
     fun release() {
         released = true
         retuneJob?.cancel()

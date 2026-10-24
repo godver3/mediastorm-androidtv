@@ -102,10 +102,12 @@ suspend fun ApiClient.clearLiveCache() {
 /**
  * Opens a channel on the server and returns the URL to play: a direct stream, or an HLS
  * session (kept alive with [keepLiveSessionAlive]). `token=` / `profileUnlock=` ride in the
- * query as on every header-less media URL.
+ * query as on every header-less media URL. [forceHls]: an HLS session even when the source is
+ * configured direct (multiscreen tiles, which each own and stop their session).
  */
-suspend fun ApiClient.startLive(channel: LiveChannel, programTitle: String?): LiveStream {
+suspend fun ApiClient.startLive(channel: LiveChannel, programTitle: String?, forceHls: Boolean = false): LiveStream {
     val q = buildMap {
+        if (forceHls) put("format", "hls")
         put("url", channel.url)
         put("target", "native")
         put("profileId", profileId)
@@ -148,8 +150,36 @@ suspend fun ApiClient.keepLiveSessionAlive(
 }.getOrNull()
 
 suspend fun ApiClient.stopLiveSession(sessionId: String) {
-    runCatching { sendRaw("POST", "/api/video/hls/${segment(sessionId)}/stop", promptOnLock = false, timeoutMs = 10_000) }
+    runCatching { stopLiveSessionStrict(sessionId) }
 }
+
+/** Like [stopLiveSession], but throws when the server didn't confirm, so the caller can retry. */
+suspend fun ApiClient.stopLiveSessionStrict(sessionId: String) {
+    sendRaw("POST", "/api/video/hls/${segment(sessionId)}/stop", promptOnLock = false, timeoutMs = 10_000)
+}
+
+/** `GET /api/live/usage`: the provider's open streams against its connection limit. */
+@Serializable
+data class LiveUsage(
+    val currentStreams: Int = 0,
+    val maxStreams: Int = 0,
+    val availableStreams: Int = 0,
+    val atLimit: Boolean = false,
+) {
+    /** Room for one more stream; a limit of 0 or less is unlimited (as Expo's `hasCapacity`). */
+    val hasCapacity: Boolean
+        get() = !atLimit && (maxStreams <= 0 || (availableStreams > 0 && currentStreams < maxStreams))
+}
+
+/** The stream usage for `sourceId`'s provider (every source when null, empty or "all"). */
+suspend fun ApiClient.liveUsage(sourceId: String?): LiveUsage = send(
+    "GET", "/api/live/usage",
+    buildMap {
+        put("profileId", profileId)
+        sourceId?.trim()?.takeIf { it.isNotEmpty() && it != "all" }?.let { put("sourceId", it) }
+    },
+    promptOnLock = false, timeoutMs = 10_000,
+)
 
 /** A server-relative media path (`/live/stream?…`, `/video/hls/…`) under `/api`, with token and unlock added. */
 internal fun ApiClient.mediaUrl(apiPath: String): String {

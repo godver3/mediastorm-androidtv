@@ -5,6 +5,7 @@ import com.strmr.tv.api.ProbedAudioTrack
 import com.strmr.tv.api.ProbedSubtitleTrack
 import com.strmr.tv.api.SubtitleStreamInfo
 import com.strmr.tv.api.TrackSelection
+import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveStream
 
 /** Tracks picked by hand for a manual source, with the probed lists their numbers refer to. */
@@ -43,6 +44,8 @@ data class PlayerSession(
     val growingRestart: (suspend () -> LiveStream)? = null,
     /** A live channel: tunes it again when its source drops ([LiveRetune]). */
     val retuneLive: (suspend () -> LiveStream)? = null,
+    /** The live channel playing, which Add Screen hands to the multiscreen. */
+    val liveChannel: LiveChannel? = null,
 )
 
 /** A resolved stream: its path, the server's track choice and what online subtitles match against. */

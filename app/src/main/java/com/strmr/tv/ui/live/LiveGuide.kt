@@ -100,7 +100,7 @@ private data class PendingFocus(val channel: String, val at: Long)
  * plays the channel, long press offers favorite / hide.
  */
 @Composable
-fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier) {
+fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier, pick: LivePick? = null) {
     var windowStart by remember { mutableLongStateOf(LiveStore.halfHour(now)) }
     var focused by remember { mutableStateOf<Pair<LiveChannel, GuideCell>?>(null) }
     var pending by remember { mutableStateOf<PendingFocus?>(null) }
@@ -126,7 +126,8 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                         if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
                         val cells = layout(store.schedules[channel.guideKey].orEmpty(), windowStart, windowStart + SPAN)
                         Row(Modifier.height(ROW_HEIGHT), verticalAlignment = Alignment.CenterVertically) {
-                            ChannelColumn(channel, channel.id in store.favorites)
+                            ChannelColumn(channel, channel.id in store.favorites,
+                                          marked = pick?.marked?.let { it.id == channel.id && it.sourceId == channel.sourceId } == true)
                             Box {
                                 // Behind the cells: the unfocused ones are translucent, the focused one covers it.
                                 NowLine(now, windowStart, dpPerMs)
@@ -143,7 +144,10 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                                         Cell(
                                             cell, now,
                                             width = maxOf(((cell.end - cell.start) * dpPerMs).dp - CELL_GAP, 16.dp),
-                                            onClick = { PlaybackCoordinator.playLive(channel, cell.program?.takeIf { it.isAiring() }?.title) },
+                                            onClick = {
+                                                pick?.onPick?.invoke(channel)
+                                                    ?: PlaybackCoordinator.playLive(channel, cell.program?.takeIf { it.isAiring() }?.title)
+                                            },
                                             onLongClick = { menuFor = channel },
                                             onFocus = { focused = channel to cell },
                                             // Off either end of the row: page the window and keep the time.
@@ -174,12 +178,16 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
 }
 
 @Composable
-private fun ChannelColumn(channel: LiveChannel, favorite: Boolean) {
+private fun ChannelColumn(channel: LiveChannel, favorite: Boolean, marked: Boolean = false) {
     Row(Modifier.width(CHANNEL_WIDTH).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ChannelLogo(channel, 50.dp, 28.dp, 10.sp, namesChannel = false)
         Column(Modifier.weight(1f)) {
             Text(channel.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (favorite) Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A), modifier = Modifier.size(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (favorite) Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A), modifier = Modifier.size(10.dp))
+                if (marked) Icon(com.strmr.tv.ui.AppIcons.Multiscreen, contentDescription = "On this screen", tint = com.strmr.tv.ui.Accent,
+                                 modifier = Modifier.size(10.dp))
+            }
         }
     }
 }

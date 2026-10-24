@@ -130,7 +130,7 @@ object PlaybackCoordinator {
     fun playLive(channel: LiveChannel, programTitle: String?) {
         if (_resolving.value != null) return
         val request = PlaybackRequest(DetailsTarget(channel.id, programTitle ?: channel.name, isMovie = true, backdropUrl = null, logoUrl = channel.logoUrl))
-        begin(request, "Tuning…", live = { ApiClient.startLive(channel, programTitle) })
+        begin(request, "Tuning…", live = { ApiClient.startLive(channel, programTitle) }, liveChannel = channel)
     }
 
     /**
@@ -170,6 +170,7 @@ object PlaybackCoordinator {
         live: (suspend () -> LiveStream)? = null,
         carried: CarriedTracks? = null,
         growing: Boolean = false,
+        liveChannel: LiveChannel? = null,
         resolve: suspend () -> ResolvedStream = { error("no resolver") },
     ) {
         if (_resolving.value != null) return
@@ -183,7 +184,7 @@ object PlaybackCoordinator {
                     val stream = live()
                     PlayerSession(request, stream.url, null, reportsProgress = false, liveSessionId = stream.sessionId,
                                   isLive = !growing, growingRestart = live.takeIf { growing },
-                                  retuneLive = live.takeIf { !growing })
+                                  retuneLive = live.takeIf { !growing }, liveChannel = liveChannel)
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
                     val r = resolve()

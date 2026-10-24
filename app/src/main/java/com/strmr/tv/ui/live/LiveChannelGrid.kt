@@ -50,7 +50,7 @@ import com.strmr.tv.ui.PageMargin
  * channels load as the grid nears its end; select plays, long press offers favorite / hide.
  */
 @Composable
-fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier) {
+fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier, pick: LivePick? = null) {
     var menuFor by remember { mutableStateOf<LiveChannel?>(null) }
     val channels = store.visibleChannels
     LazyVerticalGrid(
@@ -66,7 +66,7 @@ fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier
             val current = store.current(channel, now)
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Card(
-                    onClick = { PlaybackCoordinator.playLive(channel, current?.title) },
+                    onClick = { pick?.onPick?.invoke(channel) ?: PlaybackCoordinator.playLive(channel, current?.title) },
                     onLongClick = { menuFor = channel },
                     scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(),
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).then(if (index == 0) Modifier.focusRequester(entry) else Modifier),
@@ -80,6 +80,10 @@ fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier
                         if (channel.id in store.favorites) {
                             Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A),
                                  modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(14.dp))
+                        }
+                        if (pick?.marked?.let { it.id == channel.id && it.sourceId == channel.sourceId } == true) {
+                            Icon(AppIcons.Multiscreen, contentDescription = "On this screen", tint = com.strmr.tv.ui.Accent,
+                                 modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(14.dp))
                         }
                         if (channel.id in store.hidden) {
                             Icon(AppIcons.Hidden, contentDescription = "Hidden", tint = Color.White.copy(alpha = 0.5f),

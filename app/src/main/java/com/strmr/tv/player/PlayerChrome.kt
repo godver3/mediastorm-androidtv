@@ -58,7 +58,8 @@ private enum class Menu { INFO, AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARC
  * Media3 has no TV transport UI, so this is the player's chrome in Compose for TV, laid out
  * like the tvOS transport bar: title and the Info / Audio / Subtitles / Speed buttons over a
  * progress bar with a seek preview, menus as popovers above the buttons, and Skip Intro /
- * Next Episode as a pill at the bottom right (alone while the chrome is hidden).
+ * Next Episode as a pill at the bottom right (alone while the chrome is hidden). A live
+ * channel offers Add Screen ([onAddScreen]), which opens it in the multiscreen.
  *
  * Keys: Left / Right scrub (see [ScrubState]) from the bar or with the chrome hidden; select
  * plays / pauses (or commits a scrub); Down on the bar opens Info. Any key shows the chrome,
@@ -66,7 +67,7 @@ private enum class Menu { INFO, AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARC
  * dismisses the pill, then closes the player.
  */
 @Composable
-fun PlayerChrome(controller: PlayerController, onExit: () -> Unit) {
+fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: (() -> Unit)? = null) {
     val player = controller.player
     val playing by controller.isPlaying.collectAsState()
     val buffering by controller.buffering.collectAsState()
@@ -213,6 +214,10 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit) {
                             if (!live) MenuButton(Menu.SPEED, AppIcons.Speed, "Playback Speed")
                             // Not for live TV or trailers: only a resolved title has other sources.
                             if (switchable) MenuButton(Menu.SOURCES, AppIcons.SwapSource, "Switch Source")
+                            // A live channel: this channel and another side by side (the multiscreen).
+                            if (live && onAddScreen != null) {
+                                TransportButton(AppIcons.Multiscreen, "Add Screen", transportFocusable) { onAddScreen() }
+                            }
                         }
                     }
                     Box(Modifier.padding(top = 20.dp)) {
