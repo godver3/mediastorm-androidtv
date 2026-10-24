@@ -208,7 +208,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                                 val requester = buttons.getValue(m)
                                 TransportButton(icon, label, transportFocusable.focusRequester(requester)) { open(m, requester) }
                             }
-                            if (!live) MenuButton(Menu.INFO, Icons.Filled.Info, "Info")
+                            MenuButton(Menu.INFO, Icons.Filled.Info, "Info")
                             MenuButton(Menu.AUDIO, AppIcons.Audio, "Audio")
                             MenuButton(Menu.SUBTITLES, AppIcons.Subtitles, "Subtitles")
                             if (!live) MenuButton(Menu.SPEED, AppIcons.Speed, "Playback Speed")
@@ -222,7 +222,9 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                     }
                     Box(Modifier.padding(top = 20.dp)) {
                         if (live) {
-                            LiveBadge(transportFocusable.focusRequester(scrubber))
+                            LiveBadge(transportFocusable.focusRequester(scrubber).onKeyEvent { e ->
+                                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) { open(Menu.INFO, scrubber); true } else false
+                            })
                         } else {
                             ScrubBar(
                                 controller, scrub.target,
@@ -255,7 +257,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
         // Menus: popovers above the buttons, Info across the top.
         AnimatedVisibility(menu == Menu.INFO, Modifier.align(Alignment.TopCenter),
                            enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut()) {
-            InfoPanel(controller.request, Modifier.padding(48.dp).onKeyEvent { e ->
+            InfoPanel(controller, Modifier.padding(48.dp).onKeyEvent { e ->
                 if (e.type == KeyEventType.KeyDown && e.key in setOf(Key.DirectionUp, Key.DirectionDown)) menu = null
                 e.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
             })

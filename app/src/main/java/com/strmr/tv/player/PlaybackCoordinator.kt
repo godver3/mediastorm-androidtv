@@ -82,11 +82,12 @@ object PlaybackCoordinator {
     private fun playThroughPrequeue(request: PlaybackRequest, picks: PrequeuePick?) = begin(request, "Searching…", resolve = {
         val status = resolveStream(request)
         val subtitles = status.subtitleTracks.orEmpty()
+        val source = sourceHints(status)
         when {
-            picks == null -> ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles)
+            picks == null -> ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles, source = source)
             !picks.appliesTo(status) -> {
                 AppLog.i("ManualTracks", "details picks dropped: resolved a different stream")
-                ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles)
+                ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles, source = source)
             }
             else -> {
                 val m = picks.tracks
@@ -94,7 +95,7 @@ object PlaybackCoordinator {
                 AppLog.i("ManualTracks", "play prequeue with ${m.choice}: audio=${applied.audio?.streamIndex} " +
                     "subtitle=${applied.subtitle?.streamIndex} mode=${applied.subtitleMode} (server audio=" +
                     "${status.trackSelection?.audio?.streamIndex} subtitle=${status.trackSelection?.subtitle?.streamIndex})")
-                ResolvedStream(status.streamPath!!, applied, status.displayName, subtitles, manualTracks = true)
+                ResolvedStream(status.streamPath!!, applied, status.displayName, subtitles, manualTracks = true, source = source)
             }
         }
     })
@@ -108,14 +109,16 @@ object PlaybackCoordinator {
         // A stream picked over a library copy (Switch Source) is no longer that copy.
         begin(request.copy(libraryVersion = null), "Preparing…", carried = carried, resolve = {
             val (path, tracks) = ApiClient.resolveSource(source, request.title.titleId, request.startPosition)
+            val hints = SourceHints(source.serviceType.ifEmpty { null }, indexer = source.indexer.ifEmpty { null },
+                                    attributes = source.attributes)
             if (manual == null || manual.choice.isEmpty) {
-                ResolvedStream(path, tracks, source.title)
+                ResolvedStream(path, tracks, source.title, source = hints)
             } else {
                 val applied = ManualTracks.applied(tracks, manual.choice, manual.audio, manual.subtitles)
                 AppLog.i("ManualTracks", "play with ${manual.choice}: audio=${applied.audio?.streamIndex} " +
                     "subtitle=${applied.subtitle?.streamIndex} mode=${applied.subtitleMode} (server audio=${tracks?.audio?.streamIndex} " +
                     "subtitle=${tracks?.subtitle?.streamIndex})")
-                ResolvedStream(path, applied, source.title, manualTracks = true)
+                ResolvedStream(path, applied, source.title, manualTracks = true, source = hints)
             }
         })
 
@@ -130,7 +133,8 @@ object PlaybackCoordinator {
     fun playLive(channel: LiveChannel, programTitle: String?) {
         if (_resolving.value != null) return
         val request = PlaybackRequest(DetailsTarget(channel.id, programTitle ?: channel.name, isMovie = true, backdropUrl = null, logoUrl = channel.logoUrl))
-        begin(request, "Tuning…", live = { ApiClient.startLive(channel, programTitle) }, liveChannel = channel)
+        begin(request, "Tuning…", live = { ApiClient.startLive(channel, programTitle) }, liveChannel = channel,
+              liveLabel = StreamInfo.live(channel.name))
     }
 
     /**
@@ -144,10 +148,12 @@ object PlaybackCoordinator {
         val request = PlaybackRequest(DetailsTarget(recording.id, title, isMovie = true))
         AppLog.i("Recordings", "play ${recording.id} status=${recording.status}")
         if (RecordingRules.isRecording(recording)) {
-            begin(request, "Starting…", live = { ApiClient.startRecordingHls(recording, title) }, growing = true)
+            begin(request, "Starting…", live = { ApiClient.startRecordingHls(recording, title) }, growing = true,
+                  liveLabel = StreamInfo.recording(recording.channelName))
             return
         }
-        pending = PlayerSession(request, ApiClient.recordingStreamUrl(recording, title), null, reportsProgress = false)
+        pending = PlayerSession(request, ApiClient.recordingStreamUrl(recording, title), null, reportsProgress = false,
+                                sourceLabel = StreamInfo.recording(recording.channelName))
         launchPlayer()
     }
 
@@ -171,6 +177,7 @@ object PlaybackCoordinator {
         carried: CarriedTracks? = null,
         growing: Boolean = false,
         liveChannel: LiveChannel? = null,
+        liveLabel: String? = null,
         resolve: suspend () -> ResolvedStream = { error("no resolver") },
     ) {
         if (_resolving.value != null) return
@@ -184,14 +191,16 @@ object PlaybackCoordinator {
                     val stream = live()
                     PlayerSession(request, stream.url, null, reportsProgress = false, liveSessionId = stream.sessionId,
                                   isLive = !growing, growingRestart = live.takeIf { growing },
-                                  retuneLive = live.takeIf { !growing }, liveChannel = liveChannel)
+                                  retuneLive = live.takeIf { !growing }, liveChannel = liveChannel, sourceLabel = liveLabel)
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
                     val r = resolve()
                     PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path)), r.tracks, streamPath = r.path,
                                   releaseName = r.releaseName?.ifEmpty { null } ?: releaseFileName(r.path), subtitleStreams = r.subtitleStreams,
                                   playback = settings.await(), manualTracks = r.manualTracks, carried = carried,
-                                  pickTracksOnDevice = r.pickTracksOnDevice)
+                                  pickTracksOnDevice = r.pickTracksOnDevice,
+                                  sourceLabel = StreamInfo.source(r.path, r.source, request.libraryVersion?.origin),
+                                  sourceDolbyVision = r.source?.dolbyVisionProfile)
                 }
                 stage.value = "Starting…"
                 detail.value = null
@@ -213,6 +222,15 @@ object PlaybackCoordinator {
         val name = runCatching { java.net.URLDecoder.decode(path.substringBefore('?').substringAfterLast('/'), "UTF-8") }.getOrNull()
         return name?.takeIf { Regex("\\.(mkv|mp4|m4v|avi|ts|mov|webm)$", RegexOption.IGNORE_CASE).containsMatchIn(it) }
     }
+
+    /** What the prequeue says about the source it resolved: service type, provider, indexer. */
+    private fun sourceHints(s: PrequeueStatus) = SourceHints(
+        serviceType = s.serviceType?.ifEmpty { null } ?: s.selectedResult?.serviceType?.ifEmpty { null },
+        debridProvider = s.debridProvider?.ifEmpty { null },
+        indexer = s.selectedResult?.indexer?.ifEmpty { null },
+        attributes = s.selectedResult?.attributes.orEmpty() + s.resultAttributes.orEmpty(),
+        dolbyVisionProfile = s.dolbyVisionProfile?.ifEmpty { null },
+    )
 
     /** The player is on screen: the stream-start screen hands over to it. */
     fun playerStarted() {

@@ -137,10 +137,20 @@ data class PrequeueStatus(
     val passthroughName: String? = null,
     val selectedResult: SelectedResult? = null,
     val resultAttributes: Map<String, String>? = null,
+    /** `debrid` / `usenet` / `local` …, and the debrid service that served it. */
+    val serviceType: String? = null,
+    val debridProvider: String? = null,
+    /** The file's Dolby Vision codec string ("dvhe.07.06"), when it has one. */
+    val dolbyVisionProfile: String? = null,
 ) {
     @Serializable
     data class TargetEpisode(val seasonNumber: Int, val episodeNumber: Int)
 
     @Serializable
-    data class SelectedResult(val title: String? = null, val attributes: Map<String, String>? = null)
+    data class SelectedResult(
+        val title: String? = null,
+        val attributes: Map<String, String>? = null,
+        val indexer: String? = null,
+        val serviceType: String? = null,
+    )
 }

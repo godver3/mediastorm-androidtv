@@ -61,6 +61,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val cues = MutableStateFlow<List<Cue>>(emptyList())
     /** The video's display aspect (0 until known), so subtitles sit on the picture. */
     val videoAspect = MutableStateFlow(0f)
+    /** The selected video and audio tracks' formats (null until known), for the Info panel's stream details. */
+    val videoFormat = MutableStateFlow<Format?>(null)
+    val audioFormat = MutableStateFlow<Format?>(null)
 
     /**
      * The track preferences after this device's overrides (Settings › Playback). A library file
@@ -142,7 +145,11 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 }
                 online.tracksReady(next, prefs.subtitlePick)
             }
-            next.ofType(C.TRACK_TYPE_VIDEO).firstOrNull { it.selected }?.let { onVideoFormat(it.format) }
+            next.ofType(C.TRACK_TYPE_VIDEO).firstOrNull { it.selected }?.let {
+                videoFormat.value = it.format
+                onVideoFormat(it.format)
+            }
+            audioFormat.value = next.ofType(C.TRACK_TYPE_AUDIO).firstOrNull { it.selected }?.format
         }
 
         override fun onCues(cueGroup: CueGroup) {

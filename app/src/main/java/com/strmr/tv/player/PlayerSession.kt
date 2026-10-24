@@ -46,6 +46,10 @@ data class PlayerSession(
     val retuneLive: (suspend () -> LiveStream)? = null,
     /** The live channel playing, which Add Screen hands to the multiscreen. */
     val liveChannel: LiveChannel? = null,
+    /** Where the stream comes from, for Info ("Debrid · Real-Debrid", "Live TV · BBC One"); null for trailers. */
+    val sourceLabel: String? = null,
+    /** The server's Dolby Vision codec string for the file ("dvhe.07.06"), before any on-device Profile 7 rewrite. */
+    val sourceDolbyVision: String? = null,
 )
 
 /** A resolved stream: its path, the server's track choice and what online subtitles match against. */
@@ -56,4 +60,6 @@ data class ResolvedStream(
     val subtitleStreams: List<SubtitleStreamInfo> = emptyList(),
     val manualTracks: Boolean = false,
     val pickTracksOnDevice: Boolean = false,
+    /** The server's service type / provider / indexer for the source, for Info's Source row. */
+    val source: SourceHints? = null,
 )

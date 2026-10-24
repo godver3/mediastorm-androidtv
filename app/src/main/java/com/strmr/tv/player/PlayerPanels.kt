@@ -88,16 +88,19 @@ fun SkipPill(action: SkipAction, modifier: Modifier = Modifier, onClick: () -> U
 }
 
 /**
- * The Info panel (the tvOS player's swipe-down Info tab): the episode still or backdrop, the
- * title, the episode and the overview. Focusable, so Back or Up / Down close it.
+ * The Info panel (the tvOS player's swipe-down Info tab): the episode still or backdrop (a live
+ * channel's logo), the title, the episode, the overview and the stream's details
+ * ([StreamInfoRows]). Focusable, so Back or Up / Down close it.
  */
 @Composable
-fun InfoPanel(request: PlaybackRequest, modifier: Modifier = Modifier) {
+fun InfoPanel(controller: PlayerController, modifier: Modifier = Modifier) {
+    val request = controller.request
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    // The episode still, else a backdrop; a poster (letterboxed) only when there's no 16:9 art.
+    // The episode still, else a backdrop; a poster or channel logo (letterboxed) only when there's no 16:9 art.
     val wide = request.episode?.imageUrl ?: request.backdrops.firstOrNull() ?: request.title.backdropUrl
-    val image = wide ?: request.title.posterUrl?.takeIf { it.isNotEmpty() }
+    val logo = (request.logoUrl ?: request.title.logoUrl).takeIf { controller.session.isLive }?.let { Artwork.logo(it) }
+    val image = wide?.let { Artwork.url(it) } ?: request.title.posterUrl?.takeIf { it.isNotEmpty() }?.let { Artwork.url(it) } ?: logo
     val overview = request.episode?.overview ?: request.title.overview
     Row(
         modifier.fillMaxWidth().shadow(24.dp, PanelShape).background(Color(0xF2242426), PanelShape)
@@ -106,7 +109,7 @@ fun InfoPanel(request: PlaybackRequest, modifier: Modifier = Modifier) {
     ) {
         image?.let {
             AsyncImage(
-                model = Artwork.url(it), contentDescription = null, contentScale = if (wide != null) ContentScale.Crop else ContentScale.Fit,
+                model = it, contentDescription = null, contentScale = if (wide != null) ContentScale.Crop else ContentScale.Fit,
                 modifier = Modifier.width(320.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Color.Black),
             )
         }
@@ -120,9 +123,10 @@ fun InfoPanel(request: PlaybackRequest, modifier: Modifier = Modifier) {
                 Text(it.toString(), style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.75f))
             }
             overview?.takeIf { it.isNotBlank() }?.let {
-                Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = 0.85f),
+                Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = 0.85f),
                      modifier = Modifier.padding(top = 6.dp))
             }
+            StreamInfoRows(controller, Modifier.padding(top = 10.dp))
         }
     }
 }
