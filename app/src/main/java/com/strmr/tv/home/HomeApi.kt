@@ -161,6 +161,7 @@ suspend fun ApiClient.browsePage(
     options: BrowseOptions? = null,
 ): BrowsePage {
     if (list is BrowseList.Library) return libraryPage(list.library, options, limit, offset)
+    if (list is BrowseList.Service && list.lists.size > 1) return mergedServicePage(list, limit, offset, extra, options)
     // Continue Watching's own shape: the whole feed, paged here.
     if (list == BrowseList.ContinueWatching) {
         // Opened from a Home view: only that view's kind, as its row shows.

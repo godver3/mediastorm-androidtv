@@ -221,7 +221,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                             total?.let { Text(if (it == 1) "1 title" else "$it titles", color = Color.White.copy(alpha = 0.6f)) }
                         }
-                        val parts = (list as? BrowseList.Service)?.service?.lists?.mapIndexed { i, l -> l.title ?: "List ${i + 1}" }.orEmpty()
+                        val parts = (list as? BrowseList.Service)?.parts.orEmpty()
                         if (list.sorts.isNotEmpty() || list.filters || list.offersRandom || parts.size > 1) {
                             BrowseControls(
                                 list, options, { options = it }, genres, parts, part, { part = it }, picking,

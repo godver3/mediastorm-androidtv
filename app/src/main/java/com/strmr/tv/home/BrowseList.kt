@@ -30,7 +30,19 @@ sealed class BrowseList {
     /** A list configured as a home shelf (MDBList, Stremio, TMDB, Trakt…), with its query. */
     data class Remote(val id: String, val name: String, val params: Map<String, String>) : BrowseList()
     /** A streaming service's top lists; the grid shows the first (movies) list. */
-    data class Service(val service: StreamingService, val part: Int = 0) : BrowseList()
+    /** [part] indexes [parts]: All (every list, merged) first when the service has several. */
+    data class Service(val service: StreamingService, val part: Int = 0) : BrowseList() {
+        val parts: List<String>
+            get() = service.lists.mapIndexed { i, l -> l.title ?: "List ${i + 1}" }.let { if (it.size > 1) listOf("All") + it else it }
+
+        /** The lists [part] shows: all of them for All, else the one. */
+        val lists: List<StreamingService.ServiceList>
+            get() = when {
+                service.lists.size <= 1 -> service.lists
+                part == 0 -> service.lists
+                else -> listOfNotNull(service.lists.getOrNull(part - 1))
+            }
+    }
     /** "Because You Watched": titles like a Continue Watching title, with its backdrop for the tile. */
     data class Similar(val tmdbId: String, val kind: BrowseKind, val seed: String, val backdrop: String?) : BrowseList()
     /** A local, Plex or Jellyfin library, paged from `/api/library` ([com.strmr.tv.api.libraryPage]). */
@@ -50,7 +62,7 @@ sealed class BrowseList {
             is Genre -> name
             is Decade -> "${decade}s ${kind.noun}"
             is Remote -> name
-            is Service -> service.name + (service.lists.getOrNull(part)?.title?.let { " · $it" } ?: "")
+            is Service -> service.name + (lists.singleOrNull()?.takeIf { service.lists.size > 1 }?.title?.let { " · $it" } ?: "")
             is Similar -> "Because You Watched $seed"
             is Library -> library.name
         }
@@ -84,7 +96,7 @@ sealed class BrowseList {
             is Genre -> mapOf("source" to "genre", "genreId" to genreId.toString(), "mediaType" to kind.mediaType)
             is Decade -> mapOf("source" to "decade", "decade" to decade.toString(), "mediaType" to kind.mediaType)
             is Remote -> params
-            is Service -> mapOf("source" to "mdblist", "name" to service.name, "url" to (service.lists.getOrNull(part)?.url ?: ""))
+            is Service -> mapOf("source" to "mdblist", "name" to service.name, "url" to (lists.singleOrNull()?.url ?: ""))
             is Similar -> mapOf("source" to "similar", "tmdbId" to tmdbId, "mediaType" to kind.mediaType)
             is Library -> emptyMap()
         }
