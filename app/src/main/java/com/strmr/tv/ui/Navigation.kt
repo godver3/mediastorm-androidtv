@@ -59,7 +59,15 @@ sealed interface Page {
 }
 
 /** Opens pages over the current screen. */
-class Navigator(private val push: (Page) -> Unit, private val pop: () -> Unit = {}, private val reset: () -> Unit = {}) {
+class Navigator(
+    private val push: (Page) -> Unit,
+    private val pop: () -> Unit = {},
+    private val reset: () -> Unit = {},
+    private val depth: () -> Int = { 0 },
+) {
+    /** A page is pushed over the tabs (snapshot state: Home checks for changes when it clears). */
+    val isCovered: Boolean get() = depth() > 0
+
     fun openDetails(target: DetailsTarget, openWatchState: Boolean = false) {
         // Its stream starts resolving as the page opens, so Play starts quickly.
         PlaybackCoordinator.prewarm(target)
@@ -92,7 +100,7 @@ val LocalNavigator = staticCompositionLocalOf { Navigator(push = {}) }
 fun PageStack(content: @Composable () -> Unit) {
     val stack = remember { mutableStateListOf<Page>() }
     val navigator = remember {
-        Navigator(push = { stack.add(it) }, pop = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }, reset = { stack.clear() })
+        Navigator(push = { stack.add(it) }, pop = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }, reset = { stack.clear() }, depth = { stack.size })
     }
     CompositionLocalProvider(LocalNavigator provides navigator) {
         content()

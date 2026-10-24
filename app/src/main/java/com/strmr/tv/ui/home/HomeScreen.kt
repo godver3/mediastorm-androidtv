@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -51,6 +52,8 @@ import com.strmr.tv.ui.LocalNavigator
 import com.strmr.tv.ui.MessageDialog
 import com.strmr.tv.ui.TitleMenu
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 
 /**
  * Focus moving never scrolls a list by itself: the column scrolls from row to row, and each row
@@ -112,6 +115,10 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
             store.publishLayout()
             store.refreshIfStale()
         }
+    }
+    // Back from a details page or list grid (a title removed from a list there): reload if stale.
+    LaunchedEffect(navigator) {
+        snapshotFlow { navigator.isCovered }.drop(1).filter { !it }.collect { store.refreshIfStale() }
     }
     val shelves = store.slots.filterIsInstance<HomeSlot.Shelf>()
     // Top Carousel: one row feeds the carousel and isn't shown again below it.

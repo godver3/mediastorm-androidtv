@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -135,6 +136,8 @@ class ShelfMemory {
     internal val focus = RowFocus(list)
     /** The key of the card focus last left the row on; null until the row has been visited. */
     var lastKey: Any? = null
+    /** Where [lastKey] sat in the row, for the card that takes its place when it leaves. */
+    var lastIndex = 0
     /** Whether focus is in the row now; read while a refresh composes, before it takes a card away. */
     var hasFocus = false
 }
@@ -175,7 +178,9 @@ fun ShelfRow(
     val focus = memory.focus
     // The card entering the row lands on, by focusRestorer's fallback: also when the row was
     // out of composition, which forgets the restorer's own saved card.
-    val landing = memory.lastKey?.takeIf { it in keys } ?: keys.firstOrNull()
+    /** The card taking a removed focused card's place, which focus moves to. */
+    var replacement by remember { mutableStateOf<Any?>(null) }
+    val landing = replacement?.takeIf { it in keys } ?: memory.lastKey?.takeIf { it in keys } ?: keys.firstOrNull()
     val target = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -206,13 +211,22 @@ fun ShelfRow(
         }
     }
     // The focused card's data can change under it too (Continue Watching's next episode), and
-    // it can leave (a finished movie): the hero follows, and focus moves to the first card.
+    // it can leave (a finished movie, a title removed from its list): the hero follows, and
+    // focus moves to the card that took its place (the one before, for the row's last card).
     LaunchedEffect(cards) {
         if (!focusedBefore) return@LaunchedEffect
         if (memory.lastKey != null && memory.lastKey !in keys) {
-            memory.lastKey = null
+            val index = memory.lastIndex.coerceAtMost(keys.lastIndex)
+            val next = keys.getOrNull(index)
+            memory.lastKey = next
+            replacement = next
+            // Scrolled to first, so the card is composed to take focus.
+            focus.at.snapTo(index.coerceAtLeast(0).toFloat())
+            focus.scroll()
             withFrameNanos {}
             runCatching { target.requestFocus() }
+            replacement = null
+            cards.firstOrNull { it.id == next }?.let { onFocus(it, null) }
         } else {
             cards.firstOrNull { it.id == memory.lastKey }?.let { onFocus(it, null) }
         }
@@ -221,6 +235,7 @@ fun ShelfRow(
     LaunchedEffect(Unit) { if (!focus.inRow.isRunning) focus.inRow.snapTo(0f) }
     fun focused(index: Int) {
         memory.lastKey = keys.getOrNull(index)
+        memory.lastIndex = index
         scope.launch { focus.focus(index) }
     }
     fun landingModifier(key: Any) = if (key == landing) Modifier.focusRequester(target) else Modifier
