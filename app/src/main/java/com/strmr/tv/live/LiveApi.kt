@@ -94,6 +94,14 @@ suspend fun ApiClient.epgSchedule(keys: List<String>, startOffsetMinutes: Int, h
     }
 }
 
+@Serializable
+private data class StremioStreams(val streams: List<LiveStremioStream>? = null)
+
+/** The streams a Stremio channel's addon lists for it, for Choose Source. */
+suspend fun ApiClient.liveStremioStreams(channel: LiveChannel): List<LiveStremioStream> =
+    send<StremioStreams>("GET", "/api/live/stremio/streams", mapOf("url" to channel.url, "profileId" to profileId),
+                         timeoutMs = 60_000).streams.orEmpty()
+
 /** Clears the server's channel cache. */
 suspend fun ApiClient.clearLiveCache() {
     runCatching { sendRaw("POST", "/api/live/cache/clear") }
@@ -122,6 +130,7 @@ suspend fun ApiClient.startLive(channel: LiveChannel, programTitle: String?, for
         channel.tvgName?.let { put("tvgName", it) }
         channel.group?.let { put("category", it) }
         channel.logo?.let { put("liveChannelLogo", it) }
+        channel.stremioStreamIndex?.takeIf { it >= 0 }?.let { put("stremioStreamIndex", it.toString()) }
     }
     val start = send<LiveStart>("GET", "/api/live/hls/start", q, timeoutMs = 60_000)
     val direct = start.isDirect == true

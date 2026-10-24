@@ -66,12 +66,13 @@ fun ChannelLogo(channel: LiveChannel, width: Dp, height: Dp, fontSize: TextUnit,
     }
 }
 
-/** Long-press actions shared by channel cards and guide cells: favorite and hide. */
+/** Long-press actions shared by channel cards and guide cells: Choose Source (Stremio channels), favorite and hide. */
 @Composable
 fun ChannelMenu(store: LiveStore, channel: LiveChannel, onDismiss: () -> Unit) {
     ChoiceDialog(
         title = channel.name,
-        choices = listOf(
+        choices = listOfNotNull(
+            if (channel.hasStremioSources) DialogChoice("Choose Source") { store.chooseSource(channel) } else null,
             DialogChoice(if (channel.id in store.favorites) "Remove from Favorites" else "Add to Favorites") { store.toggleFavorite(channel) },
             DialogChoice(if (channel.id in store.hidden) "Show Channel" else "Hide Channel") { store.toggleHidden(channel) },
             DialogChoice("Cancel") {},

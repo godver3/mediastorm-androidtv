@@ -21,7 +21,19 @@ data class LiveChannel(
     val sourceName: String? = null,
     /** Provider-local id, sent as `channelId` when tuning. */
     val playbackId: String? = null,
+    /**
+     * The stream picked under Choose Source, for a channel that is a Stremio addon's stream
+     * list; sent as `stremioStreamIndex` when tuning (null lets the server pick).
+     */
+    val stremioStreamIndex: Int? = null,
 ) {
+    /** A Stremio addon stream resource (`…/stream/….json`), which can list several streams (Expo `isStremioStreamResourceUrl`). */
+    val hasStremioSources: Boolean
+        get() {
+            val path = url.substringBefore('?')
+            return url.startsWith("http") && path.contains("/stream/") && path.endsWith(".json")
+        }
+
     /** The key its EPG data is filed under (`tvgId`, else the channel id, as the Expo guide does). */
     val guideKey: String get() = tvgId?.ifEmpty { null } ?: id
 
@@ -37,6 +49,19 @@ data class LiveChannel(
 
 @Serializable
 data class LiveSource(val id: String, val name: String)
+
+/** Choose Source for a Stremio channel: the addon's streams, one of which is tuned with `stremioStreamIndex`. */
+data class LiveSourceChoice(val channel: LiveChannel, val streams: List<LiveStremioStream>)
+
+/** One stream of a Stremio channel (`GET /api/live/stremio/streams`), by its index in the addon's list. */
+@Serializable
+data class LiveStremioStream(
+    val index: Int,
+    val label: String,
+    val name: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+)
 
 /** `POST /api/live/channels`: one page of the filtered list, favorites first. */
 @Serializable

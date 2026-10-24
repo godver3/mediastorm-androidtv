@@ -66,6 +66,13 @@ class LiveStore(private val scope: CoroutineScope) {
         private set
     var actionError by mutableStateOf<String?>(null)
         private set
+    /** A passing note under the controls ("Only one source is available."), cleared after a moment. */
+    var notice by mutableStateOf<String?>(null)
+        private set
+    /** The Stremio channel whose streams Choose Source lists. */
+    var sourceChoice by mutableStateOf<LiveSourceChoice?>(null)
+    private var sourceChoiceJob: Job? = null
+    private var noticeJob: Job? = null
     var favorites by mutableStateOf<Set<String>>(emptySet())
         private set
     var hidden by mutableStateOf<Set<String>>(emptySet())
@@ -213,6 +220,42 @@ class LiveStore(private val scope: CoroutineScope) {
         val previous = hidden
         hidden = if (channel.id in hidden) hidden - channel.id else hidden + channel.id
         save { hidden = previous }
+    }
+
+    // Choose Source
+
+    /**
+     * Loads a Stremio channel's streams and opens the list when there is more than one;
+     * otherwise says why not, with the Expo app's wording.
+     */
+    fun chooseSource(channel: LiveChannel) {
+        if (sourceChoiceJob?.isActive == true) return
+        showNotice("Loading sources…", clears = false)
+        sourceChoiceJob = scope.launch {
+            try {
+                val streams = ApiClient.liveStremioStreams(channel)
+                if (streams.size > 1) {
+                    noticeJob?.cancel()
+                    notice = null
+                    sourceChoice = LiveSourceChoice(channel, streams)
+                } else {
+                    showNotice(if (streams.isEmpty()) "No playable sources found." else "Only one source is available.")
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                showNotice(e.message ?: "Failed to load sources.")
+            }
+        }
+    }
+
+    private fun showNotice(text: String, clears: Boolean = true) {
+        notice = text
+        noticeJob?.cancel()
+        if (clears) noticeJob = scope.launch {
+            delay(4_000)
+            notice = null
+        }
     }
 
     private fun save(revert: () -> Unit) {

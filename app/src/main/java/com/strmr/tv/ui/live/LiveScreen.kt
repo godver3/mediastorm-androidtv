@@ -48,6 +48,7 @@ import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveFilter
 import com.strmr.tv.live.LiveStore
 import com.strmr.tv.live.MultiscreenPrefs
+import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
@@ -160,7 +161,12 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
             store.total?.let { Text("$it channels", color = Color.White.copy(alpha = 0.6f), maxLines = 1) }
             if (pick == null) IconButton(onClick = { picker = Picker.MORE }) { Icon(Icons.Filled.MoreVert, contentDescription = "More Options") }
         }
-        (pick?.error ?: store.actionError)?.let { Text(it, color = Color(0xFFFF6B6B), modifier = Modifier.padding(horizontal = PageMargin, vertical = 4.dp)) }
+        val error = pick?.error ?: store.actionError
+        if (error != null) {
+            Text(error, color = Color(0xFFFF6B6B), modifier = Modifier.padding(horizontal = PageMargin, vertical = 4.dp))
+        } else {
+            store.notice?.let { Text(it, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = PageMargin, vertical = 4.dp)) }
+        }
 
         // Down from the controls enters the content where it was left (or its top).
         val content = Modifier.weight(1f).onFocusChanged { contentFocused = it.hasFocus }
@@ -178,6 +184,14 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
             else -> Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 2.dp)
             }
+        }
+    }
+
+    store.sourceChoice?.let { choice ->
+        LiveSourceChoiceDialog(choice, onDismiss = { store.sourceChoice = null }) { stream ->
+            store.sourceChoice = null
+            val channel = choice.channel.copy(stremioStreamIndex = stream.index)
+            pick?.onPick?.invoke(channel) ?: PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title)
         }
     }
 
