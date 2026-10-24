@@ -49,6 +49,9 @@ class DetailsModel(val target: DetailsTarget) {
     /** The episode the primary button plays: the server's up-next episode, else the first one. */
     var primaryEpisode by mutableStateOf<Episode?>(null)
         private set
+    /** The episode spoiler blurring counts from (see [EpisodePrivacy.currentEpisode]). */
+    var privacyEpisode by mutableStateOf<Episode?>(null)
+        private set
     var loadError by mutableStateOf<String?>(null)
         private set
     var trailers by mutableStateOf<TrailerList?>(null)
@@ -117,6 +120,7 @@ class DetailsModel(val target: DetailsTarget) {
                 seasons = details.seasons
                 upNext = bundle.upNextEpisode
                 primaryEpisode = findPrimaryEpisode(details.seasons, bundle.upNextEpisode)
+                privacyEpisode = EpisodePrivacy.currentEpisode(details.seasons, bundle.upNextEpisode)
                 if (selectedSeason == null) selectedSeason = primaryEpisode?.seasonNumber
             }
             resume = bundle.resume

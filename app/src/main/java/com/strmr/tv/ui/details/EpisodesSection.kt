@@ -58,6 +58,7 @@ import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.ContentMargin
 import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.home.ProgressLine
+import com.strmr.tv.ui.settings.SpoilerSettings
 
 /**
  * Season chips over the season's episodes. Focus enters the episode row on the one Play
@@ -94,6 +95,7 @@ fun EpisodesSection(
     val seasonRow = remember { FocusRequester() }
     val selectedChip = remember { FocusRequester() }
     val hasSeasonRow = seasons.size > 1
+    val privacy = SpoilerSettings.effective
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (hasSeasonRow) {
             // Starts on the selected season, so its chip is composed and can take focus.
@@ -129,10 +131,16 @@ fun EpisodesSection(
                 modifier = Modifier.focusRestorer(entry),
             ) {
                 items(current.episodes, key = { it.id }) { ep ->
+                    val watched = model.isWatched(ep)
+                    val privacyEpisode = model.privacyEpisode
                     EpisodeCard(
                         ep,
                         fallbackImage = model.title?.backdrop?.url ?: model.target.backdropUrl,
-                        watched = model.isWatched(ep),
+                        watched = watched,
+                        blurStill = EpisodePrivacy.shouldBlur(ep, privacyEpisode, privacy.blurThumbnails, privacy.blurThumbnailsIncludeCurrent, watched) &&
+                            // The series backdrop standing in for an unaired episode's still gives nothing away.
+                            !(ep.image?.url == null && !DetailsModel.hasAired(ep)),
+                        blurOverview = EpisodePrivacy.shouldBlur(ep, privacyEpisode, privacy.blurOverviews, privacy.blurOverviewsIncludeCurrent, watched),
                         inLibrary = model.libraryVersions(ep).isNotEmpty(),
                         // Marking an episode watched or unwatched clears its progress on the server.
                         progress = if (model.isWatched(ep) == (ep.watched == true)) ep.resume?.takeIf { it.eligible }?.fraction ?: 0f else 0f,
@@ -153,6 +161,9 @@ private fun EpisodeCard(
     episode: Episode,
     fallbackImage: String?,
     watched: Boolean,
+    /** Spoiler hiding (Settings › Spoilers). */
+    blurStill: Boolean,
+    blurOverview: Boolean,
     /** The episode has a copy in the profile's libraries (Play uses it). */
     inLibrary: Boolean,
     progress: Float,
@@ -168,11 +179,12 @@ private fun EpisodeCard(
             modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f),
         ) {
             Box(Modifier.fillMaxSize()) {
+                val still = Artwork.url(episode.image?.url ?: fallbackImage, "w500")
                 AsyncImage(
-                    model = Artwork.url(episode.image?.url ?: fallbackImage, "w500"),
+                    model = if (blurStill) blurredStillRequest(still) else still,
                     contentDescription = episode.name,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E)),
+                    modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E)).then(if (blurStill) Modifier.blurredStill() else Modifier),
                 )
                 if (watched) {
                     Box(
@@ -200,7 +212,13 @@ private fun EpisodeCard(
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${episode.code} · ${episode.name}", fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             episode.overview?.let {
-                Text(it, fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val color = Color.White.copy(alpha = 0.6f)
+                if (blurOverview) {
+                    Text(it, fontSize = 11.sp, style = blurredTextStyle(color), maxLines = 2, overflow = TextOverflow.Ellipsis,
+                         modifier = Modifier.hiddenOverviewSemantics())
+                } else {
+                    Text(it, fontSize = 11.sp, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

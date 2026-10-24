@@ -56,6 +56,7 @@ import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.WithDefaultScroll
 import com.strmr.tv.ui.WithFoldScroll
 import com.strmr.tv.ui.library.LibraryVersionsDialog
+import com.strmr.tv.ui.settings.SpoilerSettings
 import kotlinx.coroutines.launch
 
 /** The picker's subject: the movie, or one episode. */
@@ -100,6 +101,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
         }
     }
     LaunchedEffect(model) { model.loadLibrary() }
+    LaunchedEffect(model) { if (!target.isMovie) SpoilerSettings.refresh() }
     // A title action taken elsewhere (a menu over this page, another page): show its new state.
     LaunchedEffect(actions) { if (actions > 0) model.load() }
 

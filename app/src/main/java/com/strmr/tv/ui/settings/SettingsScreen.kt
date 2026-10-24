@@ -54,6 +54,7 @@ fun SettingsScreen() {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { TrailerSettings.serverValue = ApiClient.playbackSettings().autoPlayTrailers }
     LaunchedEffect(Unit) { loadTrackDefaults() }
+    LaunchedEffect(Unit) { SpoilerSettings.refresh() }
 
     var health by remember { mutableStateOf<String?>(null) }
     fun checkConnection() {
@@ -155,6 +156,8 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 trailingContent = { Text(AppearanceSettings.background.label) },
             )
         }
+        item { Header("Spoilers") }
+        spoilerSettingRows()
         item { Header("Playback") }
         item {
             ListItem(

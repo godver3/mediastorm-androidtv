@@ -99,7 +99,7 @@ private fun LanguageRow(title: String, value: String?, server: String?, set: (St
  * index of the device's choice, null for Default.
  */
 @Composable
-private fun ChoiceRow(
+internal fun ChoiceRow(
     title: String,
     detail: String?,
     choices: List<String>,
