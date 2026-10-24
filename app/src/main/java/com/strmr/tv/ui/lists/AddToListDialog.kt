@@ -7,16 +7,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +31,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -46,14 +45,15 @@ import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.home.CustomList
 import com.strmr.tv.home.WatchlistItem
 import com.strmr.tv.library.CustomListsStore
-import com.strmr.tv.ui.AppIcons
+import com.strmr.tv.ui.SidePanelDialog
 import com.strmr.tv.ui.onboarding.FormField
 import kotlinx.coroutines.launch
 
 /**
- * "Manage Lists…": each of the profile's lists with a check on those that already hold the
- * title. Selecting a list adds or removes the title in place; "New List…" creates one with
- * the title in it. Shown over everything while [CustomListsStore.picking] is set.
+ * "Manage Lists…" as a side panel, like Watch State and the Live category filter: each of the
+ * profile's lists, checked while it holds the title. Selecting a list adds or removes the
+ * title in place with the panel left up; "New List…" creates one with the title in it. Shown
+ * over everything while [CustomListsStore.picking] is set.
  */
 @Composable
 fun AddToListDialog(target: DetailsTarget) {
@@ -96,43 +96,34 @@ fun AddToListDialog(target: DetailsTarget) {
         }
     }
 
-    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
-            Column(
-                Modifier.width(480.dp).background(Color(0xFF1C1C1E), RoundedCornerShape(20.dp)).padding(28.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text("Manage Lists", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text(target.name, fontSize = 15.sp, color = Color.White.copy(alpha = 0.6f))
-                error?.let { Text(it, fontSize = 14.sp, color = Color(0xFFFF6B6B)) }
-                val loaded = memberships
-                if (loaded == null) {
-                    CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp).align(Alignment.CenterHorizontally), color = Color.White, strokeWidth = 2.dp)
-                }
-                LazyColumn(Modifier.heightIn(max = 360.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (loaded != null) items(CustomListsStore.userLists, key = { it.id }) { list ->
-                        val member = loaded[list.id] != null
-                        ListItem(
-                            selected = false, onClick = { toggle(list) },
-                            modifier = if (list == CustomListsStore.userLists.first()) Modifier.focusRequester(first) else Modifier,
-                            leadingContent = { Icon(if (member) Icons.Filled.CheckCircle else AppIcons.Circle, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            headlineContent = { Text(list.name) },
-                            trailingContent = {
-                                if (list.id in busy) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                                else list.itemCount?.let { Text("$it") }
-                            },
-                        )
-                    }
-                    item {
-                        ListItem(
-                            selected = false, onClick = { naming = true },
-                            modifier = if (loaded != null && CustomListsStore.userLists.isEmpty()) Modifier.focusRequester(first) else Modifier,
-                            leadingContent = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            headlineContent = { Text("New List…") },
-                        )
-                    }
-                }
+    SidePanelDialog("Manage Lists", target.name, close) {
+        error?.let { item { Text(it, fontSize = 14.sp, color = Color(0xFFFF6B6B)) } }
+        val loaded = memberships
+        if (loaded == null) {
+            item { CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp), color = Color.White, strokeWidth = 2.dp) }
+        } else {
+            items(CustomListsStore.userLists, key = { it.id }) { list ->
+                val member = loaded[list.id] != null
+                ListItem(
+                    selected = member, onClick = { toggle(list) },
+                    modifier = if (list == CustomListsStore.userLists.first()) Modifier.focusRequester(first) else Modifier,
+                    headlineContent = { Text(list.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = list.itemCount?.let { { Text(if (it == 1) "1 title" else "$it titles") } },
+                    trailingContent = when {
+                        list.id in busy -> { { CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp) } }
+                        member -> { { Icon(Icons.Filled.Check, contentDescription = "In list") } }
+                        else -> null
+                    },
+                )
             }
+        }
+        item {
+            ListItem(
+                selected = false, onClick = { naming = true },
+                modifier = if (loaded != null && CustomListsStore.userLists.isEmpty()) Modifier.focusRequester(first) else Modifier,
+                leadingContent = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                headlineContent = { Text("New List…") },
+            )
         }
     }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -22,6 +23,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Icon
@@ -50,6 +52,27 @@ private fun SidePanel(
 ) {
     val current = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { current.requestFocus() } }
+    SidePanelDialog(title, onDismiss = onDismiss) {
+        itemsIndexed(options) { index, option ->
+            val selected = isSelected(index)
+            ListItem(
+                selected = selected,
+                onClick = { onClick(index) },
+                headlineContent = { Text(option, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingContent = if (selected) { { Icon(Icons.Filled.Check, contentDescription = "Selected") } } else null,
+                modifier = if (index == focusIndex) Modifier.focusRequester(current) else Modifier,
+            )
+        }
+    }
+}
+
+/**
+ * The side panel's frame with free-form rows, for panels that mix sections ([PanelSection]),
+ * actions that close it and toggles that leave it up (Watch State, Manage Lists, More).
+ * Back dismisses; the caller focuses its first row.
+ */
+@Composable
+fun SidePanelDialog(title: String, subtitle: String? = null, onDismiss: () -> Unit, content: LazyListScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().ignoreHeldSelect().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.CenterEnd) {
             LazyColumn(
@@ -57,18 +80,22 @@ private fun SidePanel(
                 contentPadding = PaddingValues(20.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                item { Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp)) }
-                itemsIndexed(options) { index, option ->
-                    val selected = isSelected(index)
-                    ListItem(
-                        selected = selected,
-                        onClick = { onClick(index) },
-                        headlineContent = { Text(option, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        trailingContent = if (selected) { { Icon(Icons.Filled.Check, contentDescription = "Selected") } } else null,
-                        modifier = if (index == focusIndex) Modifier.focusRequester(current) else Modifier,
-                    )
+                item {
+                    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = if (subtitle == null) 8.dp else 0.dp))
+                    subtitle?.let {
+                        Text(it, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                             modifier = Modifier.padding(bottom = 8.dp))
+                    }
                 }
+                content()
             }
         }
     }
+}
+
+/** A grey section heading in a [SidePanelDialog]. */
+@Composable
+fun PanelSection(title: String) {
+    Text(title, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
 }
