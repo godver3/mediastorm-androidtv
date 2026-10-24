@@ -6,12 +6,7 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.PrequeueStatus
-import com.strmr.tv.api.ProbedAudioTrack
-import com.strmr.tv.api.ProbedSubtitleTrack
 import com.strmr.tv.api.SourceResult
-import com.strmr.tv.api.SubtitleStreamInfo
-import com.strmr.tv.api.PlaybackSettings
-import com.strmr.tv.api.TrackSelection
 import com.strmr.tv.api.playbackSettings
 import com.strmr.tv.api.prequeueStatus
 import com.strmr.tv.api.resolveSource
@@ -39,49 +34,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-
-/** Tracks picked by hand for a manual source, with the probed lists their numbers refer to. */
-data class ManualSourceTracks(
-    val choice: ManualTrackChoice,
-    val audio: List<ProbedAudioTrack>,
-    val subtitles: List<ProbedSubtitleTrack>,
-)
-
-/** What the player opens: the stream and the server's track choice for it. */
-data class PlayerSession(
-    val request: PlaybackRequest,
-    val url: String,
-    val tracks: TrackSelection?,
-    /** Trailers and live channels play without progress reports. */
-    val reportsProgress: Boolean = true,
-    /** A live channel's server HLS session, kept alive while it plays and stopped after. */
-    val liveSessionId: String? = null,
-    /** A live channel: no scrubber or seeking, closed captions offered. */
-    val isLive: Boolean = false,
-    /** The backend stream path (seek-preview thumbnails are keyed by it); null for trailers and live. */
-    val streamPath: String? = null,
-    /** The release playing (prequeue display name or the picked source's title), for subtitle matching. */
-    val releaseName: String? = null,
-    /** The file's subtitle streams as the server probed them; empty when it sent none. */
-    val subtitleStreams: List<SubtitleStreamInfo> = emptyList(),
-    /** The profile's playback settings (track languages, subtitle mode), read as the stream resolved. */
-    val playback: PlaybackSettings? = null,
-    /** [tracks] holds tracks picked by hand in manual selection: this device's track overrides don't apply. */
-    val manualTracks: Boolean = false,
-    /** Switch Source: the languages that were playing, applied over this stream's choice. */
-    val carried: CarriedTracks? = null,
-    /** A recording still recording, over a growing HLS session: opens another one if its playlist ends early. */
-    val growingRestart: (suspend () -> LiveStream)? = null,
-)
-
-/** A resolved stream: its path, the server's track choice and what online subtitles match against. */
-data class ResolvedStream(
-    val path: String,
-    val tracks: TrackSelection?,
-    val releaseName: String? = null,
-    val subtitleStreams: List<SubtitleStreamInfo> = emptyList(),
-    val manualTracks: Boolean = false,
-)
 
 /**
  * Resolves a source through the backend prequeue (or a hand-picked source through resolve),
@@ -223,7 +175,8 @@ object PlaybackCoordinator {
                 pending = if (live != null) {
                     val stream = live()
                     PlayerSession(request, stream.url, null, reportsProgress = false, liveSessionId = stream.sessionId,
-                                  isLive = !growing, growingRestart = live.takeIf { growing })
+                                  isLive = !growing, growingRestart = live.takeIf { growing },
+                                  retuneLive = live.takeIf { !growing })
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
                     val r = resolve()

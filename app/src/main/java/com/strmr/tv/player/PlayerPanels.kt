@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -118,6 +123,32 @@ fun InfoPanel(request: PlaybackRequest, modifier: Modifier = Modifier) {
                 Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = 0.85f),
                      modifier = Modifier.padding(top = 6.dp))
             }
+        }
+    }
+}
+
+/**
+ * Over a live channel while it is tuned again ([LiveRetune]): its logo and name and
+ * "Reconnecting…" on black, like the tvOS player's loading cover. Not focusable.
+ */
+@Composable
+fun LiveReconnectingCover(request: PlaybackRequest, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxSize().background(Color.Black),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
+    ) {
+        // A logo that doesn't load leaves the cover, rather than an empty box above the name (as tvOS hides it).
+        var logoFailed by remember { mutableStateOf(false) }
+        Artwork.logo(request.logoUrl ?: request.title.logoUrl)?.takeIf { !logoFailed }?.let {
+            AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Fit,
+                       onError = { logoFailed = true }, modifier = Modifier.size(320.dp, 140.dp))
+        }
+        Text(request.title.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 64.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+            Text("Reconnecting…", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.75f))
         }
     }
 }

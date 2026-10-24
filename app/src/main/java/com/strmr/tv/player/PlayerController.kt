@@ -24,8 +24,6 @@ import com.strmr.tv.api.StartPoint
 import com.strmr.tv.api.mediaHeaders
 import com.strmr.tv.api.reportProgress
 import com.strmr.tv.app.AppLog
-import com.strmr.tv.live.keepLiveSessionAlive
-import com.strmr.tv.live.stopLiveSession
 import com.strmr.tv.player.dv7.Dv7Playback
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -83,6 +81,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         session.streamPath?.takeIf { !session.isLive && session.reportsProgress }?.let { PlaybackThumbnails(it, request) }
     /** A recording still recording, over its growing HLS session (set as the player is built). */
     private var recordingHls: RecordingHls? = null
+    /** A live channel: its server session, and tuning it again when the source drops (set as the player is built). */
+    var liveRetune: LiveRetune? = null
+        private set
     val upNext: UpNext? = if (session.reportsProgress && !session.isLive) {
         UpNext(request, scope) { next ->
             report(ended = true)
@@ -93,7 +94,10 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
             isPlaying.value = playing
-            if (playing) startProgress() else if (player.playbackState == Player.STATE_READY) report(paused = true)
+            if (playing) {
+                liveRetune?.playing()
+                startProgress()
+            } else if (player.playbackState == Player.STATE_READY) report(paused = true)
         }
 
         override fun onPlaybackStateChanged(state: Int) {
@@ -103,6 +107,10 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 if (upNext?.ended() == true) return
                 recordingHls?.let { hls ->
                     hls.ended { ended.value = true }
+                    return
+                }
+                liveRetune?.let { live ->
+                    live.ended()
                     return
                 }
                 report(ended = true)
@@ -148,6 +156,10 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 player.prepare()
                 return
             }
+            if (liveRetune?.failed(e) == true) {
+                AppLog.w("Player", "live source error ${e.errorCodeName}: ${e.message}")
+                return
+            }
             AppLog.e("Player", "playback error ${e.errorCodeName}: ${e.message}", e)
             thumbnails?.cancel()
             error.value = e.message ?: e.errorCodeName
@@ -173,6 +185,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             .build()
         player.addListener(listener)
         recordingHls = session.growingRestart?.let { RecordingHls(player, scope, session.liveSessionId, it) }
+        liveRetune = session.retuneLive?.let { LiveRetune(player, scope, session.liveSessionId, it, ::liveGaveUp) }
         // Debug builds log every player event under the EventLogger tag.
         if (com.strmr.tv.BuildConfig.DEBUG) player.addAnalyticsListener(androidx.media3.exoplayer.util.EventLogger())
         // A growing recording's playlist plays from its start (0), not its live edge.
@@ -219,14 +232,10 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         player.seekTo((duration * start.value / 100).toLong())
     }
 
-    /** A live channel's server HLS session stays open only while it is pinged. */
-    private val keepalive: Job? = session.liveSessionId?.takeIf { session.growingRestart == null }?.let { id ->
-        scope.launch {
-            while (isActive) {
-                delay(30_000)
-                ApiClient.keepLiveSessionAlive(id)
-            }
-        }
+    /** A live channel that couldn't be kept on air closes, its message over the page beneath (as on tvOS). */
+    private fun liveGaveUp(message: String) {
+        PlaybackCoordinator.errorMessage.value = message
+        ended.value = true
     }
 
     private fun startProgress() {
@@ -309,8 +318,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         thumbnails?.cancel()
         upNext?.cancel()
         progressJob?.cancel()
-        keepalive?.cancel()
-        recordingHls?.release() ?: session.liveSessionId?.let { id -> MainScope().launch { ApiClient.stopLiveSession(id) } }
+        // Each stops its server session.
+        recordingHls?.release()
+        liveRetune?.release()
         player.removeListener(listener)
         player.release()
         // Let the last report finish on its own.
