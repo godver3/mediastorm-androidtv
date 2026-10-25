@@ -214,3 +214,11 @@ fun formatTimestamp(seconds: Double): String {
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
 }
+
+/** A runtime in minutes as "52m" / "1h" / "1h 5m"; null when unknown. */
+fun formatRuntime(minutes: Int?): String? {
+    val r = minutes?.takeIf { it > 0 } ?: return null
+    val h = r / 60
+    val m = r % 60
+    return if (h == 0) "${m}m" else if (m == 0) "${h}h" else "${h}h ${m}m"
+}

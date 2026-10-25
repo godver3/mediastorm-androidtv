@@ -18,6 +18,7 @@ import com.strmr.tv.api.Title
 import com.strmr.tv.api.TrailerList
 import com.strmr.tv.api.collectionMovies
 import com.strmr.tv.api.detailsBundle
+import com.strmr.tv.api.formatRuntime
 import com.strmr.tv.api.libraryMatches
 import com.strmr.tv.api.setWatched
 import com.strmr.tv.home.CardBadge
@@ -266,7 +267,7 @@ class DetailsModel(val target: DetailsTarget) {
             val parts = mutableListOf<String>()
             (title?.year ?: target.year)?.let { parts += it.toString() }
             title?.certification?.takeIf { it.isNotEmpty() }?.let { parts += it }
-            title?.runtimeMinutes?.takeIf { it > 0 }?.let { r -> parts += (if (r / 60 > 0) "${r / 60}h " else "") + "${r % 60}m" }
+            formatRuntime(title?.runtimeMinutes)?.let { parts += it }
             if (seasons.isNotEmpty()) {
                 val n = seasons.count { it.number > 0 }
                 parts += if (n == 1) "1 Season" else "$n Seasons"

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +50,7 @@ import coil.compose.AsyncImage
 import com.strmr.tv.ui.cardFocusBorder
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.api.Episode
+import com.strmr.tv.api.formatRuntime
 import com.strmr.tv.home.ReleaseBadge
 import com.strmr.tv.ui.CardFocusScale
 import com.strmr.tv.ui.captionGap
@@ -182,7 +184,7 @@ private fun EpisodeCard(
                 val still = Artwork.url(episode.image?.url ?: fallbackImage, "w500")
                 AsyncImage(
                     model = if (blurStill) blurredStillRequest(still) else still,
-                    contentDescription = episode.name,
+                    contentDescription = episode.name + (episode.runtimeMinutes?.takeIf { it > 0 }?.let { ", $it minutes" } ?: ""),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E)).then(if (blurStill) Modifier.blurredStill() else Modifier),
                 )
@@ -210,7 +212,14 @@ private fun EpisodeCard(
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("${episode.code} · ${episode.name}", fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // The runtime trails the name, so a long name truncates first.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                Text("${episode.code} · ${episode.name}", fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                formatRuntime(episode.runtimeMinutes)?.let {
+                    Text(it, fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
+                }
+            }
             episode.overview?.let {
                 val color = Color.White.copy(alpha = 0.6f)
                 if (blurOverview) {
