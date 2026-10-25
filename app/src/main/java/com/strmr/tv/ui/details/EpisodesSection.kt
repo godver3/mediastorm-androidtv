@@ -108,7 +108,9 @@ fun EpisodesSection(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.focusRequester(seasonRow).focusRestorer(selectedChip),
             ) {
-                items(seasons, key = { it.id }) { season ->
+                // Keyed by number: a season's ID can be empty (a TVDB season with no record), and a
+                // repeated LazyRow key crashes the page.
+                items(seasons, key = { it.number }) { season ->
                     val selected = season.number == current.number
                     FilterChip(
                         selected = selected, onClick = { model.selectedSeason = season.number },
@@ -121,7 +123,7 @@ fun EpisodesSection(
         } else {
             Text(current.name.ifEmpty { "Episodes" }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = ContentMargin))
         }
-        key(current.id) {
+        key(current.number) {
             val entryIndex = current.episodes.indexOfFirst { it.id == model.primaryEpisode?.id }.coerceAtLeast(0)
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
             val entry = remember { FocusRequester() }
@@ -132,7 +134,7 @@ fun EpisodesSection(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.focusRestorer(entry),
             ) {
-                items(current.episodes, key = { it.id }) { ep ->
+                items(current.episodes, key = { "${it.seasonNumber}x${it.episodeNumber}:${it.id}" }) { ep ->
                     val watched = model.isWatched(ep)
                     val privacyEpisode = model.privacyEpisode
                     EpisodeCard(
