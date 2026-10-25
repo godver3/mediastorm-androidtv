@@ -169,6 +169,7 @@ object AppUpdater {
             state = State.Failed(e.message ?: "Download failed", manifest)
             return
         }
+        withContext(Dispatchers.IO) { fetchProfile(manifest, UpdateInstaller.profileFor(apk)) }
         AppLog.i("Update", "${manifest.label} downloaded and verified")
         state = State.Ready(manifest, apk)
         val silentAuto = installsOnLeave() && !manual
@@ -206,6 +207,25 @@ object AppUpdater {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * The baseline profile for this Android version, beside the APK. Optional: without it the
+     * update installs uncompiled and runs slowly until the system's idle compile.
+     */
+    private fun fetchProfile(manifest: UpdateManifest, file: File) {
+        val sdk = android.os.Build.VERSION.SDK_INT
+        val profile = manifest.profiles.firstOrNull { sdk in it.minApi..it.maxApi } ?: return
+        runCatching {
+            http.newCall(Request.Builder().url(profile.url).build()).execute().use {
+                if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+                file.outputStream().use { out -> it.body!!.byteStream().copyTo(out) }
+            }
+            if (!UpdateInstaller.sha256(file).equals(profile.sha256, ignoreCase = true)) throw IOException("checksum mismatch")
+        }.onFailure {
+            file.delete()
+            AppLog.w("Update", "baseline profile for ${manifest.label} skipped: ${it.message}")
         }
     }
 

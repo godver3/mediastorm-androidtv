@@ -110,13 +110,21 @@ object UpdateInstaller {
         return certs.orEmpty().map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).hex() }.toSet()
     }
 
-    /** Writes the APK into an install session and commits it; the outcome arrives in [UpdateInstallReceiver]. */
+    /** Where the APK's baseline profile is kept, if one was downloaded. */
+    fun profileFor(apk: File) = File(apk.parentFile, apk.nameWithoutExtension + ".dm")
+
+    /**
+     * Writes the APK, and its baseline profile when there is one (the system then compiles the
+     * update as it installs), into an install session and commits it; the outcome arrives in
+     * [UpdateInstallReceiver].
+     */
     @SuppressLint("RequestInstallPackagesPolicy")
     fun install(apk: File) {
         val installer = context.packageManager.packageInstaller
+        val profile = profileFor(apk).takeIf { it.exists() }
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(context.packageName)
-            setSize(apk.length())
+            setSize(apk.length() + (profile?.length() ?: 0))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
@@ -124,16 +132,18 @@ object UpdateInstaller {
         val id = installer.createSession(params)
         try {
             installer.openSession(id).use { session ->
-                session.openWrite("base.apk", 0, apk.length()).use { out ->
-                    apk.inputStream().use { it.copyTo(out, 1 shl 16) }
-                    session.fsync(out)
+                for ((name, file) in listOfNotNull("base.apk" to apk, profile?.let { "base.dm" to it })) {
+                    session.openWrite(name, 0, file.length()).use { out ->
+                        file.inputStream().use { it.copyTo(out, 1 shl 16) }
+                        session.fsync(out)
+                    }
                 }
                 val intent = Intent(context, UpdateInstallReceiver::class.java)
                 // Mutable: the installer adds the status and, if needed, the confirmation intent.
                 val pending = PendingIntent.getBroadcast(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
                 session.commit(pending.intentSender)
             }
-            AppLog.i("Update", "install session $id committed (silent=$silent)")
+            AppLog.i("Update", "install session $id committed (silent=$silent, profile=${profile != null})")
         } catch (e: Exception) {
             runCatching { installer.abandonSession(id) }
             throw e

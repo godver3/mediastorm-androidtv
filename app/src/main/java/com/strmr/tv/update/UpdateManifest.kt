@@ -20,6 +20,12 @@ data class UpdateManifest(
     /** Commit subjects since the previous build, shown in the update prompt. */
     val notes: List<String> = emptyList(),
     val publishedAt: String? = null,
+    /** The build's baseline profiles (dex metadata), so the update is compiled as it installs. */
+    val profiles: List<UpdateProfile> = emptyList(),
 ) {
     val label: String get() = "$versionName ($versionCode)"
 }
+
+/** A baseline profile `.dm` for the Android versions [minApi]..[maxApi]. */
+@Serializable
+data class UpdateProfile(val minApi: Int, val maxApi: Int, val url: String, val sha256: String)
