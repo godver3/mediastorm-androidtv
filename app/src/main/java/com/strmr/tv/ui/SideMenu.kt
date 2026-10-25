@@ -3,6 +3,8 @@ package com.strmr.tv.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -99,6 +101,8 @@ internal fun SideMenu(
                         if (railWidth.let { w -> w == null || width < w }) railWidth = width
                     }
                     .background(background)
+                    // More entries than the screen holds scroll instead of squeezing the last ones.
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 28.dp)
                     // Entering from the page lands on the current entry, not the one beside the focused card.
                     .focusProperties { onEnter = { menuFocus.requestFocus() } }
