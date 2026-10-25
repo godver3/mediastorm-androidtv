@@ -77,6 +77,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     private val prefs = TrackPreferences(session.tracks, effectiveTracks)
     private var prefsApplied = false
     private var startApplied = false
+    private var audioRetried = false
     /** The playback's main-thread scope, cancelled shortly after [release]. */
     val scope = MainScope()
     private var progressJob: Job? = null
@@ -161,6 +162,13 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         }
 
         override fun onPlayerError(e: PlaybackException) {
+            // A passthrough track the output refused: PassthroughGuard now offers PCM, so prepare again once.
+            if (e.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED && !audioRetried) {
+                audioRetried = true
+                AppLog.w("Player", "audio output failed (${e.message}); retrying with decoded audio")
+                player.prepare()
+                return
+            }
             // A live stream that fell behind its window rejoins at the live edge.
             if (session.isLive && e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                 AppLog.w("Player", "behind the live window; rejoining")
@@ -179,7 +187,8 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     }
 
     init {
-        val renderers = DefaultRenderersFactory(context)
+        // Passthrough only where the output takes it (not Bluetooth); PCM otherwise.
+        val renderers = PassthroughGuard.renderersFactory(context)
             // Platform decoders first; the FFmpeg extension (TrueHD, DTS…) when none can.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
