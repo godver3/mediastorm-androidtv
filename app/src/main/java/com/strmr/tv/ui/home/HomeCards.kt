@@ -237,6 +237,7 @@ private val CardBadge.Symbol.icon: ImageVector
         CardBadge.Symbol.UNRELEASED -> AppIcons.Hourglass
         CardBadge.Symbol.IN_THEATERS -> AppIcons.Theaters
         CardBadge.Symbol.WATCHED -> Icons.Filled.Check
+        CardBadge.Symbol.IN_PROGRESS -> AppIcons.WatchedPartial
     }
 
 /** Resume progress: a white capsule on a faint track, inset in the card (the tvOS bar). */

@@ -114,7 +114,7 @@ data class HomeCard(
             artworkUrl = item.backdropUrl ?: item.posterUrl,
             posterUrl = item.textPosterUrl ?: item.posterUrl,
             badge = ReleaseBadge.forTitle(item.availability, item.status, item.releaseDate)
-                ?: if (item.watchState == "complete") CardBadge.Watched else null,
+                ?: CardBadge.forWatchState(item.watchState),
         )
 
         /** A list title; `rank` (Top 10) shows as the badge. */
@@ -128,7 +128,9 @@ data class HomeCard(
             logoUrl = title.logo?.url,
             artworkUrl = title.backdrop?.url ?: title.poster?.url,
             posterUrl = title.textPoster?.url ?: title.poster?.url,
-            badge = rank?.let { CardBadge("#$it") } ?: ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate),
+            badge = rank?.let { CardBadge("#$it") }
+                ?: ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate)
+                ?: CardBadge.forWatchState(title.watchState),
             rank = rank,
             certification = title.certification?.takeIf { it.isNotBlank() },
             genre = title.genres?.firstOrNull(),

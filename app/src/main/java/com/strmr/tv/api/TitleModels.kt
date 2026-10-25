@@ -106,6 +106,8 @@ data class Title(
     val credits: Credits? = null,
     /** Movies: the collection the movie belongs to (details only). */
     val collection: CollectionRef? = null,
+    /** none | partial | complete, for the profile that asked (Search, Top 10, list rows). */
+    val watchState: String? = null,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
 }

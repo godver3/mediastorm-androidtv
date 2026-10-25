@@ -12,13 +12,21 @@ import java.util.Locale
  * shows instead of the text (the text stays as the content description and in the details header).
  */
 data class CardBadge(val text: String, val symbol: Symbol? = null) {
-    enum class Symbol { COMING_SOON, UNRELEASED, IN_THEATERS, WATCHED }
+    enum class Symbol { COMING_SOON, UNRELEASED, IN_THEATERS, WATCHED, IN_PROGRESS }
 
     companion object {
         val ComingSoon = CardBadge("Coming Soon", Symbol.COMING_SOON)
         val Unreleased = CardBadge("Unreleased", Symbol.UNRELEASED)
         val InTheaters = CardBadge("In Theaters", Symbol.IN_THEATERS)
         val Watched = CardBadge("Watched", Symbol.WATCHED)
+        val InProgress = CardBadge("In Progress", Symbol.IN_PROGRESS)
+
+        /** The server's `watchState`: watched, or started (a movie's progress, a series' episodes). */
+        fun forWatchState(state: String?): CardBadge? = when (state) {
+            "complete" -> Watched
+            "partial" -> InProgress
+            else -> null
+        }
     }
 }
 
