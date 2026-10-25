@@ -1,6 +1,7 @@
 package com.strmr.tv.ui.home
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,41 +35,55 @@ import coil.request.ImageRequest
 import com.strmr.tv.api.Artwork
 
 /**
- * The carousel's backdrop: the slide's art over the last one, faded in once it has loaded.
- * Two images and one alpha read in the draw phase, so a crossfade redraws two layers and
- * recomposes nothing (cheap on a Fire TV). [next] is fetched ahead so auto-advance fades at once.
+ * The carousel's backdrop: a stack of slide art, each new slide fading in over whatever is on
+ * screen once it has loaded; a layer fully in drops the ones beneath. Rapid presses fade from
+ * the half-faded art, never back to the slide that was up first. Each layer keeps its own image
+ * (nothing reloads mid-fade) and alpha read in the draw phase, so a crossfade recomposes nothing
+ * (cheap on a Fire TV). [next] is fetched ahead so auto-advance fades at once.
  */
 @Composable
 fun CarouselBackdrop(url: String?, next: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val shown = Artwork.url(url)
-    /** The art under the fading one: the slide before, until the new one is fully in. */
-    var under by remember { mutableStateOf(shown) }
-    val fade = remember { Animatable(1f) }
+    val layers = remember { mutableStateListOf<BackdropLayer>() }
     LaunchedEffect(shown) {
-        if (shown == null) { under = null; fade.snapTo(1f) } else if (shown != under) fade.snapTo(0f)
+        if (shown == null) { layers.clear(); return@LaunchedEffect }
+        if (layers.lastOrNull()?.url == shown) return@LaunchedEffect
+        // Layers not yet fading in show nothing; past that, cap the full-screen layers drawn at once.
+        val bottom = layers.firstOrNull()
+        layers.removeAll { it !== bottom && it.alpha.value == 0f }
+        while (layers.size >= MAX_LAYERS) layers.removeAt(1)
+        // The first art shows as it loads; later ones start hidden, so a preloaded one never draws at full alpha first.
+        layers += BackdropLayer(shown, Animatable(if (layers.isEmpty()) 1f else 0f))
     }
     LaunchedEffect(next) {
         Artwork.url(next)?.let { context.imageLoader.enqueue(ImageRequest.Builder(context).data(it).build()) }
     }
-    var loaded by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(loaded) {
-        if (loaded == null || loaded != shown) return@LaunchedEffect
-        fade.animateTo(1f, tween(FADE_MS))
-        under = shown
-    }
     Box(modifier) {
-        AsyncImage(model = under, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        AsyncImage(
-            model = shown, contentDescription = null, contentScale = ContentScale.Crop,
-            onSuccess = { loaded = shown },
-            onError = { loaded = shown },
-            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = fade.value },
-        )
+        for (layer in layers) key(layer) {
+            var loaded by remember { mutableStateOf(false) }
+            LaunchedEffect(loaded) {
+                if (!loaded) return@LaunchedEffect
+                layer.alpha.animateTo(1f, tween(FADE_MS))
+                val index = layers.indexOf(layer)
+                if (index > 0) layers.removeRange(0, index)
+            }
+            AsyncImage(
+                model = layer.url, contentDescription = null, contentScale = ContentScale.Crop,
+                onSuccess = { loaded = true },
+                onError = { loaded = true },
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = layer.alpha.value },
+            )
+        }
         CarouselScrim()
     }
 }
 
+/** One slide's art in the backdrop stack, with its fade. */
+private class BackdropLayer(val url: String, val alpha: Animatable<Float, AnimationVector1D>)
+
+/** The settled art, one slide fading in, and one caught mid-fade by a quick press. */
+private const val MAX_LAYERS = 3
 private const val FADE_MS = 700
 
 /**
