@@ -93,6 +93,7 @@ fun PosterGrid(
     }
     val cardSize = GridCardSizeStore.size
     val captionGap = if (columns == null) captionGap(POSTER_MAX_HEIGHT * cardSize.scale) else POSTER_CAPTION_GAP
+    val keys = remember(cards) { uniqueKeys(cards) { it.id } }
     LazyVerticalGrid(
         columns = columns ?: GridCells.Adaptive(cardSize.posterMinWidth),
         state = rememberLazyGridState(),
@@ -102,7 +103,7 @@ fun PosterGrid(
         modifier = modifier.focusRestorer(),
     ) {
         header()
-        itemsIndexed(cards, key = { _, c -> c.id }) { index, card ->
+        itemsIndexed(cards, key = { index, _ -> keys[index] }) { index, card ->
             if (onNearEnd != null && index >= cards.size - nearEndCards) androidx.compose.runtime.LaunchedEffect(cards.size) { onNearEnd() }
             PosterCard(
                 card,

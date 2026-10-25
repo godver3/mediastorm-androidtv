@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -49,6 +50,7 @@ import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.player.PlaybackRequest
 import com.strmr.tv.ui.PageMargin
 import com.strmr.tv.ui.pageBackground
+import com.strmr.tv.ui.uniqueKeys
 import kotlinx.coroutines.launch
 
 /**
@@ -132,7 +134,10 @@ fun LibraryShowScreen(entry: LibraryEntry) {
                 }
             }
             season?.let { s ->
-                items(s.episodes.sortedBy { it.episodeNumber }, key = { "${s.seasonNumber}-${it.episodeNumber}" }) { e ->
+                // Unnumbered extras share episode number 0, so the key needs the group ID.
+                val episodes = s.episodes.sortedBy { it.episodeNumber }
+                val keys = uniqueKeys(episodes) { it.id ?: "${s.seasonNumber}-${it.episodeNumber}" }
+                itemsIndexed(episodes, key = { i, _ -> keys[i] }) { _, e ->
                     ListItem(
                         selected = false,
                         onClick = { play(s, e) },

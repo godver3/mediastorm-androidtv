@@ -77,6 +77,7 @@ data class LibraryItem(
 
 @Serializable
 data class LibraryEpisode(
+    val id: String? = null,
     val episodeNumber: Int,
     val episodeTitle: String? = null,
     val episodeOverview: String? = null,

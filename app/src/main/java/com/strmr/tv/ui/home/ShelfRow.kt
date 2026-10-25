@@ -42,6 +42,7 @@ import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeShelf
 import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.ui.ContentMargin
+import com.strmr.tv.ui.uniqueKeys
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -242,6 +243,7 @@ fun ShelfRow(
 
     Column(Modifier.height(metrics.rowHeight)) {
         Text(shelf.title, fontSize = 19.sp, fontWeight = FontWeight.Medium, modifier = Modifier.height(23.dp).padding(start = ROW_INSET))
+        val keys = remember(cards) { uniqueKeys(cards) { it.id } }
         CompositionLocalProvider(LocalBringIntoViewSpec provides NoAutoScroll) {
             LazyRow(
                 state = list,
@@ -264,7 +266,7 @@ fun ShelfRow(
                         )
                     }
                 }
-                itemsIndexed(cards, key = { _, card -> card.id }) { i, card ->
+                itemsIndexed(cards, key = { i, _ -> keys[i] }) { i, card ->
                     val index = first + i
                     HomeCardView(
                         card, metrics, showTitles, { focus.open(index) },

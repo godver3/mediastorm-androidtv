@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismiss: () -> Unit) {
     val ordered = remember(model.seasons) { model.seasons.sortedBy { it.number } }
-    val aired = remember(model.seasons) { ordered.associate { s -> s.id to s.episodes.filter(DetailsModel::hasAired) } }
+    val aired = remember(model.seasons) { ordered.associate { s -> s.number to s.episodes.filter(DetailsModel::hasAired) } }
     val regular = ordered.map { it.number }.filter { it > 0 }
     val latest = if (regular.size > 1) regular.max() else null
     val rest = ordered.filter { it.number != latest }
@@ -78,7 +78,7 @@ fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismi
             }
         }
         item {
-            val allAired = ordered.flatMap { aired[it.id].orEmpty() }
+            val allAired = ordered.flatMap { aired[it.number].orEmpty() }
             val all = ordered.flatMap { it.episodes }
             val focus = if (model.primaryEpisode == null) Modifier.focusRequester(first) else Modifier
             PanelSection("All Episodes")
@@ -86,7 +86,7 @@ fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismi
                 apply(true, allAired, WatchedScope.SHOW, close = true)
             }
             if (latest != null) {
-                val restAired = rest.flatMap { aired[it.id].orEmpty() }
+                val restAired = rest.flatMap { aired[it.number].orEmpty() }
                 Row("All except Season $latest as watched", enabled = restAired.isNotEmpty()) {
                     apply(true, restAired, null, close = true)
                 }
@@ -102,8 +102,9 @@ fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismi
             }
         }
         if (ordered.isNotEmpty()) item { PanelSection("Seasons") }
-        for (season in ordered) item(key = season.id) {
-            SeasonToggle(season, aired[season.id].orEmpty(), model::isWatched) { w, eps -> apply(w, eps, seasonScope(season), close = false) }
+        // Keyed by number: a season's ID can be empty, and a repeated key crashes the dialog.
+        for (season in ordered) item(key = season.number) {
+            SeasonToggle(season, aired[season.number].orEmpty(), model::isWatched) { w, eps -> apply(w, eps, seasonScope(season), close = false) }
         }
     }
 }
