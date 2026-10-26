@@ -71,5 +71,5 @@ private fun DrawScope.soccerBall(color: Color) {
     }
 }
 
-/** Expo's sports accent (#00c8f0): the score-change cue, hockey goal badges. */
-internal val SportsAccent = Color(0xFF00C8F0)
+/** The sports accent (#8ebcf7, the Expo Midnight sports theme's): the score-change cue, hockey goal badges. */
+internal val SportsAccent = Color(0xFF8EBCF7)
