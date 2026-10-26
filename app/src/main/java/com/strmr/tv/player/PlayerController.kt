@@ -81,6 +81,8 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** The playback's main-thread scope, cancelled shortly after [release]. */
     val scope = MainScope()
     private var progressJob: Job? = null
+    /** The latest progress report in flight, which pages reloading after playback wait on. */
+    private var lastReport: Job? = null
     /** A downloaded or translated subtitle, drawn in place of ExoPlayer's cues while selected. */
     val external = ExternalSubtitles(scope, { player.currentPosition }) { cues.value = it }
     val online = OnlineSubtitles(this, scope)
@@ -279,7 +281,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         if (!session.reportsProgress) return
         val (position, duration) = times() ?: return
         val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath)
-        scope.launch { withContext(NonCancellable) { ApiClient.reportProgress(body) } }
+        lastReport = scope.launch { withContext(NonCancellable) { ApiClient.reportProgress(body) } }
     }
 
     /** `byUser`: picked in a menu, which stops a running automatic subtitle search. */
@@ -330,8 +332,8 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         switchTo.value = SourceSwitchRequest(SourceSwitchRules.resumeAt(request, position), source, carried)
     }
 
-    /** Saves the position and lets go of the player. */
-    fun release() {
+    /** Saves the position and lets go of the player; returns the last report, still finishing. */
+    fun release(): Job? {
         if (!ended.value && advanceTo.value == null) report(paused = true)
         clock.cancel()
         online.cancel()
@@ -346,6 +348,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         player.release()
         // Let the last report finish on its own.
         MainScope().launch { delay(5_000); scope.cancel() }
+        return lastReport
     }
 }
 

@@ -129,11 +129,11 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        controller?.release()
+        val saving = controller?.release()
         controller = null
         frameRate?.reset()
         PlaybackCoordinator.playerOpen = false
-        if (isFinishing) PlaybackCoordinator.playerClosed()
+        if (isFinishing) PlaybackCoordinator.playerClosed(saving)
         // After the release, so a direct stream's provider connection is closed first.
         handover?.let { MultiscreenLauncher.open(it) }
         handover = null

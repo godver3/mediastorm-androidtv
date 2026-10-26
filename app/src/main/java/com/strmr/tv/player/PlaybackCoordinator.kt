@@ -32,6 +32,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -246,8 +247,15 @@ object PlaybackCoordinator {
         detail.value = null
     }
 
-    fun playerClosed() {
-        sessionsEnded.value += 1
+    /**
+     * The player closed. Pages reload watch state on this, so it waits (briefly) for the final
+     * progress report to land; otherwise details would show the resume point from before.
+     */
+    fun playerClosed(saving: Job? = null) {
+        scope.launch {
+            withTimeoutOrNull(3_000) { saving?.join() }
+            sessionsEnded.value += 1
+        }
     }
 
     /**
