@@ -81,6 +81,17 @@ class StreamInfoTest {
         assertEquals("Recording", StreamInfo.recording(""))
     }
 
+    @Test fun trackerQuery() {
+        // A pre-resolved debrid link is a plain https URL: only the service type says it is debrid.
+        assertEquals(mapOf("sourceServiceType" to "debrid", "debridProvider" to "torbox"),
+                     StreamInfo.trackerQuery("https://cdn.example/f.mkv", SourceHints("Debrid", debridProvider = "torbox")))
+        assertEquals(mapOf("sourceServiceType" to "debrid", "debridProvider" to "realdebrid"),
+                     StreamInfo.trackerQuery("/debrid/realdebrid/1/f.mkv", null))
+        assertEquals(mapOf("sourceServiceType" to "usenet"), StreamInfo.trackerQuery("/usenet/f.mkv", SourceHints("usenet", debridProvider = "x")))
+        assertEquals(mapOf("sourceServiceType" to "plex"), StreamInfo.trackerQuery("plexmedia:42", SourceHints("usenet")))
+        assertEquals(emptyMap<String, String>(), StreamInfo.trackerQuery("/f.mkv", null))
+    }
+
     @Test fun debridProviders() {
         assertEquals("Debrid-Link", StreamInfo.debridProviderName("debrid_link"))
         assertEquals("Premiumize", StreamInfo.debridProviderName("PREMIUMIZE"))

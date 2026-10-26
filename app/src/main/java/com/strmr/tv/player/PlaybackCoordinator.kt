@@ -200,7 +200,7 @@ object PlaybackCoordinator {
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
                     val r = resolve()
-                    PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path)), r.tracks, streamPath = r.path,
+                    PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path) + StreamInfo.trackerQuery(r.path, r.source)), r.tracks, streamPath = r.path,
                                   releaseName = r.releaseName?.ifEmpty { null } ?: releaseFileName(r.path), subtitleStreams = r.subtitleStreams,
                                   playback = settings.await(), manualTracks = r.manualTracks, carried = carried,
                                   pickTracksOnDevice = r.pickTracksOnDevice,

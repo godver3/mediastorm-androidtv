@@ -203,21 +203,9 @@ object StreamInfo {
         libraryOrigin?.takeIf { it.isNotBlank() }?.let { return it }
         val p = path?.trim()?.lowercase()?.ifEmpty { null } ?: return null
         val explicit = hints?.serviceType?.trim()?.lowercase()?.takeIf { it in serviceTypes }
-        val type = explicit ?: when {
-            p.startsWith("localmedia:") -> "local"
-            p.startsWith("plexmedia:") -> "plex"
-            p.startsWith("jellyfinmedia:") -> "jellyfin"
-            "/debrid/" in p || p.startsWith("debrid/") -> "debrid"
-            else -> "usenet"
-        }
+        val type = explicit ?: serviceTypeFromPath(p) ?: "usenet"
         return when (type) {
-            "debrid" -> {
-                val raw = hints?.debridProvider?.ifBlank { null }
-                    ?: hints?.attributes?.get("debridProvider")?.ifBlank { null }
-                    ?: hints?.attributes?.get("provider")?.ifBlank { null }
-                    ?: debridProviderFromPath(path)
-                listOfNotNull("Debrid", debridProviderName(raw)).joinToString(" · ")
-            }
+            "debrid" -> listOfNotNull("Debrid", debridProviderName(debridProvider(path, hints))).joinToString(" · ")
             "usenet" -> listOfNotNull("Usenet", hints?.indexer?.trim()?.ifEmpty { null }).joinToString(" · ")
             "local" -> "Local"
             "plex" -> "Plex"
@@ -226,6 +214,38 @@ object StreamInfo {
             else -> null
         }
     }
+
+    /**
+     * `sourceServiceType` / `debridProvider` for `/api/video/stream`: the server's dashboard
+     * otherwise guesses from the path and calls anything outside `/debrid/` (a direct debrid
+     * link, a library file) usenet. Library paths win, then the server's service type, then the
+     * path; nothing when none of them says.
+     */
+    fun trackerQuery(path: String, hints: SourceHints?): Map<String, String> {
+        val p = path.trim().lowercase()
+        val library = serviceTypeFromPath(p)?.takeIf { it != "debrid" }
+        val type = library ?: hints?.serviceType?.trim()?.lowercase()?.takeIf { it in serviceTypes }
+            ?: serviceTypeFromPath(p) ?: return emptyMap()
+        val provider = if (type == "debrid") debridProvider(path, hints) else null
+        return buildMap {
+            put("sourceServiceType", type)
+            provider?.let { put("debridProvider", it) }
+        }
+    }
+
+    private fun serviceTypeFromPath(p: String): String? = when {
+        p.startsWith("localmedia:") -> "local"
+        p.startsWith("plexmedia:") -> "plex"
+        p.startsWith("jellyfinmedia:") -> "jellyfin"
+        "/debrid/" in p || p.startsWith("debrid/") -> "debrid"
+        else -> null
+    }
+
+    private fun debridProvider(path: String?, hints: SourceHints?): String? =
+        hints?.debridProvider?.ifBlank { null }
+            ?: hints?.attributes?.get("debridProvider")?.ifBlank { null }
+            ?: hints?.attributes?.get("provider")?.ifBlank { null }
+            ?: debridProviderFromPath(path)
 
     private val serviceTypes = setOf("debrid", "usenet", "local", "plex", "jellyfin", "peartube")
 
