@@ -67,25 +67,28 @@ object DetailsButtons {
         stored?.mapNotNull { name -> DetailsAction.entries.firstOrNull { it.name == name } }?.toSet() ?: defaultInMore
 }
 
-/** Customize Buttons: one row per secondary action, On for the row, Off for More. Rows toggle with the panel left up. */
+/**
+ * Customize Buttons: one row per secondary action showing where it goes, In row or In More;
+ * selecting it moves it to the other, with the panel left up.
+ */
 @Composable
 fun DetailsButtonsDialog(onDismiss: () -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
-    SidePanelDialog("Customize Buttons", "Show in row", onDismiss) {
+    SidePanelDialog("Customize Buttons", "Where each button goes", onDismiss) {
         itemsIndexed(DetailsAction.entries) { index, action ->
             val shown = DetailsButtons.inRow(action)
             ListItem(
                 selected = false,
                 onClick = { DetailsButtons.setInRow(action, !shown) },
                 headlineContent = { Text(action.title) },
-                trailingContent = { Text(if (shown) "On" else "Off") },
+                trailingContent = { Text(if (shown) "In row" else "In More") },
                 modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
             )
         }
         item {
             Text(
-                "Buttons that are off are listed in More. Play and More always stay in the row. Saved on this device for this profile.",
+                "Select a button to move it between the row on the details page and the More menu. Play and More always stay in the row. Saved on this device for this profile.",
                 fontSize = 13.sp, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(top = 12.dp),
             )
         }
