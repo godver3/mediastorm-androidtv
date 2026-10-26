@@ -142,6 +142,8 @@ data class PrequeueStatus(
     val debridProvider: String? = null,
     /** The file's Dolby Vision codec string ("dvhe.07.06"), when it has one. */
     val dolbyVisionProfile: String? = null,
+    /** The server's probe saw an HDR10 (PQ) video stream. */
+    val hasHdr10: Boolean = false,
 ) {
     @Serializable
     data class TargetEpisode(val seasonNumber: Int, val episodeNumber: Int)

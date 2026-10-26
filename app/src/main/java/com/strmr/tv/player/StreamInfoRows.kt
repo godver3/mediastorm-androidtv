@@ -29,7 +29,7 @@ fun streamInfoRows(session: PlayerSession, video: Format?, audio: Format?): List
     return listOfNotNull(
         session.releaseName?.takeIf { it.isNotBlank() && !session.isLive }?.let { "File" to it },
         v?.let(StreamInfo::video)?.let { "Video" to it },
-        v?.let { StreamInfo.dynamicRange(it, session.sourceDolbyVision, session.releaseName) }?.let { "Dynamic range" to it },
+        v?.let { StreamInfo.dynamicRange(it, session.sourceDolbyVision, session.releaseName, session.sourceHdr10) }?.let { "Dynamic range" to it },
         a?.let(StreamInfo::audio)?.let { "Audio" to it },
         session.sourceLabel?.let { "Source" to it },
     )

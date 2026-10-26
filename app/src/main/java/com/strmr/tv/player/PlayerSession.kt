@@ -50,6 +50,8 @@ data class PlayerSession(
     val sourceLabel: String? = null,
     /** The server's Dolby Vision codec string for the file ("dvhe.07.06"), before any on-device Profile 7 rewrite. */
     val sourceDolbyVision: String? = null,
+    /** The server's probe saw HDR10 (PQ) video in the file. */
+    val sourceHdr10: Boolean = false,
 )
 
 /** A resolved stream: its path, the server's track choice and what online subtitles match against. */

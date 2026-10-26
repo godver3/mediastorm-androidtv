@@ -32,6 +32,8 @@ data class SourceHints(
     val attributes: Map<String, String> = emptyMap(),
     /** The server's Dolby Vision codec string for the file ("dvhe.07.06"), before any on-device rewrite. */
     val dolbyVisionProfile: String? = null,
+    /** The server's probe saw HDR10 (PQ) video. */
+    val hdr10: Boolean = false,
 )
 
 /** The Info panel's stream-details rows (File / Video / Dynamic range / Audio / Source). */
@@ -119,8 +121,10 @@ object StreamInfo {
      * SDR / HDR10 / HDR10+ / HLG / Dolby Vision (Profile N). `sourceDv` is the server's codec string
      * for the file: a Profile 7 file this device rewrote (player/dv7) still reports Profile 7, with
      * what it plays as. HDR10+ isn't signalled in the Format, so it comes from the release name.
+     * A Format without HDR colour info (an MKV with no Colour element, a DV track the device opens
+     * as plain HEVC) falls back on the server's probe (`sourceDv`, `sourceHdr10`) rather than SDR.
      */
-    fun dynamicRange(f: TrackFacts, sourceDv: String? = null, releaseName: String? = null): String? {
+    fun dynamicRange(f: TrackFacts, sourceDv: String? = null, releaseName: String? = null, sourceHdr10: Boolean = false): String? {
         if (f.mime == null && f.codecs == null && f.colorTransfer == null) return null
         val playingProfile = dolbyVisionProfile(f.codecs)
         val isDv = f.mime == MimeTypes.VIDEO_DOLBY_VISION || f.codecs?.lowercase()?.let { "dvh" in it || "dva" in it || "dav1" in it } == true
@@ -130,9 +134,12 @@ object StreamInfo {
             return if (isDv) "Dolby Vision Profile 7 (as 8.1)" else "Dolby Vision Profile 7 (HDR10 base layer)"
         }
         if (isDv) return listOfNotNull("Dolby Vision", (playingProfile ?: sourceProfile)?.let { "Profile $it" }).joinToString(" ")
-        return when (f.colorTransfer) {
-            C.COLOR_TRANSFER_ST2084 -> if (releaseName?.let(::isHdr10Plus) == true) "HDR10+" else "HDR10"
-            C.COLOR_TRANSFER_HLG -> "HLG"
+        val hdr10 = if (releaseName?.let(::isHdr10Plus) == true) "HDR10+" else "HDR10"
+        return when {
+            sourceProfile != null -> "Dolby Vision Profile $sourceProfile" + if (pq) " (HDR10 base layer)" else ""
+            pq -> hdr10
+            f.colorTransfer == C.COLOR_TRANSFER_HLG -> "HLG"
+            sourceHdr10 -> hdr10
             else -> "SDR"
         }
     }

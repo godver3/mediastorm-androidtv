@@ -40,6 +40,12 @@ class StreamInfoTest {
         assertEquals("Dolby Vision Profile 7 (HDR10 base layer)", StreamInfo.dynamicRange(pq, sourceDv = "dvhe.07.06"))
         assertEquals("Dolby Vision Profile 7", StreamInfo.dynamicRange(TrackFacts(MimeTypes.VIDEO_DOLBY_VISION, "dvhe.07.06"), "dvhe.07.06"))
         assertNull(StreamInfo.dynamicRange(TrackFacts()))
+        // No HDR colour info in the Format: the server's probe decides, not SDR.
+        val hevc = TrackFacts(MimeTypes.VIDEO_H265, "hvc1.2.4.L153.B0")
+        assertEquals("HDR10", StreamInfo.dynamicRange(hevc, sourceHdr10 = true))
+        assertEquals("Dolby Vision Profile 8", StreamInfo.dynamicRange(hevc, sourceDv = "dvhe.08.06", sourceHdr10 = true))
+        assertEquals("Dolby Vision Profile 8 (HDR10 base layer)", StreamInfo.dynamicRange(pq, sourceDv = "dvhe.08.06"))
+        assertEquals("SDR", StreamInfo.dynamicRange(hevc))
     }
 
     @Test fun audioLine() {
