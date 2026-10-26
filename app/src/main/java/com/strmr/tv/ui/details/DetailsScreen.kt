@@ -1,5 +1,6 @@
 package com.strmr.tv.ui.details
 
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -24,15 +25,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -160,20 +165,30 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     ) {
         val screenHeight = maxHeight
         val backdropAlpha by animateFloatAsState(if (trailer.showing) 0f else 1f, tween(400), label = "backdrop")
+        val pageScroll = rememberScrollState()
+        // How far the page is scrolled toward the rows (0 at the header, 1 by half a screen down),
+        // read in the draw phase so scrolling doesn't recompose the page.
+        val foldPx = with(LocalDensity.current) { screenHeight.toPx() } * 0.5f
+        val belowFold = { (pageScroll.value / foldPx).coerceIn(0f, 1f) }
         AsyncImage(
             model = ImageRequest.Builder(context).data(Artwork.url(model.title?.backdrop?.url ?: target.backdropUrl)).crossfade(300).build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().alpha(backdropAlpha),
+            modifier = Modifier.fillMaxSize().alpha(backdropAlpha).graphicsLayer {
+                // Below the fold the backdrop blurs behind the rows (Android 12+; older ones only dim).
+                val blur = belowFold() * BackdropBlur.toPx()
+                renderEffect = if (Build.VERSION.SDK_INT >= 31 && blur > 0f) BlurEffect(blur, blur, TileMode.Clamp) else null
+            },
         )
+        Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = belowFold() * BackdropDim)) })
         trailer.player?.let { TrailerVideo(it) }
         BackdropShade(hidden = trailer.immersive)
 
         val pageAlpha by animateFloatAsState(if (trailer.immersive) 0f else 1f, tween(400), label = "page")
-        val pageScroll = rememberScrollState()
         WithFoldScroll(pageScroll) { rowScroll ->
         Column(Modifier.fillMaxSize().alpha(pageAlpha).verticalScroll(pageScroll)) {
-            Box(Modifier.fillMaxWidth().height(screenHeight)) {
+            // The header fades as it scrolls up, so the actions don't linger above the rows.
+            Box(Modifier.fillMaxWidth().height(screenHeight).graphicsLayer { alpha = 1f - belowFold() }) {
                 DetailsHeader(
                     model, trailer,
                     onPlay = { p -> model.play(p.episode, p.start, prequeueTracks.pick(warm)) },
@@ -248,6 +263,9 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
         )
     }
 }
+
+private val BackdropBlur = 24.dp
+private val BackdropDim = if (Build.VERSION.SDK_INT >= 31) 0.2f else 0.45f
 
 /** The backdrop trailer, cropped to fill like the image under it. */
 @OptIn(UnstableApi::class)
