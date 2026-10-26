@@ -108,9 +108,18 @@ data class Title(
     val collection: CollectionRef? = null,
     /** none | partial | complete, for the profile that asked (Search, Top 10, list rows). */
     val watchState: String? = null,
+    /** Multi-source ratings (IMDb, Rotten Tomatoes, …), hydrated from MDBList when enabled. */
+    val ratings: List<Rating>? = null,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
 }
+
+/**
+ * One source's score: [source] is imdb, tmdb, trakt, tomatoes, audience, metacritic or
+ * letterboxd; [value] is on that source's [max] scale.
+ */
+@Serializable
+data class Rating(val source: String, val value: Double, val max: Double = 10.0)
 
 @Serializable
 data class SeriesDetails(val title: Title, val seasons: List<Season> = emptyList())

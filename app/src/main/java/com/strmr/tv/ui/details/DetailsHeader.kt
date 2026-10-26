@@ -98,6 +98,7 @@ fun BoxScope.DetailsHeader(
             model.headerBadge?.let { BadgeLabel(it.text, it.symbol) }
             Text(model.metadataLine, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f))
         }
+        model.title?.ratings?.takeIf { it.isNotEmpty() }?.let { RatingsRow(it) }
         (model.title?.overview ?: target.overview)?.let {
             // Cut off, it is focusable and opens whole over the page (Up from the actions reaches it).
             ExpandableText(it, title = target.name, maxLines = 3, fontSize = 13.sp, modifier = Modifier.widthIn(max = 520.dp))
