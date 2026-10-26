@@ -170,7 +170,7 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
         }
         // Inset as tvOS places them: closer to the edge on the narrower poster.
         val inset = if (wide) 8.dp else 5.dp
-        val progress = card.progress > 0.01f
+        val progress = showsProgress(card.progress)
         if (metrics.text.overlays(wide) && card.drawable == null && !card.logoTile) {
             CardOverlay(card.title, card.subtitle, inset, progress, Modifier.align(Alignment.BottomStart))
         }
@@ -239,6 +239,9 @@ private val CardBadge.Symbol.icon: ImageVector
         CardBadge.Symbol.WATCHED -> Icons.Filled.Check
         CardBadge.Symbol.IN_PROGRESS -> AppIcons.WatchedPartial
     }
+
+/** Whether a card shows its resume progress: only between 5% and 90% watched. */
+fun showsProgress(progress: Float): Boolean = progress > 0.05f && progress < 0.9f
 
 /** Resume progress: a white capsule on a faint track, inset in the card (the tvOS bar). */
 @Composable

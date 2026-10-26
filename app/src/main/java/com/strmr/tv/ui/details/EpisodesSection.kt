@@ -60,6 +60,7 @@ import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.ContentMargin
 import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.home.ProgressLine
+import com.strmr.tv.ui.home.showsProgress
 import com.strmr.tv.ui.settings.SpoilerSettings
 
 /**
@@ -200,17 +201,17 @@ private fun EpisodeCard(
                 ReleaseBadge.airDateLabel(episode.airedDate)?.let {
                     Text(
                         it, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = if (progress > 0.01f) 16.dp else 8.dp)
+                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = if (showsProgress(progress)) 16.dp else 8.dp)
                             .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
                 if (inLibrary) {
                     Box(
-                        Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = if (progress > 0.01f) 16.dp else 8.dp)
+                        Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = if (showsProgress(progress)) 16.dp else 8.dp)
                             .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
                     ) { Icon(AppIcons.Library, contentDescription = "In your library", tint = Color.White, modifier = Modifier.size(13.dp)) }
                 }
-                if (progress > 0.01f) ProgressLine(progress, Modifier.align(Alignment.BottomStart).padding(8.dp))
+                if (showsProgress(progress)) ProgressLine(progress, Modifier.align(Alignment.BottomStart).padding(8.dp))
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -45,6 +45,7 @@ import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
 import com.strmr.tv.ui.home.Badge
 import com.strmr.tv.ui.home.ProgressLine
+import com.strmr.tv.ui.home.showsProgress
 import com.strmr.tv.ui.library.rememberLibraryOpener
 
 /**
@@ -166,7 +167,7 @@ fun PosterCard(
                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 )
                 card.badge?.let { Badge(it, Modifier.align(Alignment.TopStart).padding(5.dp)) }
-                if (card.progress > 0.01f) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(5.dp))
+                if (showsProgress(card.progress)) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(5.dp))
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
