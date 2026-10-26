@@ -62,6 +62,7 @@ internal fun StackedHome(
     /** 0 the carousel, 1 the rows. */
     val toRows = remember { Animatable(0f) }
     CrossfadeDriver(active, toRows)
+    if (carousel.slides.isNotEmpty()) CarouselAutoAdvance(carousel.state, carousel.slides.size, active)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val size = layout.effectiveHeroSize
         val textScale = layout.heroTextSize.scale

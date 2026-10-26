@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
@@ -51,16 +52,17 @@ private const val ADVANCE_MS = 8_000L
 private const val SELECT_GUARD_MS = 1_000L
 
 /**
- * Advances [state] every 8 s, focused or not; any remote press starts the 8 s again. Paused
- * while a page or the player covers Home, or the app is in the background (window focus: pages
- * are dialogs). Its own scope, so a slide change or a press recomposes only this.
+ * Advances [state] every 8 s while the carousel is up ([shown]), focused or not; any remote
+ * press starts the 8 s again. Paused while it is crossfaded away for the rows, a page or the
+ * player covers Home, or the app is in the background (window focus: pages are dialogs). Its
+ * own scope, so a slide change or a press recomposes only this.
  */
 @Composable
-fun CarouselAutoAdvance(state: CarouselState, count: Int) {
+fun CarouselAutoAdvance(state: CarouselState, count: Int, shown: State<Boolean>) {
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     val index = state.index
     val presses = RemotePresses.count
-    val running = count > 1 && windowFocused
+    val running = count > 1 && windowFocused && shown.value
     LaunchedEffect(index, count, running, presses) {
         if (!running) return@LaunchedEffect
         delay(ADVANCE_MS)

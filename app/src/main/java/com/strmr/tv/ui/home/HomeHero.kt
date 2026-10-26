@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -29,9 +34,11 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.home.HeroSize
+import kotlinx.coroutines.delay
 
 /** What the hero shows for the focused card (or explore card). */
 data class HeroContent(
@@ -51,7 +58,7 @@ fun HeroBackdrop(hero: HeroContent?) {
             Image(painterResource(hero.drawable), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(Artwork.url(hero?.backdropUrl)).crossfade(350).build(),
+                model = ImageRequest.Builder(LocalContext.current).data(settledArt(Artwork.url(hero?.backdropUrl))).crossfade(350).build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -60,6 +67,25 @@ fun HeroBackdrop(hero: HeroContent?) {
         HeroScrim()
     }
 }
+
+/**
+ * [url] once focus has rested on it for [ART_SETTLE_MS], or at once when it is already in
+ * memory: a fast D-pad sweep then fetches and decodes a full-screen backdrop only where it
+ * stops, not one per card it passes.
+ */
+@Composable
+private fun settledArt(url: String?): String? {
+    val context = LocalContext.current
+    var settled by remember { mutableStateOf(url) }
+    LaunchedEffect(url) {
+        val inMemory = context.imageLoader.memoryCache?.keys?.any { it.key == url } == true
+        if (url != null && !inMemory) delay(ART_SETTLE_MS)
+        settled = url
+    }
+    return settled
+}
+
+private const val ART_SETTLE_MS = 150L
 
 /**
  * The two scrims, drawn once into a cached layer: as gradient shaders, redrawn every frame the

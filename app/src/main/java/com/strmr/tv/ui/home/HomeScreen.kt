@@ -110,7 +110,7 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
 
     LaunchedEffect(Unit) {
         if (store.settings == null) {
-            store.load()
+            store.ensureLoaded()
         } else {
             store.publishLayout()
             store.refreshIfStale()
@@ -153,7 +153,6 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
     if (!layout.topCarousel && layout.focusedInfo) {
         ClassicHome(hero) { modifier -> rows(store.slots, modifier, { hero = it }, null) }
     } else {
-        if (hasSlides) CarouselAutoAdvance(carouselState, slideCount)
         StackedHome(
             store.slots.filterNot { it.id == carouselId },
             carouselId?.let { CarouselSetup(carouselShelf, slides, carouselFocus, carouselState) },

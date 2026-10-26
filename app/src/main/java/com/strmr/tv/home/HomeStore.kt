@@ -58,6 +58,9 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
     /** The manifest revision of the last full load; a different one means reload. */
     private var revision: String? = null
     private var generation = 0
+    /** Full loads and staleness checks running: overlapping triggers (re-entering Home after playing) skip. */
+    private var loadsRunning = 0
+    private var checksRunning = 0
     /** Rows show as they arrive once the page is up; before that it waits on the top row. */
     private var revealed = false
     /** Calendar rows waiting on a server calendar still being built: they keep loading and retry. */
@@ -74,6 +77,20 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
 
     /** Reloads the config and every row. Rows already shown stay until their new cards arrive. */
     suspend fun load() {
+        loadsRunning++
+        try {
+            loadNow()
+        } finally {
+            loadsRunning--
+        }
+    }
+
+    /** Loads unless a load is already running (opening Home and the playback rows' reload both ask). */
+    suspend fun ensureLoaded() {
+        if (loadsRunning == 0) load()
+    }
+
+    private suspend fun loadNow() {
         val gen = ++generation
         calendarRetry?.cancel()
         calendarRetries = 0
@@ -113,16 +130,23 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
     /** Reloads only when the server's home manifest changed (returning to Home, waking, every few minutes). */
     suspend fun refreshIfStale() {
         val known = revision ?: return
-        if (isLoading) return
-        val current = ApiClient.homeRevision()
-        if (current != null && current != known) return load()
-        val retry = plan.filter { it.id in failed || (it.id in calendarPending && calendarRetry?.isActive != true) }
-        if (retry.isNotEmpty()) loadRows(retry, generation)
+        if (isLoading || loadsRunning > 0 || checksRunning > 0) return
+        checksRunning++
+        try {
+            val current = ApiClient.homeRevision()
+            if (current != null && current != known) return load()
+            val retry = plan.filter { it.id in failed || (it.id in calendarPending && calendarRetry?.isActive != true) }
+            if (retry.isNotEmpty()) loadRows(retry, generation)
+        } finally {
+            checksRunning--
+        }
     }
 
     /** Reloads the rows built from Continue Watching and playback (after playing). */
     suspend fun reloadPlaybackRows() {
-        if (settings == null) return load()
+        if (settings == null) return ensureLoaded()
+        // A full load running fetches these rows too.
+        if (loadsRunning > 0) return
         loadRows(plan.filter { it.source.followsPlayback }, generation)
     }
 

@@ -18,6 +18,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlinx.serialization.json.JsonElement
@@ -134,6 +135,8 @@ object ApiClient {
     /**
      * A JSON array response, decoded lossily ([LossyList]): a `null` body (Go's empty slice) is
      * empty and an item that fails to decode is skipped and logged instead of failing the list.
+     * Responses decode on [Dispatchers.Default]: Home's rows all arrive at launch, and decoding
+     * them on the main thread dropped frames while focus moved.
      */
     suspend inline fun <reified T> sendList(
         method: String, path: String,
@@ -141,7 +144,10 @@ object ApiClient {
         body: JsonElement? = null,
         promptOnLock: Boolean = true,
         timeoutMs: Long = 30_000,
-    ): List<T> = LossyList.decode(json, serializer<T>(), sendRaw(method, path, query, body, promptOnLock = promptOnLock, timeoutMs = timeoutMs))
+    ): List<T> {
+        val raw = sendRaw(method, path, query, body, promptOnLock = promptOnLock, timeoutMs = timeoutMs)
+        return withContext(Dispatchers.Default) { LossyList.decode(json, serializer<T>(), raw) }
+    }
 
     suspend inline fun <reified T> send(
         method: String, path: String,
@@ -151,7 +157,10 @@ object ApiClient {
         promptOnLock: Boolean = true,
         timeoutMs: Long = 30_000,
         headers: Map<String, String> = emptyMap(),
-    ): T = json.decodeFromString(sendRaw(method, path, query, body, authorized, promptOnLock, timeoutMs, headers = headers))
+    ): T {
+        val raw = sendRaw(method, path, query, body, authorized, promptOnLock, timeoutMs, headers = headers)
+        return withContext(Dispatchers.Default) { json.decodeFromString(raw) }
+    }
 
     /**
      * Authorized calls refresh the session ahead of expiry, and when the server says the

@@ -90,7 +90,7 @@ data class CalendarItem(
         get() = runCatching {
             val zone = ZoneId.systemDefault()
             if (airTime != null) {
-                LocalDateTime.parse("$airDate $airTime", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")).atZone(zone)
+                LocalDateTime.parse("$airDate $airTime", AIR_TIME).atZone(zone)
             } else {
                 LocalDate.parse(airDate).atStartOfDay(zone)
             }.toInstant().toEpochMilli()
@@ -127,3 +127,6 @@ data class DashboardStream(
     val backdropUrl: String? = null,
     val liveSourceUrl: String? = null,
 )
+
+/** A calendar air time: shared, as the calendar rows sort by `airs` (immutable, thread-safe). */
+private val AIR_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
