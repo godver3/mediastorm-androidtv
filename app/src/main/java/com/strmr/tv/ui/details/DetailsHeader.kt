@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -24,9 +25,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -52,9 +55,10 @@ import kotlinx.coroutines.launch
 
 /**
  * The first screen's lower-left block: title logo (else the name), the metadata line, three
- * lines of overview and the actions, in the tvOS order: Play / Resume, Start Over, Choose
+ * lines of overview and the actions, in the tvOS order: Play / Resume, Start Over, Versions, Choose
  * Source, Audio & Subtitles (the prequeued stream's tracks, [PrequeueTracksButton]), Trailer, Watchlist, Manage Lists, watched (a series opens [onWatchState]) and More
- * (Set Aside, Continue Watching and Hide, [DetailsMoreMenu]).
+ * (Set Aside, Continue Watching and Hide, [DetailsMoreMenu]). Customize Buttons, in More, moves
+ * any of the secondary ones into More ([DetailsButtons]).
  */
 @Composable
 fun BoxScope.DetailsHeader(
@@ -106,39 +110,22 @@ fun BoxScope.DetailsHeader(
         (model.loadError ?: model.watchedError ?: trailer.errorMessage)?.let { Text(it, fontSize = 12.sp, color = Color(0xFFFF6B6B)) }
 
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            // One primary button whose label changes as details load (Play → Resume), rather
-            // than swapping buttons, so focus stays put.
-            Button(
-                onClick = { primary?.let(onPlay) },
-                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                modifier = Modifier.focusRequester(playFocus),
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                Text(primary?.label ?: "Play")
-            }
-            if (primary?.start != null) {
-                // Filled like the icon buttons beside it (the tvOS secondary button), not outlined.
-                Button(
-                    onClick = { onStartOver(primary) },
-                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                    colors = ButtonDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                ) {
-                    Icon(AppIcons.Restart, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text("Start Over")
+            PrimaryButton(primary, model, playFocus, onPlay)
+            // Secondary actions are icon-only, as on the Expo details page. Those Customize Buttons
+            // moved to More ([DetailsButtons]) are left out here and listed there instead.
+            if (primary?.start != null && DetailsButtons.inRow(DetailsAction.START_OVER)) {
+                CaptionedIconButton("Start from the beginning", onClick = { onStartOver(primary) }) {
+                    Icon(AppIcons.Restart, contentDescription = "Start Over")
                 }
             }
-            VersionsButton(model, onVersions)
-            // Secondary actions are icon-only, as on the Expo details page.
-            IconButton(onClick = onChooseSource, enabled = target.isMovie || model.primaryEpisode != null) {
-                Icon(Icons.Filled.Search, contentDescription = "Choose Source")
+            if (DetailsButtons.inRow(DetailsAction.VERSIONS)) VersionsButton(model, onVersions)
+            if (DetailsButtons.inRow(DetailsAction.CHOOSE_SOURCE)) {
+                IconButton(onClick = onChooseSource, enabled = target.isMovie || model.primaryEpisode != null) {
+                    Icon(Icons.Filled.Search, contentDescription = "Choose Source")
+                }
             }
-            PrequeueTracksButton(prequeueTracks, warm)
-            if (trailer.available) {
+            if (DetailsButtons.inRow(DetailsAction.TRACKS)) PrequeueTracksButton(prequeueTracks, warm)
+            if (trailer.available && DetailsButtons.inRow(DetailsAction.TRAILER)) {
                 IconButton(onClick = { trailer.buttonPressed(target.name) }) {
                     when {
                         trailer.preparingFullScreen -> CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
@@ -147,14 +134,74 @@ fun BoxScope.DetailsHeader(
                     }
                 }
             }
-            WatchlistButton(model)
-            IconButton(onClick = { CustomListsStore.picking = target }) {
-                Icon(AppIcons.PlaylistAdd, contentDescription = "Manage Lists")
+            if (DetailsButtons.inRow(DetailsAction.WATCHLIST)) WatchlistButton(model)
+            if (DetailsButtons.inRow(DetailsAction.LISTS)) {
+                IconButton(onClick = { CustomListsStore.picking = target }) {
+                    Icon(AppIcons.PlaylistAdd, contentDescription = "Manage Lists")
+                }
             }
-            WatchedButton(model, onWatchState)
+            if (DetailsButtons.inRow(DetailsAction.WATCHED)) WatchedButton(model, onWatchState)
             IconButton(onClick = onMore) { Icon(AppIcons.MoreHoriz, contentDescription = "More") }
         }
     }
+}
+
+/**
+ * One primary button whose label changes as details load (Play → Resume), rather than swapping
+ * buttons, so focus stays put. With a resume point it fills left to right with the progress, as
+ * the Expo button does (white at rest, like the cards' progress bars; a shade when focused), and
+ * its focus caption gives the time.
+ */
+@Composable
+private fun PrimaryButton(primary: DetailsModel.Primary?, model: DetailsModel, focus: FocusRequester, onPlay: (DetailsModel.Primary) -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val fraction = if (primary?.start == null) 0f else model.resumeFraction(primary.episode)
+    Box(contentAlignment = Alignment.BottomCenter) {
+        Button(
+            onClick = { primary?.let(onPlay) },
+            // The padding goes inside, so the fill reaches the button's edges.
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.focusRequester(focus).onFocusChanged { focused = it.isFocused },
+        ) {
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (fraction > 0f) {
+                    Box(
+                        Modifier.matchParentSize().drawBehind {
+                            drawRect(
+                                if (focused) Color.Black.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.22f),
+                                size = Size(size.width * fraction.coerceAtMost(1f), size.height),
+                            )
+                        },
+                    )
+                }
+                Row(Modifier.padding(ButtonDefaults.ButtonWithIconContentPadding), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(primary?.label ?: "Play")
+                }
+            }
+        }
+        val start = primary?.start
+        if (focused && start != null) FocusCaption("From ${start.label}")
+    }
+}
+
+/** An icon button with a caption under it while focused, as Versions and Audio & Subtitles show. */
+@Composable
+private fun CaptionedIconButton(caption: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Box(contentAlignment = Alignment.BottomCenter) {
+        IconButton(onClick = onClick, modifier = Modifier.onFocusChanged { focused = it.isFocused }) { icon() }
+        if (focused) FocusCaption(caption)
+    }
+}
+
+@Composable
+internal fun FocusCaption(text: String) {
+    Text(
+        text, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f), maxLines = 1,
+        modifier = Modifier.floatingBelow(),
+    )
 }
 
 /**
@@ -170,13 +217,7 @@ private fun VersionsButton(model: DetailsModel, onVersions: () -> Unit) {
         IconButton(onClick = onVersions, modifier = Modifier.onFocusChanged { focused = it.isFocused }) {
             Icon(AppIcons.Library, contentDescription = "Versions")
         }
-        if (focused) {
-            Text(
-                (if (versions.size > 1) "${versions.size} versions · " else "") + "${best.source.label} · ${best.quality}",
-                fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f), maxLines = 1,
-                modifier = Modifier.floatingBelow(),
-            )
-        }
+        if (focused) FocusCaption((if (versions.size > 1) "${versions.size} versions · " else "") + "${best.source.label} · ${best.quality}")
     }
 }
 

@@ -194,18 +194,29 @@ class DetailsModel(val target: DetailsTarget) {
         return if (isUpNext(episode, next)) resume?.startPoint else null
     }
 
-    /** The episode / resume point the primary button plays, and its label. */
+    /** How far through the resume point is (0–1), for the primary button's fill. */
+    fun resumeFraction(episode: Episode?): Float {
+        if (episode == null) return resume?.fraction ?: 0f
+        episode.resume?.let { return it.fraction }
+        val next = upNext ?: return 0f
+        return if (isUpNext(episode, next)) resume?.fraction ?: 0f else 0f
+    }
+
+    /**
+     * The episode / resume point the primary button plays, and its label. The resume time is the
+     * button's focus caption and its fill, not part of the label.
+     */
     data class Primary(val episode: Episode?, val start: StartPoint?, val label: String)
 
     val primary: Primary?
         get() {
             if (target.isMovie) {
                 val at = resumePoint(null)
-                return if (at != null) Primary(null, at, "Resume from ${at.label}") else Primary(null, null, "Play")
+                return if (at != null) Primary(null, at, "Resume") else Primary(null, null, "Play")
             }
             val ep = primaryEpisode ?: return null
             val at = resumePoint(ep)
-            return if (at != null) Primary(ep, at, "Resume ${ep.code} · ${at.label}") else Primary(ep, null, "Play ${ep.code}")
+            return if (at != null) Primary(ep, at, "Resume ${ep.code}") else Primary(ep, null, "Play ${ep.code}")
         }
 
     /**

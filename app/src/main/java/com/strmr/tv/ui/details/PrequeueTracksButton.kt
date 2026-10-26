@@ -14,13 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
-import androidx.tv.material3.Text
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.PlaybackSettings
 import com.strmr.tv.api.PrequeueStatus
@@ -146,13 +143,7 @@ fun PrequeueTracksButton(state: PrequeueTracks, warm: WarmPrequeue?) {
                 Icon(AppIcons.Waveform, contentDescription = "Audio & Subtitles")
             }
         }
-        if (focused) {
-            Text(
-                if (status == null) "Finding a source…" else state.caption(status),
-                fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f), maxLines = 1,
-                modifier = Modifier.floatingBelow(),
-            )
-        }
+        if (focused) FocusCaption(if (status == null) "Finding a source…" else state.caption(status))
     }
 }
 

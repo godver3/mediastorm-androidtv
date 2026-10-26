@@ -90,6 +90,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     var headerFocused by remember { mutableStateOf(true) }
     var watchState by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
+    var customizingButtons by remember { mutableStateOf(false) }
     val navigator = com.strmr.tv.ui.LocalNavigator.current
     val actions = com.strmr.tv.library.TitleActions.changes
     // A long-press menu's bulk watch-state action opens the sheet once the seasons are in.
@@ -130,7 +131,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     // header keeps its focus state under them; this one flag stops the trailer for the visit
     // instead (as the Expo page's dismissTrailerAutoPlay; it doesn't restart when they close).
     val menuOpen = picker != null || pendingSource != null || versionsFor != null || pendingVersion != null ||
-        prequeueTracks.open || watchState || more || CustomListsStore.picking != null
+        prequeueTracks.open || watchState || more || customizingButtons || CustomListsStore.picking != null
     LaunchedEffect(menuOpen) { if (menuOpen) trailer.dismiss("menu open") }
 
     fun chooseVersion(version: LibraryVersion, episode: Episode?) {
@@ -142,6 +143,11 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
         val resumeAt = model.resumePoint(episode)
         if (resumeAt != null) pendingSource = PendingSource(source, episode, resumeAt, manual) else model.play(source, episode, null, manual)
     }
+
+    // Shared by the row's buttons and, for those moved there, More.
+    val startOver = { p: DetailsModel.Primary -> model.play(p.episode, null, prequeueTracks.pick(warm)) }
+    val openVersions = { versionsFor = PickerTarget(if (target.isMovie) null else model.primaryEpisode) }
+    val chooseSource = { picker = PickerTarget(if (target.isMovie) null else model.primaryEpisode) }
 
     BoxWithConstraints(
         Modifier.fillMaxSize().background(Color.Black).onPreviewKeyEvent { e ->
@@ -171,9 +177,9 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
                 DetailsHeader(
                     model, trailer,
                     onPlay = { p -> model.play(p.episode, p.start, prequeueTracks.pick(warm)) },
-                    onStartOver = { p -> model.play(p.episode, null, prequeueTracks.pick(warm)) },
-                    onVersions = { versionsFor = PickerTarget(if (target.isMovie) null else model.primaryEpisode) },
-                    onChooseSource = { picker = PickerTarget(if (target.isMovie) null else model.primaryEpisode) },
+                    onStartOver = startOver,
+                    onVersions = openVersions,
+                    onChooseSource = chooseSource,
                     prequeueTracks = prequeueTracks,
                     warm = warm,
                     onWatchState = { watchState = true },
@@ -202,7 +208,14 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
         model.primary?.let { p -> model.play(p.episode, p.start, prequeueTracks.pick(warm)) }
     }
     if (watchState) WatchStateDialog(model, onChanged = { com.strmr.tv.library.TitleActions.changed() }, onDismiss = { watchState = false })
-    if (more) DetailsMoreMenu(target, scope, onHidden = { navigator.close() }, onDismiss = { more = false })
+    if (more) {
+        val moved = movedActions(
+            model, trailer, prequeueTracks, warm, scope,
+            onStartOver = startOver, onVersions = openVersions, onChooseSource = chooseSource, onWatchState = { watchState = true },
+        )
+        DetailsMoreMenu(target, scope, moved, onCustomize = { customizingButtons = true }, onHidden = { navigator.close() }, onDismiss = { more = false })
+    }
+    if (customizingButtons) DetailsButtonsDialog(onDismiss = { customizingButtons = false })
     picker?.let { p ->
         SourcePicker(target, p.episode, onPick = { source, manual -> choose(source, p.episode, manual) }, onDismiss = { picker = null })
     }
