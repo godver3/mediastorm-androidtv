@@ -43,7 +43,7 @@ import coil.compose.AsyncImage
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
-import com.strmr.tv.ui.home.Badge
+import com.strmr.tv.ui.home.Badges
 import com.strmr.tv.ui.home.ProgressLine
 import com.strmr.tv.ui.home.showsProgress
 import com.strmr.tv.ui.library.rememberLibraryOpener
@@ -166,7 +166,7 @@ fun PosterCard(
                     model = Artwork.url(card.posterUrl ?: card.artworkUrl, "w342"), contentDescription = card.title,
                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 )
-                card.badge?.let { Badge(it, Modifier.align(Alignment.TopStart).padding(5.dp)) }
+                Badges(card, Modifier.align(Alignment.TopStart).padding(5.dp))
                 if (showsProgress(card.progress)) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(5.dp))
             }
         }

@@ -45,7 +45,10 @@ data class HomeCard(
     val posterUrl: String? = null,
     /** 0–1; 0 hides the bar. */
     val progress: Float = 0f,
+    /** Rank, release status or air date: shown first. */
     val badge: CardBadge? = null,
+    /** Watched or in progress, shown beside [badge] (a watched title can still be in theaters). */
+    val watchBadge: CardBadge? = null,
     /** "New": Continue Watching's next episode came out in the last 72 hours. */
     val newEpisode: NewEpisodeBadge? = null,
     /** The card draws `logoUrl` on a plain tile instead of artwork (services, hubs, channels). */
@@ -113,8 +116,8 @@ data class HomeCard(
             logoUrl = item.logoUrl,
             artworkUrl = item.backdropUrl ?: item.posterUrl,
             posterUrl = item.textPosterUrl ?: item.posterUrl,
-            badge = ReleaseBadge.forTitle(item.availability, item.status, item.releaseDate)
-                ?: CardBadge.forWatchState(item.watchState),
+            badge = ReleaseBadge.forTitle(item.availability, item.status, item.releaseDate),
+            watchBadge = CardBadge.forWatchState(item.watchState),
         )
 
         /** A list title; `rank` (Top 10) shows as the badge. */
@@ -129,8 +132,8 @@ data class HomeCard(
             artworkUrl = title.backdrop?.url ?: title.poster?.url,
             posterUrl = title.textPoster?.url ?: title.poster?.url,
             badge = rank?.let { CardBadge("#$it") }
-                ?: ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate)
-                ?: CardBadge.forWatchState(title.watchState),
+                ?: ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate),
+            watchBadge = CardBadge.forWatchState(title.watchState),
             rank = rank,
             certification = title.certification?.takeIf { it.isNotBlank() },
             genre = title.genres?.firstOrNull(),

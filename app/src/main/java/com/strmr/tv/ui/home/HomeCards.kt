@@ -179,10 +179,10 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
         if (!wide && new != null) {
             Column(Modifier.align(Alignment.TopStart).padding(inset), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NewEpisodeBadgeView(new)
-                card.badge?.let { Badge(it, wide = false) }
+                Badges(card)
             }
         } else {
-            card.badge?.let { Badge(it, Modifier.align(Alignment.TopStart).padding(inset), wide = wide) }
+            Badges(card, Modifier.align(Alignment.TopStart).padding(inset), wide = wide)
             if (new != null) NewEpisodeBadgeView(new, Modifier.align(Alignment.TopEnd).padding(inset))
         }
         if (progress) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(inset))
@@ -213,6 +213,14 @@ fun Badge(badge: CardBadge, modifier: Modifier = Modifier, wide: Boolean = false
     ) {
         Icon(icon, contentDescription = badge.text, tint = Color.White, modifier = Modifier.size(13.dp))
     }
+}
+
+/** A card's badges stacked in its top-left corner, as the Expo app stacks a release status with the watch state. */
+@Composable
+fun Badges(card: HomeCard, modifier: Modifier = Modifier, wide: Boolean = false) {
+    val badges = listOfNotNull(card.badge, card.watchBadge)
+    if (badges.isEmpty()) return
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) { badges.forEach { Badge(it, wide = wide) } }
 }
 
 /** Small capsule label on artwork or beside metadata, with an optional leading symbol. */
