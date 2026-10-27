@@ -160,11 +160,12 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
         )
     }
 
-    // A title action (Set Aside, hide, watched): the playback rows (Continue Watching, Set Aside) reload.
+    // A title action (Set Aside, hide, watched): every row reloads, as on tvOS, since any row's
+    // cards carry the server's watch badge. Rows keep their cards until the new ones arrive.
     val actions = TitleActions.changes
     LaunchedEffect(actions) {
         if (actions == 0) return@LaunchedEffect
-        store.reloadPlaybackRows()
+        store.load()
         refocus++
     }
     // A title added to or removed from the watchlist (from any menu or details page): the
