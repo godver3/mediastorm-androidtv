@@ -24,6 +24,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -48,6 +50,8 @@ import com.strmr.tv.api.Artwork
 import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.CardText
 import com.strmr.tv.home.ExploreCard
+import com.strmr.tv.home.HomeSlot
+import com.strmr.tv.home.HomeLayoutStore
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.ui.Accent
@@ -86,6 +90,19 @@ data class CardMetrics(val style: ShelfStyle, val scale: Double, val text: CardT
         const val BASE_HEIGHT = 135f
     }
 }
+
+/** A row's card geometry: its style, at that style's own card size (else Card Size). */
+fun HomeLayoutStore.metrics(shelf: String): CardMetrics {
+    val style = style(shelf)
+    return CardMetrics(style, cardScale(style), cardText)
+}
+
+/**
+ * The rows area under the full hero: the tallest row on the page, so the hero and the focused
+ * row stay put moving between rows of different sizes (a shorter row shows more of the next).
+ */
+fun HomeLayoutStore.tallestRowHeight(slots: List<HomeSlot>): Dp =
+    slots.maxOfOrNull { metrics(it.id).rowHeight } ?: CardMetrics(ShelfStyle.POSTER, effectiveCardScale, cardText).rowHeight
 
 /**
  * A Home card: Compose for TV's Card, which scales and outlines on focus. Posters show the
@@ -251,10 +268,17 @@ private val CardBadge.Symbol.icon: ImageVector
 /** Whether a card shows its resume progress: only between 5% and 90% watched. */
 fun showsProgress(progress: Float): Boolean = progress > 0.05f && progress < 0.9f
 
-/** Resume progress: a white capsule on a faint track, inset in the card (the tvOS bar). */
+/**
+ * Resume progress: a white capsule on a faint track, inset in the card (the tvOS bar). The
+ * track sits on a dark base, so it reads on bright art as well as on the text gradient.
+ */
 @Composable
 fun ProgressLine(progress: Float, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(3.dp).background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))) {
+    Box(
+        modifier.fillMaxWidth().height(4.dp)
+            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)),
+    ) {
         Box(Modifier.fillMaxHeight().fillMaxWidth(progress).background(Color.White, RoundedCornerShape(50)))
     }
 }
@@ -276,7 +300,7 @@ private fun CardOverlay(title: String, subtitle: String, inset: Dp, progress: Bo
     Column(
         modifier.fillMaxWidth()
             .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to Color.Black.copy(alpha = 0.7f), 1f to Color.Black.copy(alpha = 0.95f)))
-            .padding(start = inset, end = inset, top = 16.dp, bottom = inset + if (progress) 6.dp else 0.dp),
+            .padding(start = inset, end = inset, top = 16.dp, bottom = inset + if (progress) 7.dp else 0.dp),
     ) {
         Text(title, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle.isNotEmpty()) {
@@ -331,13 +355,27 @@ fun ExploreCardView(
 
 /** A row still loading (or that failed): its title over empty card shapes, so nothing moves when it arrives. */
 @Composable
-fun PlaceholderRow(title: String, failed: Boolean, metrics: CardMetrics) {
+fun PlaceholderRow(title: String, failed: Boolean, metrics: CardMetrics, entry: FocusRequester? = null) {
     Column(Modifier.height(metrics.rowHeight)) {
         Text(if (failed) "$title — couldn't load" else title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
              color = Color.White.copy(alpha = if (failed) 0.5f else 1f), modifier = Modifier.padding(start = ContentMargin))
         Row(Modifier.padding(start = ContentMargin, top = metrics.liftRoom), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            repeat(6) {
-                Box(Modifier.size(metrics.width, metrics.height).background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp)))
+            repeat(6) { index ->
+                val shape = RoundedCornerShape(10.dp)
+                val fill = Color.White.copy(alpha = 0.06f)
+                if (index == 0 && !failed) {
+                    // A loading row's first card takes focus, so Down stops on the row it waits for;
+                    // Home hands focus to the row's own card when it arrives.
+                    Card(
+                        onClick = {},
+                        scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(),
+                        shape = CardDefaults.shape(shape),
+                        colors = CardDefaults.colors(containerColor = fill, focusedContainerColor = fill),
+                        modifier = Modifier.size(metrics.width, metrics.height).let { if (entry != null) it.focusRequester(entry) else it },
+                    ) {}
+                } else {
+                    Box(Modifier.size(metrics.width, metrics.height).background(fill, shape))
+                }
             }
         }
     }

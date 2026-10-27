@@ -50,11 +50,11 @@ enum class CardText(val label: String) {
 }
 
 /** How a Home row draws its cards. */
-enum class ShelfStyle(val label: String) {
-    POSTER("Poster"),
+enum class ShelfStyle(val label: String, val cardSizeLabel: String) {
+    POSTER("Poster", "Poster Cards"),
     /** The focused poster opens to a 16:9 card with the title's backdrop (`tvLandscapeOnFocus`). */
-    EXPANDING_POSTER("Poster, Expands on Focus"),
-    LANDSCAPE("Landscape");
+    EXPANDING_POSTER("Poster, Expands on Focus", "Expanding Poster Cards"),
+    LANDSCAPE("Landscape", "Landscape Cards");
 
     companion object {
         /** Shelves the Expo TV home draws landscape; the rest are posters. */
@@ -109,6 +109,20 @@ data class HomeLayoutOptions(val topCarousel: Boolean, val focusedInfo: Boolean)
     }
 }
 
+/** Card sizes chosen for one kind of row, as saved in preferences ("LANDSCAPE=SMALL"). */
+object StyleCardSizes {
+    fun encode(sizes: Map<ShelfStyle, CardSize>): Set<String> = sizes.map { "${it.key.name}=${it.value.name}" }.toSet()
+
+    fun decode(saved: Set<String>): Map<ShelfStyle, CardSize> = saved.mapNotNull { entry ->
+        val style = ShelfStyle.entries.firstOrNull { it.name == entry.substringBefore('=') }
+        val size = CardSize.entries.firstOrNull { it.name == entry.substringAfter('=') }
+        if (style != null && size != null) style to size else null
+    }.toMap()
+
+    /** A style's card scale: its own size, else [cardSize]'s (the Card Size setting). */
+    fun scale(sizes: Map<ShelfStyle, CardSize>, style: ShelfStyle, cardSize: Double) = sizes[style]?.scale ?: cardSize
+}
+
 /** A row the profile shows, for the per-row settings. */
 data class ShelfLayoutInfo(val id: String, val title: String, val landscapeByDefault: Boolean)
 
@@ -161,6 +175,9 @@ object HomeLayoutStore {
         private set
     var shelfStyles by mutableStateOf(readStyles())
         private set
+    /** Card sizes chosen for one kind of row (device only); a kind not listed takes Card Size. */
+    var styleCardSizes by mutableStateOf(readStyleCardSizes())
+        private set
     /** Rows hidden from Home on this device; they still load, so showing one again is immediate. */
     var hiddenShelves by mutableStateOf(prefs.getStringSet("hiddenShelves", emptySet())!!.toSet())
         private set
@@ -170,6 +187,9 @@ object HomeLayoutStore {
     val effectiveHeroSize get() = heroSize ?: profile.heroSize
     /** The same Card Size in every Top Carousel / Focused Title Info combination. */
     val effectiveCardScale get() = cardSize?.scale ?: profile.cardScale
+
+    /** The card scale of rows drawn in a style: its own size, else Card Size's. */
+    fun cardScale(style: ShelfStyle) = StyleCardSizes.scale(styleCardSizes, style, effectiveCardScale)
 
     fun chooseFocusPosition(v: FocusedCardPosition?) { focusPosition = v; putEnum("focusPosition", v) }
     fun chooseExpandPosters(v: Boolean?) {
@@ -192,6 +212,11 @@ object HomeLayoutStore {
     }
     fun chooseHeroTextSize(v: HeroTextSize) { heroTextSize = v; putEnum("heroTextSize", v) }
     fun chooseCardSize(v: CardSize?) { cardSize = v; putEnum("cardSize", v) }
+    /** Sets one kind of row's card size; null follows Card Size. */
+    fun chooseStyleCardSize(style: ShelfStyle, v: CardSize?) {
+        styleCardSizes = if (v == null) styleCardSizes - style else styleCardSizes + (style to v)
+        prefs.edit().putStringSet(STYLE_CARD_SIZES, StyleCardSizes.encode(styleCardSizes)).apply()
+    }
     fun chooseCardText(v: CardText) { cardText = v; putEnum("cardText", v) }
     fun chooseViewSwitcher(v: Boolean) { viewSwitcher = v; prefs.edit().putBoolean("viewSwitcher", v).apply() }
 
@@ -234,6 +259,7 @@ object HomeLayoutStore {
 
     private const val TOP_CAROUSEL = "topCarousel"
     private const val FOCUSED_INFO = "focusedInfo"
+    private const val STYLE_CARD_SIZES = "styleCardSizes"
 
     private inline fun <reified E : Enum<E>> enumOrNull(key: String): E? =
         prefs.getString(key, null)?.let { name -> enumValues<E>().firstOrNull { it.name == name } }
@@ -244,4 +270,6 @@ object HomeLayoutStore {
         val id = entry.substringBeforeLast('=')
         ShelfStyle.entries.firstOrNull { it.name == entry.substringAfterLast('=') }?.let { id to it }
     }.toMap()
+
+    private fun readStyleCardSizes() = StyleCardSizes.decode(prefs.getStringSet(STYLE_CARD_SIZES, emptySet())!!)
 }

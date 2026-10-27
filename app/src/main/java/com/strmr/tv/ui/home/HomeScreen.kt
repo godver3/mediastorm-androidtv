@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import com.strmr.tv.app.AppSession
@@ -42,7 +43,6 @@ import com.strmr.tv.home.HomeSlot
 import com.strmr.tv.home.HomeStore
 import com.strmr.tv.home.HomeViewStore
 import com.strmr.tv.home.HomeViews
-import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.library.TitleActions
 import com.strmr.tv.library.WatchlistStore
 import com.strmr.tv.player.PlaybackCoordinator
@@ -151,7 +151,7 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
     }
 
     if (!layout.topCarousel && layout.focusedInfo) {
-        ClassicHome(hero) { modifier -> rows(store.slots, modifier, { hero = it }, null) }
+        ClassicHome(hero, layout.tallestRowHeight(store.slots)) { modifier -> rows(store.slots, modifier, { hero = it }, null) }
     } else {
         StackedHome(
             store.slots.filterNot { it.id == carouselId },
@@ -187,11 +187,10 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
  * Top Carousel off, Focused Title Info on: the Classic Home, the hero following the focused card.
  */
 @Composable
-private fun ClassicHome(hero: HeroContent?, rows: @Composable (Modifier) -> Unit) {
+private fun ClassicHome(hero: HeroContent?, rowHeight: Dp, rows: @Composable (Modifier) -> Unit) {
     val layout = HomeLayoutStore
     val size = layout.effectiveHeroSize
     val full = size == HeroSize.FULL
-    val rowHeight = CardMetrics(ShelfStyle.POSTER, layout.effectiveCardScale, layout.cardText).rowHeight
     Box(Modifier.fillMaxSize()) {
         HeroBackdrop(hero)
         // As on tvOS: with the full hero, the rows area is exactly one row tall above the

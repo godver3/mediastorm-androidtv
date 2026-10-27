@@ -96,6 +96,13 @@ fun HomeLayoutSettings() {
                     s.chooseCardSize(cycleNullable(s.cardSize, CardSize.entries))
                 }
             }
+            // One kind of row's card size; Default follows Card Size.
+            items(ShelfStyle.entries, key = { "size-${it.name}" }) { style ->
+                val chosen = s.styleCardSizes[style]
+                Choice(style.cardSizeLabel, label(chosen?.label, CardSize.nearest(s.effectiveCardScale).label)) {
+                    s.chooseStyleCardSize(style, cycleNullable(chosen, CardSize.entries))
+                }
+            }
             item { Choice("Card Titles", s.cardText.label) { s.chooseCardText(cycle(s.cardText, CardText.entries)) } }
             item {
                 Choice("Posters Expand on Focus", label(s.expandPosters?.let(::onOff), onOff(profile.expandPosters))) {

@@ -23,7 +23,6 @@ import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLayoutStore
 import com.strmr.tv.home.HomeShelf
 import com.strmr.tv.home.HomeSlot
-import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.ui.ContentMargin
 
 /** The Top Carousel's row, its slides and its page-held focus and slide. */
@@ -69,7 +68,7 @@ internal fun StackedHome(
         val full = size == HeroSize.FULL
         val gap = if (size == HeroSize.OFF) 0.dp else 18.dp
         // Where Classic puts the focused row: on the bottom safe area under the full hero, else under a smaller one.
-        val rowHeight = CardMetrics(ShelfStyle.POSTER, layout.effectiveCardScale, layout.cardText).rowHeight
+        val rowHeight = layout.tallestRowHeight(slots)
         val infoRowTop = if (full) maxHeight - SAFE_BOTTOM - rowHeight else TAB_BAR_CLEARANCE + heroHeight(size, textScale) + gap
         // The rows area, clipped as Classic's: one row tall over the safe area under the full hero, else to the bottom.
         val areaTop = if (info) infoRowTop else menuTop

@@ -95,6 +95,8 @@ internal fun HomeRows(
     val noHeader = remember { mutableStateOf(false) }
     var headerFocused by (header?.active ?: noHeader)
     val memories = remember { mutableMapOf<String, ShelfMemory>() }
+    /** The row whose loading placeholder holds focus: it hands focus on when the row arrives. */
+    var placeholderFocused by remember { mutableStateOf<String?>(null) }
     val focusedRow = slots.indexOfFirst { it.id == focusedId }.takeIf { it >= 0 } ?: focusedIndex.coerceIn(0, maxOf(slots.lastIndex, 0))
     LaunchedEffect(focusedRow, headerFocused) {
         if (headerFocused) state.animateScrollToItem(0) else state.animateScrollToItem(focusedRow + lead)
@@ -120,32 +122,52 @@ internal fun HomeRows(
         }
     }
     /**
-     * Up / down past rows still loading or failed (which hold nothing focusable) to the next row
-     * with cards. Focus search can't: that row is off screen and not composed. False when the
-     * adjacent row has cards (plain focus search) or no row with cards lies that way.
+     * Up / down past failed rows (which hold nothing focusable) to the next row that takes focus:
+     * one with cards, or one still loading, whose placeholder holds focus until it arrives (as on
+     * tvOS; skipping it, Down at launch went past Continue Watching while it loaded). Focus search
+     * can't: that row is off screen and not composed. False when the adjacent row takes focus
+     * (plain focus search) or no such row lies that way.
      */
     fun skipPlaceholders(from: Int, step: Int): Boolean {
-        if (slots.getOrNull(from + step).let { it == null || it is HomeSlot.Shelf }) return false
+        if (slots.getOrNull(from + step).let { it == null || it !is HomeSlot.Failed }) return false
         val target = generateSequence(from + step) { it + step }.takeWhile { it in slots.indices }
-            .firstOrNull { slots[it] is HomeSlot.Shelf } ?: return false
+            .firstOrNull { slots[it] !is HomeSlot.Failed } ?: return false
         focusRow(target)
         return true
     }
-    /** Up from the first row with cards: back to the header, which scrolls back in. */
+    /** Up from the first row that takes focus: back to the header, which scrolls back in. */
     fun toHeader(from: Int): Boolean {
-        if (header == null || slots.take(from).any { it is HomeSlot.Shelf }) return false
+        if (header == null || slots.take(from).any { it !is HomeSlot.Failed }) return false
         headerFocused = true
         focusWhenComposed(header.focus)
         return true
     }
-    val firstShelf = slots.indexOfFirst { it is HomeSlot.Shelf }
+    /** The first row that takes focus: Home's first focus at launch, and Down from the header. */
+    val firstRow = slots.indexOfFirst { it !is HomeSlot.Failed }
     val onHeaderDown: () -> Unit = {
-        if (firstShelf >= 0) {
-            val id = slots[firstShelf].id
+        if (firstRow >= 0) {
+            val id = slots[firstRow].id
             focusedId = id
-            focusedIndex = firstShelf
+            focusedIndex = firstRow
             headerFocused = false
             focusWhenComposed(requesters.getOrPut(id) { FocusRequester() })
+        }
+    }
+    // The row a placeholder held focus for has arrived: focus into its cards. Failed (or gone),
+    // focus moves on to the next row that takes it, else the nearest above.
+    LaunchedEffect(slots) {
+        val id = placeholderFocused ?: return@LaunchedEffect
+        val index = slots.indexOfFirst { it.id == id }
+        when (slots.getOrNull(index)) {
+            is HomeSlot.Loading -> return@LaunchedEffect
+            is HomeSlot.Shelf -> { placeholderFocused = null; focusWhenComposed(requesters.getOrPut(id) { FocusRequester() }) }
+            else -> {
+                placeholderFocused = null
+                val from = index.coerceAtLeast(0)
+                val target = (from..slots.lastIndex).firstOrNull { slots[it] !is HomeSlot.Failed }
+                    ?: (from - 1 downTo 0).firstOrNull { slots[it] !is HomeSlot.Failed } ?: return@LaunchedEffect
+                focusRow(target)
+            }
         }
     }
     LaunchedEffect(refocus) {
@@ -171,11 +193,16 @@ internal fun HomeRows(
                 }
             }
             itemsIndexed(slots, key = { _, slot -> slot.id }) { index, slot ->
-                val metrics = CardMetrics(layout.style(slot.id), layout.effectiveCardScale, layout.cardText)
+                val metrics = layout.metrics(slot.id)
                 val requester = requesters.getOrPut(slot.id) { FocusRequester() }
                 Box(
                     Modifier.focusRequester(requester)
-                        .onFocusChanged { if (it.hasFocus) { focusedId = slot.id; focusedIndex = index; headerFocused = false } }
+                        .onFocusChanged {
+                            if (it.hasFocus) {
+                                focusedId = slot.id; focusedIndex = index; headerFocused = false
+                                placeholderFocused = if (slot is HomeSlot.Loading) slot.id else null
+                            }
+                        }
                         .onPreviewKeyEvent { e ->
                             e.type == KeyEventType.KeyDown && when (e.key) {
                                 Key.DirectionDown -> skipPlaceholders(index, 1)
@@ -189,13 +216,14 @@ internal fun HomeRows(
                         is HomeSlot.Shelf -> ShelfRow(
                             slot.shelf, metrics, layout.effectiveFocusPosition, metrics.captions,
                             memory = memories.getOrPut(slot.id) { ShelfMemory() },
-                            entry = if (index == firstShelf) firstCard else null,
+                            entry = if (index == firstRow) firstCard else null,
                             onFocus = { card, explore -> (card?.hero() ?: explore?.hero())?.let(onHero) },
                             onOpen = onCard,
                             onExplore = onExplore,
                             onMenu = { card -> onMenu(slot.shelf, card) },
                         )
-                        is HomeSlot.Loading -> PlaceholderRow(slot.title, failed = false, metrics = metrics)
+                        is HomeSlot.Loading -> PlaceholderRow(slot.title, failed = false, metrics = metrics,
+                                                              entry = if (index == firstRow) firstCard else null)
                         is HomeSlot.Failed -> PlaceholderRow(slot.title, failed = true, metrics = metrics)
                     }
                 }
