@@ -32,7 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -156,8 +158,13 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
 
     BoxWithConstraints(
         Modifier.fillMaxSize().background(Color.Black).onPreviewKeyEvent { e ->
-            // Any press over the immersive trailer brings the page back first.
-            if (trailer.immersive && e.type == KeyEventType.KeyDown) {
+            // Play/Pause stops the backdrop trailer, as opening a menu does, rather than leaving
+            // a paused frame behind the header.
+            if (trailer.showing && e.key in PlayPauseKeys) {
+                if (e.type == KeyEventType.KeyDown) trailer.dismiss("play/pause")
+                true
+            } else if (trailer.immersive && e.type == KeyEventType.KeyDown) {
+                // Any press over the immersive trailer brings the page back first.
                 trailer.wake()
                 true
             } else false
@@ -265,6 +272,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
 }
 
 private val BackdropBlur = 24.dp
+private val PlayPauseKeys = setOf(Key.MediaPlayPause, Key.MediaPause, Key.MediaPlay)
 private val BackdropDim = if (Build.VERSION.SDK_INT >= 31) 0.2f else 0.45f
 
 /** The backdrop trailer, cropped to fill like the image under it. */
