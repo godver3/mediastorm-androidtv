@@ -19,8 +19,10 @@ import javax.crypto.spec.GCMParameterSpec
  * restore never carries a session to another device.
  *
  * Some TV Keystores fail to load a key they hold ("Failed to obtain information about key"),
- * which blocked signing in and pairing. A key that won't load is replaced; a Keystore that
- * can't encrypt at all leaves the value in the private file unencrypted rather than unsaved.
+ * sometimes only for a moment (a cold start after an update). Nothing is deleted for it: a value
+ * that won't decrypt stays stored for a later launch, and a key that won't load is kept, since
+ * replacing it would lose every value sealed with it. A write the Keystore can't seal goes into
+ * the private file unencrypted rather than unsaved.
  */
 object SecureStore {
     private const val KEY_ALIAS = "strmr.secure"
@@ -28,6 +30,9 @@ object SecureStore {
     /** Marks a value stored unencrypted because the Keystore couldn't encrypt it. */
     private const val PLAIN = "plain:"
     private val prefs by lazy { App.context.getSharedPreferences("strmr.secure", Context.MODE_PRIVATE) }
+
+    /** Whether anything is stored for `account`, readable or not. */
+    fun contains(account: String): Boolean = prefs.contains(account)
 
     fun read(account: String): String? {
         val stored = prefs.getString(account, null) ?: return null
@@ -38,8 +43,8 @@ object SecureStore {
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes, 0, 12))
             String(cipher.doFinal(bytes, 12, bytes.size - 12), Charsets.UTF_8)
         }.getOrElse {
-            // A key lost with an app-data wipe, or a value from another key: unreadable, drop it.
-            delete(account)
+            // Kept: the Keystore can fail for a moment, and a later launch may read it.
+            AppLog.w("SecureStore", "can't decrypt $account (${it.message})")
             null
         }
     }
@@ -65,13 +70,22 @@ object SecureStore {
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        try {
-            (store.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
-        } catch (e: Exception) {
-            // Held but unloadable: values sealed with it are lost either way, so start over.
-            AppLog.w("SecureStore", "Keystore key unreadable (${e.message}); replacing it")
-            runCatching { store.deleteEntry(KEY_ALIAS) }
+        if (!store.containsAlias(KEY_ALIAS)) return generate()
+        // Held but unloadable can be momentary; a few tries before giving up on this call.
+        var failure: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                (store.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+            } catch (e: Exception) {
+                failure = e
+            }
+            if (attempt < 2) Thread.sleep(50)
         }
+        AppLog.w("SecureStore", "Keystore key unreadable (${failure?.message}); keeping it")
+        throw IllegalStateException("Keystore key unreadable", failure)
+    }
+
+    private fun generate(): SecretKey {
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         generator.init(
             KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)

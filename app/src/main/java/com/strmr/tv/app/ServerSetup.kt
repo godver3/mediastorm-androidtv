@@ -11,6 +11,7 @@ import com.strmr.tv.auth.AuthSession
 import com.strmr.tv.auth.DiscoveredServer
 import com.strmr.tv.auth.ServerAddress
 import com.strmr.tv.launcher.LauncherSync
+import com.strmr.tv.remote.RemoteAccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl
@@ -24,7 +25,8 @@ internal object ServerSetup {
         val url = ServerAddress.normalize(input)
             ?: throw ApiError.NotReady("Enter a server address, like 192.168.1.10 or media.example.com.")
         api.checkHealth(url)
-        if (RemoteSession.isRemote.value) RemoteSession.leave()
+        // An unreadable pairing kept from an earlier launch goes too, so it never outranks this server.
+        if (RemoteSession.isRemote.value || RemoteAccess.pairingUnreadable) RemoteSession.leave()
         if (url != AppSession.serverUrl.value) {
             LauncherSync.clear("server changed")
             api.logout()

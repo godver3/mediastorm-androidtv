@@ -56,8 +56,20 @@ object RemoteAccess {
         val connectionCode: String,
     )
 
-    var pairing: Pairing? = SecureStore.read(ACCOUNT)?.let { runCatching { Json.decodeFromString<Pairing>(it) }.getOrNull() }
+    var pairing: Pairing? = load()
         private set
+
+    /** A pairing is saved but the Keystore can't read it right now (kept for a later launch). */
+    val pairingUnreadable: Boolean get() = pairing == null && SecureStore.contains(ACCOUNT)
+
+    private fun load(): Pairing? =
+        SecureStore.read(ACCOUNT)?.let { runCatching { Json.decodeFromString<Pairing>(it) }.getOrNull() }
+
+    /** Reads the saved pairing again when it couldn't be read before; true when there is one. */
+    fun reload(): Boolean {
+        if (pairing == null) pairing = load()
+        return pairing != null
+    }
 
     private const val ACCOUNT = "remoteAccess"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

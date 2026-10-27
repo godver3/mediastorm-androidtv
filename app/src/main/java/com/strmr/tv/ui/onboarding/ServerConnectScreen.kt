@@ -70,7 +70,8 @@ fun ServerConnectScreen() {
         browser.start()
         onDispose { browser.stop() }
     }
-    if (current != null) BackHandler { session.cancelServerChange() }
+    val canCancel = current != null || session.canCancelServerChange
+    if (canCancel) BackHandler { session.cancelServerChange() }
 
     fun connect() {
         if (connecting || resolved == null) return
@@ -143,7 +144,7 @@ fun ServerConnectScreen() {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             BusyButton("Connect", busy = connecting && connectingId == null, enabled = resolved != null,
                        modifier = Modifier.focusRequester(connectFocus), onClick = ::connect)
-            if (current != null) {
+            if (canCancel) {
                 OutlinedButton(onClick = { session.cancelServerChange() }, enabled = !connecting && !pairing) { Text("Cancel") }
             }
         }

@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,7 +22,6 @@ import com.strmr.tv.ui.onboarding.OnboardingLayout
 import com.strmr.tv.ui.onboarding.ProfileLockPrompt
 import com.strmr.tv.ui.onboarding.ProfilePickerScreen
 import com.strmr.tv.ui.onboarding.ServerConnectScreen
-import kotlinx.coroutines.launch
 
 /** Startup phase → screen; a locked-profile PIN prompt over whatever is showing. */
 @Composable
@@ -51,10 +49,9 @@ fun RootScreen() {
 @Composable
 private fun StartupUnavailable(message: String) {
     val server by AppSession.serverUrl.collectAsState()
-    val scope = rememberCoroutineScope()
     OnboardingLayout(title = "Couldn't Connect to ${server?.host ?: "the Server"}", subtitle = message) {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Button(onClick = { scope.launch { AppSession.resumeSession() } }) { Text("Try Again") }
+            Button(onClick = { AppSession.retryStartup() }) { Text("Try Again") }
             OutlinedButton(onClick = { AppSession.changeServer() }) { Text("Change Server") }
         }
     }

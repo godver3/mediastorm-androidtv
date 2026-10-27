@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 internal object RemoteSession {
     val isRemote = MutableStateFlow(false)
-    val paired: Boolean get() = RemoteAccess.pairing != null
+    val paired: Boolean get() = RemoteAccess.pairing != null || RemoteAccess.reload()
 
     /** Pairs with a connection code from the server's admin UI. */
     suspend fun pair(code: String) {
@@ -27,7 +27,7 @@ internal object RemoteSession {
         AppSession.moveTo(AppSession.Phase.Login)
     }
 
-    /** Launch with a stored pairing. */
+    /** Launch with a stored pairing, or Try Again after it failed: the session loads with the proxy. */
     suspend fun start() {
         AppSession.moveTo(AppSession.Phase.Starting)
         enter()

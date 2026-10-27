@@ -12,6 +12,7 @@ import com.strmr.tv.api.verifyPin
 import com.strmr.tv.auth.DiscoveredServer
 import com.strmr.tv.launcher.DeepLinkRouter
 import com.strmr.tv.launcher.LauncherSync
+import com.strmr.tv.remote.RemoteAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,6 +95,9 @@ object AppSession {
             } else if (saved != null) {
                 useServer(saved)
                 if (api.session != null) resumeSession() else _phase.value = Phase.Login
+            } else if (RemoteAccess.pairingUnreadable) {
+                // Kept for a later launch; pairing again replaces it.
+                _phase.value = Phase.Server
             } else {
                 // Keystore values can outlive a data clear on some boxes; a token without a server is stale.
                 ServerSetup.forgetEverything()
@@ -105,6 +109,10 @@ object AppSession {
 
     /** Re-checks a stored session by listing profiles, then restores the last one. */
     suspend fun resumeSession() {
+        if (api.session == null) {
+            _phase.value = Phase.Login
+            return
+        }
         _phase.value = Phase.Starting
         if (isRemote.value) {
             try {
@@ -146,13 +154,28 @@ object AppSession {
 
     internal fun useServer(url: HttpUrl) = ServerSetup.use(url, scope)
 
+    /**
+     * Try Again on the startup error: a remote launch that never connected starts over. In the
+     * session's scope, since leaving the error screen would cancel the screen's own.
+     */
+    fun retryStartup() {
+        scope.launch { if (isRemote.value && RemoteSession.paired) RemoteSession.start() else resumeSession() }
+    }
+
     fun changeServer() {
         _phase.value = Phase.Server
     }
 
+    /** Whether "Change Server" can be backed out of: a server is in use, or a pairing is saved. */
+    val canCancelServerChange: Boolean get() = serverUrl.value != null || RemoteSession.paired
+
     /** Back out of "Change Server" to wherever we were. */
     fun cancelServerChange() {
-        if (serverUrl.value == null) return
+        if (serverUrl.value == null) {
+            // Paired, but the launch never connected: try it again.
+            if (RemoteSession.paired) scope.launch { RemoteSession.start() }
+            return
+        }
         _phase.value = when {
             profile.value != null -> Phase.Ready
             api.session != null -> Phase.Profiles
