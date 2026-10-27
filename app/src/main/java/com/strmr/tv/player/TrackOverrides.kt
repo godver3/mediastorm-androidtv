@@ -8,7 +8,7 @@ import com.strmr.tv.app.App
 
 /**
  * Settings › Playback's track choices on this device: Subtitles (off / forced-only / on),
- * Subtitle Translation, Subtitle Language and Audio Language. Each is null for Default, which
+ * Subtitle Translation, Subtitle Language, Audio Language and Audio Format. Each is null for Default, which
  * follows the server (the profile's playback settings, `/api/settings` for translation);
  * a value overrides it here. The player picks tracks itself when an override differs from
  * the server's choice ([ClientTrackSelector]) and the online subtitle search uses the
@@ -20,6 +20,7 @@ object TrackOverrides {
     private const val TRANSLATION = "subtitleTranslation"
     private const val SUBTITLE_LANGUAGE = "subtitleLanguage"
     private const val AUDIO_LANGUAGE = "audioLanguage"
+    private const val LOSSLESS_AUDIO = "losslessAudio"
 
     val modes = listOf("off", "forced-only", "on")
 
@@ -33,6 +34,12 @@ object TrackOverrides {
         private set
     var audioLanguage by mutableStateOf(string(AUDIO_LANGUAGE))
         private set
+    /**
+     * Audio Format: on picks TrueHD (then DTS, FLAC, PCM) over the server's E-AC-3-first order.
+     * The profile has no such setting, so off (Default) is the server's order.
+     */
+    var losslessAudio by mutableStateOf(prefs.getBoolean(LOSSLESS_AUDIO, false))
+        private set
 
     /** The server's values, shown as "Default (…)"; null until read (or unset on the server). */
     var serverSubtitleMode by mutableStateOf<String?>(null)
@@ -43,6 +50,7 @@ object TrackOverrides {
     fun chooseSubtitleMode(value: String?) { subtitleMode = value; putString(MODE, value) }
     fun chooseSubtitleLanguage(value: String?) { subtitleLanguage = value; putString(SUBTITLE_LANGUAGE, value) }
     fun chooseAudioLanguage(value: String?) { audioLanguage = value; putString(AUDIO_LANGUAGE, value) }
+    fun chooseLosslessAudio(value: Boolean) { losslessAudio = value; prefs.edit().putBoolean(LOSSLESS_AUDIO, value).apply() }
     fun chooseTranslation(value: Boolean?) {
         translation = value
         prefs.edit().apply { if (value == null) remove(TRANSLATION) else putBoolean(TRANSLATION, value) }.apply()

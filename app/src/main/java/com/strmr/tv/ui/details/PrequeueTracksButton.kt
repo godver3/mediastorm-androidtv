@@ -85,7 +85,7 @@ class PrequeueTracks(val model: DetailsModel) {
     /** The profile's languages after this device's overrides, for the panel's allowed-language filter. */
     fun defaults(status: PrequeueStatus): TrackDefaults {
         val e = EffectiveTracks.current(status.trackSelection, playback)
-        return TrackDefaults(e.audioLanguage, e.subtitleLanguage, e.subtitleMode, e.allowedLanguages)
+        return TrackDefaults(e.audioLanguage, e.subtitleLanguage, e.subtitleMode, e.allowedLanguages, e.losslessAudio)
     }
 
     /**
@@ -106,7 +106,7 @@ class PrequeueTracks(val model: DetailsModel) {
         val chosen = choiceFor(status)
         val pre = preselected(status)
         val d = defaults(status)
-        val audioIndex = chosen.audio ?: pre?.audio ?: ManualTracks.defaultAudio(lists.audio, d.audioLanguage)
+        val audioIndex = chosen.audio ?: pre?.audio ?: ManualTracks.defaultAudio(lists.audio, d.audioLanguage, d.losslessAudio)
         val subtitleIndex = when (chosen.subtitle) {
             null -> if (pre != null) pre.subtitle else ManualTracks.defaultSubtitle(lists.subtitles, d.subtitleLanguage, d.subtitleMode)
             ManualTrackChoice.OFF -> null

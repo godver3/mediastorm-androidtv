@@ -27,7 +27,8 @@ suspend fun loadTrackDefaults() {
 
 /**
  * Settings › Playback: Subtitles, Subtitle Translation, Subtitle Language and Audio
- * Language, each Default (the server's value, shown) or this device's own choice.
+ * Language, each Default (the server's value, shown) or this device's own choice, then Audio
+ * Format (Default is the server's E-AC-3-first order; the profile has no such setting).
  */
 fun LazyListScope.trackSettingRows() {
     item {
@@ -67,6 +68,15 @@ fun LazyListScope.trackSettingRows() {
     item {
         val o = TrackOverrides
         LanguageRow("Audio Language", o.audioLanguage, o.serverAudioLanguage, o::chooseAudioLanguage, regional = true)
+    }
+    item {
+        val o = TrackOverrides
+        ChoiceRow(
+            "Audio Format", "Which audio track starts when a source has several in your language",
+            choices = listOf("Lossless (TrueHD)"),
+            selected = if (o.losslessAudio) 0 else null,
+            defaultName = "Compatible, E-AC-3",
+        ) { i -> o.chooseLosslessAudio(i == 0) }
     }
 }
 

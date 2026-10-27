@@ -48,7 +48,13 @@ import com.strmr.tv.ui.ignoreHeldSelect
 data class ProbeState(val probe: TrackProbe?)
 
 /** What the panel preselects before the user changes anything: the profile's languages and mode. */
-data class TrackDefaults(val audioLanguage: String?, val subtitleLanguage: String?, val subtitleMode: String?, val allowed: List<String>)
+data class TrackDefaults(
+    val audioLanguage: String?,
+    val subtitleLanguage: String?,
+    val subtitleMode: String?,
+    val allowed: List<String>,
+    val losslessAudio: Boolean = false,
+)
 
 /** Tracks the server already chose (container stream numbers; a null subtitle is off), preselected instead. */
 data class PreselectedTracks(val audio: Int?, val subtitle: Int?)
@@ -74,7 +80,7 @@ fun SourceTracksDialog(
     val tracks = state.probe as? TrackProbe.Tracks
     val audio = tracks?.audio?.let { list -> ManualTracks.allowed(list, defaults?.allowed.orEmpty()) { it.language } }.orEmpty()
     val subtitles = tracks?.subtitles?.let { list -> ManualTracks.allowed(list, defaults?.allowed.orEmpty()) { it.language } }.orEmpty()
-    val defaultAudio = if (preselected != null) preselected.audio else ManualTracks.defaultAudio(audio, defaults?.audioLanguage)
+    val defaultAudio = if (preselected != null) preselected.audio else ManualTracks.defaultAudio(audio, defaults?.audioLanguage, defaults?.losslessAudio == true)
     val defaultSubtitle = if (preselected != null) preselected.subtitle
         else ManualTracks.defaultSubtitle(subtitles, defaults?.subtitleLanguage, defaults?.subtitleMode)
     val selectedAudio = choice.audio ?: defaultAudio

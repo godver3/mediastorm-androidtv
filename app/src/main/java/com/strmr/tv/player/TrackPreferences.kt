@@ -45,7 +45,9 @@ class TrackPreferences(private val selection: TrackSelection?, private val effec
         val audio = tracks.ofType(C.TRACK_TYPE_AUDIO).filter { it.supported }
         val audioPick = if (effective?.clientAudio == true) {
             audio.getOrNull(ClientTrackSelector.findAllowedAudio(audio.map { it.format.audioCandidate() },
-                                                                 effective.allowedLanguages, effective.audioLanguage))
+                                                                 effective.allowedLanguages, effective.audioLanguage,
+                                                                 effective.losslessAudio))
+                ?: selection?.audio?.takeIf { effective.serverAudioFallback }?.let { match(it, audio) }
         } else {
             selection?.audio?.let { match(it, audio) }
         }

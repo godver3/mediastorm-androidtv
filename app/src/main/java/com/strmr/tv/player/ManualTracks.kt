@@ -51,11 +51,18 @@ object ManualTracks {
             ?: tracks.firstOrNull { codec(it) !in trueHd && !isCommentary(it.title) }?.index
             ?: tracks.firstOrNull()?.index
 
-    /** The audio track preselected for [preferred]; null when there are no tracks. */
-    fun defaultAudio(tracks: List<ProbedAudioTrack>, preferred: String?): Int? {
+    /**
+     * The audio track preselected for [preferred]; null when there are no tracks. `lossless`
+     * (Audio Format) puts TrueHD, then DTS / FLAC / PCM, first, as the player's pick does.
+     */
+    fun defaultAudio(tracks: List<ProbedAudioTrack>, preferred: String?, lossless: Boolean = false): Int? {
         if (tracks.isEmpty()) return null
         if (preferred.isNullOrBlank()) return firstCompatible(tracks)
-        val passes: List<(ProbedAudioTrack) -> Boolean> = listOf(
+        val losslessPasses: List<(ProbedAudioTrack) -> Boolean> = if (!lossless) emptyList() else listOf(
+            { codec(it) in trueHd && !isCommentary(it.title) },
+            { ClientTrackSelector.isLossless(codec(it)) && !isCommentary(it.title) },
+        )
+        val passes: List<(ProbedAudioTrack) -> Boolean> = losslessPasses + listOf(
             { codec(it) in compatible && !isCommentary(it.title) },
             { codec(it) !in trueHd && !isCommentary(it.title) },
             { !isCommentary(it.title) },
@@ -65,7 +72,7 @@ object ManualTracks {
         )
         RegionalAudio.variant(preferred)?.let { variant ->
             val regional = tracks.filter { RegionalAudio.matches(variant, it.language, it.title) && !isCommentary(it.title) }
-            for (pass in passes.take(3)) {
+            for (pass in passes.take(losslessPasses.size + 3)) {
                 regional.firstOrNull { matchesLanguage(it.language, it.title, preferred) && pass(it) }?.let { return it.index }
             }
         }

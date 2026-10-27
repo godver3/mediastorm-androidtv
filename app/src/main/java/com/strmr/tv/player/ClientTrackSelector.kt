@@ -6,7 +6,8 @@ import java.util.Locale
  * The server's track selector (`backend/services/trackselect`) on the client, for when this
  * device overrides the profile's languages or subtitle mode: the same language matching
  * (codes, names, words of a track's label), audio codec order (E-AC-3, then AAC / AC-3 / MP3,
- * then DTS and the like, TrueHD last; commentary only when nothing else matches) and
+ * then DTS and the like, TrueHD last; commentary only when nothing else matches; Audio Format
+ * Lossless puts TrueHD, then DTS / FLAC / PCM, first) and
  * subtitle priorities (forced tracks only for forced-only; for on, non-forced SDH, then
  * full / plain or dubtitles depending on the audio language, then non-signs, then signs,
  * then a forced track). Indices are positions in the given lists; -1 is none.
@@ -63,12 +64,18 @@ object ClientTrackSelector {
             t.split(Regex("[^a-z]+")).any { it == "ad" }
     }
     private fun isTrueHd(codec: String) = codec.lowercase() in setOf("truehd", "mlp")
+    /** The lossless formats after TrueHD. ffprobe names DTS-HD MA plain `dts`, so DTS counts. */
+    fun isLossless(codec: String) = codec.lowercase().let { isTrueHd(it) || it == "dts" || it == "flac" || it == "alac" || it.startsWith("pcm") || it == "raw" }
     private val compatible = setOf("aac", "ac3", "eac3", "mp3")
 
-    /** A region-tagged preference ("fr-CA") first tries that regional dub ([RegionalAudio]). */
-    fun findAudio(tracks: List<Audio>, preferred: String?): Int {
+    /**
+     * A region-tagged preference ("fr-CA") first tries that regional dub ([RegionalAudio]);
+     * `lossless` puts TrueHD, then [isLossless], ahead of the codec order.
+     */
+    fun findAudio(tracks: List<Audio>, preferred: String?, lossless: Boolean = false): Int {
         if (preferred.isNullOrBlank() || tracks.isEmpty()) return -1
-        val passes: List<(Audio) -> Boolean> = listOf(
+        val losslessPasses: List<(Audio) -> Boolean> = if (!lossless) emptyList() else listOf({ isTrueHd(it.codec) }, { isLossless(it.codec) })
+        val passes: List<(Audio) -> Boolean> = losslessPasses + listOf(
             { it.codec.equals("eac3", true) }, { it.codec.lowercase() in compatible }, { !isTrueHd(it.codec) }, { isTrueHd(it.codec) },
         )
         RegionalAudio.variant(preferred)?.let { variant ->
@@ -91,14 +98,14 @@ object ClientTrackSelector {
     }
 
     /** The preferred language when it is allowed (and present), else the first allowed language present. */
-    fun findAllowedAudio(tracks: List<Audio>, allowed: List<String>, preferred: String?): Int {
+    fun findAllowedAudio(tracks: List<Audio>, allowed: List<String>, preferred: String?, lossless: Boolean = false): Int {
         val allow = allowed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct()
-        if (allow.isEmpty()) return findAudio(tracks, preferred)
+        if (allow.isEmpty()) return findAudio(tracks, preferred, lossless)
         val pref = preferred?.trim()?.lowercase().orEmpty()
         if (pref.isNotEmpty() && allow.any { matchesLanguage(pref, "", it) }) {
-            findAudio(tracks, pref).takeIf { it >= 0 }?.let { return it }
+            findAudio(tracks, pref, lossless).takeIf { it >= 0 }?.let { return it }
         }
-        for (language in allow) findAudio(tracks, language).takeIf { it >= 0 }?.let { return it }
+        for (language in allow) findAudio(tracks, language, lossless).takeIf { it >= 0 }?.let { return it }
         return -1
     }
 

@@ -46,8 +46,10 @@ class SourceTracks(private val scope: CoroutineScope) {
         AppLog.i(TAG, "long press ${result.serviceType} \"${result.title}\"")
         if (defaults == null) scope.launch {
             val playback = runCatching { ApiClient.playbackSettings() }.getOrNull()
-            val effective = EffectiveTracks.resolve(null, playback, TrackOverrides.audioLanguage, TrackOverrides.subtitleLanguage, TrackOverrides.subtitleMode)
-            defaults = TrackDefaults(effective.audioLanguage, effective.subtitleLanguage, effective.subtitleMode, effective.allowedLanguages)
+            val effective = EffectiveTracks.resolve(null, playback, TrackOverrides.audioLanguage, TrackOverrides.subtitleLanguage,
+                                                    TrackOverrides.subtitleMode, TrackOverrides.losslessAudio)
+            defaults = TrackDefaults(effective.audioLanguage, effective.subtitleLanguage, effective.subtitleMode, effective.allowedLanguages,
+                                     effective.losslessAudio)
         }
         val known = probes[result.index]
         if (known == null || known.probe is TrackProbe.Failed) probe(result)

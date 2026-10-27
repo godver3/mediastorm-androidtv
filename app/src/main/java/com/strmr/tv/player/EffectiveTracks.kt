@@ -9,7 +9,8 @@ import com.strmr.tv.api.TrackSelection
  * One playback's track preferences after this device's [TrackOverrides]: the server's
  * (its track choice, else the profile's playback settings) where an override is Default.
  * `clientAudio` / `clientSubtitles` say the override changes that choice, so the player
- * picks the track itself ([ClientTrackSelector]) instead of mapping the server's.
+ * picks the track itself ([ClientTrackSelector]) instead of mapping the server's. Audio Format
+ * Lossless re-picks the audio in the same languages, TrueHD first (`losslessAudio`).
  */
 data class EffectiveTracks(
     val audioLanguage: String?,
@@ -19,6 +20,9 @@ data class EffectiveTracks(
     val allowedLanguages: List<String>,
     val clientAudio: Boolean,
     val clientSubtitles: Boolean,
+    val losslessAudio: Boolean = false,
+    /** Lossless alone changed the audio: with no track to pick by language, keep the server's. */
+    val serverAudioFallback: Boolean = false,
 ) {
     companion object {
         fun resolve(
@@ -27,6 +31,7 @@ data class EffectiveTracks(
             audioOverride: String?,
             subtitleLanguageOverride: String?,
             modeOverride: String?,
+            losslessAudio: Boolean = false,
         ): EffectiveTracks {
             val serverAudio = if (selection != null) selection.audioLanguage?.ifEmpty { null } else playback?.preferredAudioLanguage
             val serverLanguage = if (selection != null) selection.subtitleLanguage?.ifEmpty { null } else playback?.preferredSubtitleLanguage
@@ -34,23 +39,27 @@ data class EffectiveTracks(
             fun differs(override: String?, server: String?) =
                 override != null && (server == null || !ClientTrackSelector.matchesLanguage(server, "", override))
             // French (Canada) here and plain French on the server (or the reverse) pick different dubs.
-            val clientAudio = differs(audioOverride, serverAudio) ||
+            val clientLanguage = differs(audioOverride, serverAudio) ||
                 (audioOverride != null && !RegionalAudio.sameVariant(audioOverride, serverAudio))
-            val clientSubtitles = clientAudio || differs(subtitleLanguageOverride, serverLanguage) ||
+            // Lossless keeps the audio language, so the subtitle choice stands.
+            val clientSubtitles = clientLanguage || differs(subtitleLanguageOverride, serverLanguage) ||
                 (modeOverride != null && modeOverride != serverMode)
             return EffectiveTracks(
                 audioLanguage = audioOverride ?: serverAudio,
                 subtitleLanguage = subtitleLanguageOverride ?: serverLanguage,
                 subtitleMode = modeOverride ?: serverMode,
                 allowedLanguages = playback?.allowedTrackLanguages.orEmpty(),
-                clientAudio = clientAudio,
+                clientAudio = clientLanguage || losslessAudio,
                 clientSubtitles = clientSubtitles,
+                losslessAudio = losslessAudio,
+                serverAudioFallback = losslessAudio && audioOverride == null,
             )
         }
 
         /** With this device's current overrides. */
         fun current(selection: TrackSelection?, playback: PlaybackSettings?) = resolve(
             selection, playback, TrackOverrides.audioLanguage, TrackOverrides.subtitleLanguage, TrackOverrides.subtitleMode,
+            TrackOverrides.losslessAudio,
         )
     }
 }
