@@ -74,9 +74,11 @@ class DetailsModel(val target: DetailsTarget) {
     var collectionMovies by mutableStateOf<List<Title>>(emptyList())
         private set
     private var watchedBusy = false
-    private var upNext: EpisodeRef? = null
+    // State, so the primary button follows a reload after playback (a movie's page has nothing
+    // else that changes then).
+    private var upNext by mutableStateOf<EpisodeRef?>(null)
     /** Server resume decision for the movie, or for `upNext`. */
-    private var resume: ResumeState? = null
+    private var resume by mutableStateOf<ResumeState?>(null)
     /** Fixed per page, so the stream-start art order doesn't reshuffle between plays. */
     private val artSeed = Random.nextLong()
     /**
