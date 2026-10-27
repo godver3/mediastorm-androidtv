@@ -26,10 +26,41 @@ class LiveHlsFallbackTest {
     }
 
     @Test
-    fun aRetunedDirectStreamThatNeverPlaysFallsBack() {
-        val hls = LiveHlsFallback(direct = true).apply { playing() }
+    fun aRetunedDirectStreamThatNeverPlaysDoesNotFallBackOnceDirectPlayed() {
+        val hls = LiveHlsFallback(direct = true)
+        assertTrue(hls.playing())
+        assertTrue(hls.directWorked)
+        assertFalse(hls.playing())
+        // Direct is known to work for the source: a retune that never plays is the provider's failure.
         hls.tuned(direct = true)
-        assertTrue(hls.failed())
+        assertFalse(hls.failed())
+    }
+
+    @Test
+    fun noFallbackOnceDirectHasPlayedForTheSource() {
+        val hls = LiveHlsFallback(direct = true).apply { directWorked = true }
+        assertFalse(hls.failed())
+        assertFalse(hls.forcesHls)
+    }
+
+    @Test
+    fun theFallbackPlayingIsNotADirectStream() {
+        val hls = LiveHlsFallback(direct = true)
+        hls.failed()
+        hls.tuned(direct = false)
+        assertFalse(hls.playing())
+        assertFalse(hls.directWorked)
+    }
+
+    @Test
+    fun aStalledFallbackIsNotConfirmed() {
+        val hls = LiveHlsFallback(direct = true)
+        hls.failed()
+        hls.tuned(direct = false)
+        hls.playing()
+        hls.stalled()
+        assertFalse(hls.confirm())
+        assertEquals(LiveHlsFallback.Mode.FALLBACK, hls.mode)
     }
 
     @Test

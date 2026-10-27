@@ -114,6 +114,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         override fun onPlaybackStateChanged(state: Int) {
             buffering.value = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
             if (state == Player.STATE_READY) applyPercentStart()
+            if (state == Player.STATE_BUFFERING) liveRetune?.buffering()
             if (state == Player.STATE_ENDED && advanceTo.value == null) {
                 if (upNext?.ended() == true) return
                 recordingHls?.let { hls ->

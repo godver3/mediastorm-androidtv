@@ -18,7 +18,8 @@ import java.net.URLEncoder
  * `LiveHLSPreference`). When a direct stream won't start the player retries once as an HLS
  * session ([com.strmr.tv.player.LiveHlsFallback]); once that has played for a while the choice
  * is kept on this device for the server and live source, and later tunes of that source ask
- * for HLS at once. Settings › Reset Live TV Playback clears it.
+ * for HLS at once, unless a direct stream of the source has played here before, which rules the
+ * fallback out for it. Settings › Try Direct Again clears both marks.
  */
 object LiveHlsPreference {
     /** The server (its remote-access identity) and live source a preference belongs to. */
@@ -56,15 +57,28 @@ object LiveHlsPreference {
 
     fun prefersHls(scope: Scope): Boolean = prefs.getString(key(scope), null) == "hls"
 
+    /**
+     * Never over a source whose direct stream has played: a direct stream that worked once and
+     * then struggles is a provider having a bad moment, and the server's HLS session reads the
+     * same provider.
+     */
     fun remember(scope: Scope) {
+        if (directWorked(scope)) return
         prefs.edit().putString(key(scope), "hls").apply()
     }
 
-    /** Forgets every remembered source; returns how many there were. */
+    /** A direct stream of this source played on this device. */
+    fun directWorked(scope: Scope): Boolean = prefs.getString(key(scope), null) == "direct"
+
+    fun rememberDirectWorked(scope: Scope) {
+        prefs.edit().putString(key(scope), "direct").apply()
+    }
+
+    /** Forgets every remembered source; returns how many were remembered as needing HLS. */
     fun resetAll(): Int {
-        val keys = prefs.all.keys.filter { it.startsWith(PREFIX) }
-        prefs.edit().apply { keys.forEach(::remove) }.apply()
-        return keys.size
+        val entries = prefs.all.filterKeys { it.startsWith(PREFIX) }
+        prefs.edit().apply { entries.keys.forEach(::remove) }.apply()
+        return entries.values.count { it == "hls" }
     }
 
     internal fun key(scope: Scope): String =

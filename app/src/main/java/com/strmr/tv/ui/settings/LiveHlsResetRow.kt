@@ -18,10 +18,16 @@ fun LazyListScope.liveHlsResetRow() {
         var result by remember { mutableStateOf<String?>(null) }
         ListItem(
             selected = false,
-            onClick = { result = if (LiveHlsPreference.resetAll() == 0) "Nothing to reset" else "Reset" },
-            headlineContent = { Text("Reset Live TV Playback") },
-            supportingContent = { Text("Try your provider's own stream format again on the next tune") },
+            onClick = { result = resetResult(LiveHlsPreference.resetAll()) },
+            headlineContent = { Text("Try Direct Again") },
+            supportingContent = { Text("Forget live sources switched to HLS, so they try their own stream format on the next tune") },
             trailingContent = { result?.let { Text(it) } },
         )
     }
+}
+
+private fun resetResult(count: Int): String = when (count) {
+    0 -> "Nothing to reset"
+    1 -> "Reset 1 source"
+    else -> "Reset $count sources"
 }
