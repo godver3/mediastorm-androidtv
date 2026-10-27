@@ -1,5 +1,8 @@
 package com.strmr.tv.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -82,6 +85,14 @@ internal fun HomeRows(
     onMenu: (HomeShelf, HomeCard) -> Unit,
     refocus: Int,
     header: RowsHeader? = null,
+    /** The row shown, by ID, once the move to it is done: the full hero's rows area takes its height. */
+    onRow: (String) -> Unit = {},
+    /**
+     * The full hero's page fade, set when it shows one shelf to a screen: moving from row to row,
+     * the page fades out, the next row takes the place unanimated and it fades back in, rather
+     * than the rows sliding up or down. Null: rows scroll.
+     */
+    fade: Animatable<Float, AnimationVector1D>? = null,
 ) {
     val layout = HomeLayoutStore
     val state = rememberLazyListState()
@@ -98,8 +109,30 @@ internal fun HomeRows(
     /** The row whose loading placeholder holds focus: it hands focus on when the row arrives. */
     var placeholderFocused by remember { mutableStateOf<String?>(null) }
     val focusedRow = slots.indexOfFirst { it.id == focusedId }.takeIf { it >= 0 } ?: focusedIndex.coerceIn(0, maxOf(slots.lastIndex, 0))
+    /** The row shown: until a fade has swapped rows, the row being left. Its card's info is the hero. */
+    var shown by remember { mutableStateOf<String?>(null) }
+    /** Each row's last focused card's info, kept back while its row fades in. */
+    val heroes = remember { mutableMapOf<String, HeroContent>() }
+    val wasHeader = remember { booleanArrayOf(headerFocused) }
     LaunchedEffect(focusedRow, headerFocused) {
-        if (headerFocused) state.animateScrollToItem(0) else state.animateScrollToItem(focusedRow + lead)
+        val fromHeader = wasHeader[0]
+        wasHeader[0] = headerFocused
+        if (headerFocused) {
+            state.animateScrollToItem(0)
+            return@LaunchedEffect
+        }
+        val id = slots.getOrNull(focusedRow)?.id
+        fun show() { shown = id; id?.let { onRow(it) }; id?.let(heroes::get)?.let(onHero) }
+        if (fade != null && !fromHeader && shown != null && shown != id) {
+            fade.animateTo(0f, tween(ROW_FADE_OUT_MS))
+            state.scrollToItem(focusedRow + lead)
+            show()
+            fade.animateTo(1f, tween(ROW_FADE_IN_MS))
+        } else {
+            fade?.snapTo(1f)
+            show()
+            state.animateScrollToItem(focusedRow + lead)
+        }
     }
     // After a title action the rows are rebuilt (a row appearing above the focused one, as Set
     // Aside does, is otherwise skipped by focus search) and focus goes back to the focused row,
@@ -217,7 +250,12 @@ internal fun HomeRows(
                             slot.shelf, metrics, layout.effectiveFocusPosition, metrics.captions,
                             memory = memories.getOrPut(slot.id) { ShelfMemory() },
                             entry = if (index == firstRow) firstCard else null,
-                            onFocus = { card, explore -> (card?.hero() ?: explore?.hero())?.let(onHero) },
+                            onFocus = { card, explore ->
+                                (card?.hero() ?: explore?.hero())?.let { info ->
+                                    heroes[slot.id] = info
+                                    if (fade == null || shown == slot.id) onHero(info)
+                                }
+                            },
                             onOpen = onCard,
                             onExplore = onExplore,
                             onMenu = { card -> onMenu(slot.shelf, card) },
@@ -248,6 +286,10 @@ private fun Modifier.headerOverflow(room: Dp, state: LazyListState): Modifier = 
     val atHeader = state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0
     clipRect(bottom = size.height - if (atHeader) 0f else extra) { this@drawWithContent.drawContent() }
 }
+
+/** The full hero's fade from row to row: out, then in once the next row is in place. */
+private const val ROW_FADE_OUT_MS = 120
+private const val ROW_FADE_IN_MS = 200
 
 internal fun HomeCard.hero() = HeroContent(title, subtitle, overview, backdropUrl ?: artworkUrl, logoUrl, drawable)
 

@@ -1,5 +1,8 @@
 package com.strmr.tv.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -107,6 +110,11 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
     var menuError by remember { mutableStateOf<String?>(null) }
     /** Bumped after a title action reloads the rows: focus returns to the rows if the focused card left. */
     var refocus by remember { mutableIntStateOf(0) }
+    /** The row shown, which sizes the rows area under the full hero. */
+    var shownRow by remember { mutableStateOf<String?>(null) }
+    /** Focused Title Info with the full hero shows one shelf to a screen, fading from row to row. */
+    val oneShelf = layout.focusedInfo && layout.effectiveHeroSize == HeroSize.FULL
+    val rowFade = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
         if (store.settings == null) {
@@ -146,17 +154,18 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
 
     val rows: @Composable (List<HomeSlot>, Modifier, (HeroContent) -> Unit, RowsHeader?) -> Unit = { slots, modifier, onHero, header ->
         if (!HomeStatus(store, modifier)) {
-            HomeRows(slots, firstCard, modifier, onHero, onCard = onCard, onExplore = onExplore, onMenu = onMenu, refocus = refocus, header = header)
+            HomeRows(slots, firstCard, modifier, onHero, onCard = onCard, onExplore = onExplore, onMenu = onMenu, refocus = refocus, header = header,
+                     onRow = { shownRow = it }, fade = rowFade.takeIf { oneShelf })
         }
     }
 
     if (!layout.topCarousel && layout.focusedInfo) {
-        ClassicHome(hero, layout.tallestRowHeight(store.slots)) { modifier -> rows(store.slots, modifier, { hero = it }, null) }
+        ClassicHome(hero, layout.fullHeroRowHeight(store.slots, shownRow), rowFade) { modifier -> rows(store.slots, modifier, { hero = it }, null) }
     } else {
         StackedHome(
             store.slots.filterNot { it.id == carouselId },
             carouselId?.let { CarouselSetup(carouselShelf, slides, carouselFocus, carouselState) },
-            hero, onHero = { hero = it }, rows = rows,
+            hero, shownRow, rowFade, onHero = { hero = it }, rows = rows,
         )
     }
 
@@ -188,18 +197,19 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
  * Top Carousel off, Focused Title Info on: the Classic Home, the hero following the focused card.
  */
 @Composable
-private fun ClassicHome(hero: HeroContent?, rowHeight: Dp, rows: @Composable (Modifier) -> Unit) {
+private fun ClassicHome(hero: HeroContent?, rowHeight: Dp, fade: Animatable<Float, AnimationVector1D>, rows: @Composable (Modifier) -> Unit) {
     val layout = HomeLayoutStore
     val size = layout.effectiveHeroSize
     val full = size == HeroSize.FULL
     Box(Modifier.fillMaxSize()) {
         HeroBackdrop(hero)
-        // As on tvOS: with the full hero, the rows area is exactly one row tall above the
-        // bottom safe area, so the focused shelf sits on the bottom edge and nothing peeks in
-        // under it. A smaller hero sits under the tab bar and the rows run to the screen's
-        // bottom edge, so more of them show.
+        // As on tvOS: with the full hero, the rows area is exactly the shown row's height above
+        // the bottom safe area, so that shelf sits on the bottom edge and nothing peeks in under
+        // it; it changes size while the page is faded out between rows. A smaller hero sits under
+        // the tab bar and the rows run to the screen's bottom edge, so more of them show.
         Column(
-            Modifier.fillMaxSize().padding(top = if (full) 0.dp else TAB_BAR_CLEARANCE, bottom = if (full) SAFE_BOTTOM else 0.dp),
+            Modifier.fillMaxSize().padding(top = if (full) 0.dp else TAB_BAR_CLEARANCE, bottom = if (full) SAFE_BOTTOM else 0.dp)
+                .graphicsLayer { alpha = fade.value },
             verticalArrangement = Arrangement.spacedBy(if (size == HeroSize.OFF) 0.dp else 18.dp, if (full) Alignment.Bottom else Alignment.Top),
         ) {
             HeroInfo(hero, size, layout.heroTextSize.scale, Modifier.padding(horizontal = ContentMargin))
@@ -224,6 +234,9 @@ private fun HomeStatus(store: HomeStore, modifier: Modifier): Boolean {
     }
     return true
 }
+
+/** The full hero's rows area resizing as the carousel scrolls away or back, as long as that scroll. */
+internal const val ROW_RESIZE_MS = 300
 
 /** Room above a smaller hero for the tab bar (tvOS: the 60 pt safe area plus 90). */
 internal val TAB_BAR_CLEARANCE = 75.dp

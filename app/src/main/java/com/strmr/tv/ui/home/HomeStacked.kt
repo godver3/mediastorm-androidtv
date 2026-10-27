@@ -1,6 +1,10 @@
 package com.strmr.tv.ui.home
 
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,6 +50,9 @@ internal fun StackedHome(
     slots: List<HomeSlot>,
     carousel: CarouselSetup?,
     hero: HeroContent?,
+    shownRow: String?,
+    /** The full hero's fade from row to row (`HomeRows`). */
+    fade: Animatable<Float, AnimationVector1D>,
     onHero: (HeroContent) -> Unit,
     rows: @Composable (List<HomeSlot>, Modifier, (HeroContent) -> Unit, RowsHeader?) -> Unit,
 ) {
@@ -68,7 +76,14 @@ internal fun StackedHome(
         val full = size == HeroSize.FULL
         val gap = if (size == HeroSize.OFF) 0.dp else 18.dp
         // Where Classic puts the focused row: on the bottom safe area under the full hero, else under a smaller one.
-        val rowHeight = layout.tallestRowHeight(slots)
+        // The shown row's height (as Classic's), the tallest row's while the carousel is up. It
+        // resizes with the carousel's scroll, and at once while the page is faded between rows.
+        val tallest = layout.tallestRowHeight(slots)
+        val faded by remember { derivedStateOf { fade.value < 1f } }
+        val rowHeight by animateDpAsState(
+            if (active.value) tallest else layout.fullHeroRowHeight(slots, shownRow),
+            if (faded) snap() else tween(ROW_RESIZE_MS), label = "rowsArea",
+        )
         val infoRowTop = if (full) maxHeight - SAFE_BOTTOM - rowHeight else TAB_BAR_CLEARANCE + heroHeight(size, textScale) + gap
         // The rows area, clipped as Classic's: one row tall over the safe area under the full hero, else to the bottom.
         val areaTop = if (info) infoRowTop else menuTop
@@ -80,14 +95,14 @@ internal fun StackedHome(
             carousel.slides, carousel.state, carousel.shelf?.title,
             Modifier.align(Alignment.BottomStart).graphicsLayer { alpha = 1f - toRows.value },
         )
-        if (info) InfoText(hero, size, textScale, infoRowTop - gap - heroHeight(size, textScale), toRows)
+        if (info) InfoText(hero, size, textScale, infoRowTop - gap - heroHeight(size, textScale), toRows, fade)
         // The controls' item runs FOCUS_ROOM past the rows area under the buttons, so a focused
         // button isn't cut off at its foot (with the full hero that is the bottom safe area).
         val header = RowsHeader(carousel.focus, active, tail = if (info) areaHeight else 0.dp, overflow = FOCUS_ROOM) { onDown ->
             val bottom = if (areaBottom == 0.dp) SAFE_BOTTOM else 0.dp
             CarouselControls(carousel.slides, carousel.state, carousel.focus, areaHeight + FOCUS_ROOM, bottom + FOCUS_ROOM, onDown)
         }
-        rows(slots, Modifier.fillMaxSize().padding(top = areaTop, bottom = areaBottom), onHero, header)
+        rows(slots, Modifier.fillMaxSize().padding(top = areaTop, bottom = areaBottom).graphicsLayer { alpha = fade.value }, onHero, header)
     }
 }
 
@@ -114,10 +129,10 @@ private fun InfoBackdrop(hero: HeroContent?, carousel: CarouselSetup, active: Mu
 
 /** The Focused Title Info text at [top], crossfading with the slide's as focus crosses into the rows and back. */
 @Composable
-private fun InfoText(hero: HeroContent?, size: HeroSize, textScale: Float, top: Dp, toRows: Animatable<Float, *>) {
+private fun InfoText(hero: HeroContent?, size: HeroSize, textScale: Float, top: Dp, toRows: Animatable<Float, *>, fade: Animatable<Float, *>) {
     HeroInfo(
         hero, size, textScale,
-        Modifier.padding(start = ContentMargin, end = ContentMargin, top = top).graphicsLayer { alpha = toRows.value },
+        Modifier.padding(start = ContentMargin, end = ContentMargin, top = top).graphicsLayer { alpha = toRows.value * fade.value },
     )
 }
 

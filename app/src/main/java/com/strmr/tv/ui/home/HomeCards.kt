@@ -97,12 +97,18 @@ fun HomeLayoutStore.metrics(shelf: String): CardMetrics {
     return CardMetrics(style, cardScale(style), cardText)
 }
 
-/**
- * The rows area under the full hero: the tallest row on the page, so the hero and the focused
- * row stay put moving between rows of different sizes (a shorter row shows more of the next).
- */
+/** The tallest row on the page. */
 fun HomeLayoutStore.tallestRowHeight(slots: List<HomeSlot>): Dp =
     slots.maxOfOrNull { metrics(it.id).rowHeight } ?: CardMetrics(ShelfStyle.POSTER, effectiveCardScale, cardText).rowHeight
+
+/**
+ * The rows area under the full hero (tvOS `rowHeight`): the focused row's height, so that row
+ * sits on the bottom edge and the one under it never shows; a row of smaller cards brings the
+ * hero down with it (while the page is faded between rows). Before any row has focus, the
+ * tallest row's.
+ */
+fun HomeLayoutStore.fullHeroRowHeight(slots: List<HomeSlot>, focused: String?): Dp =
+    slots.firstOrNull { it.id == focused }?.let { metrics(it.id).rowHeight } ?: tallestRowHeight(slots)
 
 /**
  * A Home card: Compose for TV's Card, which scales and outlines on focus. Posters show the
