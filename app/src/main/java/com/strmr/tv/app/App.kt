@@ -13,7 +13,9 @@ class App : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         context = applicationContext
+        com.strmr.tv.diagnostics.CrashReporter.install()
         AppForeground.register(this)
+        com.strmr.tv.diagnostics.MainThreadWatchdog.start()
         // Expo's "foreground" trigger (a no-op until a profile is in use).
         AppForeground.onEntered = { com.strmr.tv.adaptive.AdaptiveThroughput.scheduleIdle("foreground-idle") }
         AppUpdater.start()
