@@ -83,6 +83,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     private var progressJob: Job? = null
     /** The latest progress report in flight, which pages reloading after playback wait on. */
     private var lastReport: Job? = null
+    private val progressLog = ProgressLog(request.title.name + (request.episode?.let { " · ${it.code}" } ?: ""))
     /** A downloaded or translated subtitle, drawn in place of ExoPlayer's cues while selected. */
     val external = ExternalSubtitles(scope, { player.currentPosition }) { cues.value = it }
     val online = OnlineSubtitles(this, scope)
@@ -278,11 +279,25 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         return player.currentPosition / 1000.0 to duration / 1000.0
     }
 
-    fun report(paused: Boolean = false, ended: Boolean = false) {
+    fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) {
         if (!session.reportsProgress) return
         val (position, duration) = times() ?: return
         val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath)
-        lastReport = scope.launch { withContext(NonCancellable) { ApiClient.reportProgress(body) } }
+        val kind = when {
+            ended -> ProgressLog.Kind.END
+            closing -> ProgressLog.Kind.CLOSE
+            paused -> ProgressLog.Kind.PAUSE
+            else -> ProgressLog.Kind.PERIODIC
+        }
+        lastReport = scope.launch {
+            withContext(NonCancellable) {
+                try {
+                    progressLog.saved(kind, position, duration, ApiClient.reportProgress(body))
+                } catch (e: Exception) {
+                    progressLog.failed(kind, position, duration, e)
+                }
+            }
+        }
     }
 
     /** `byUser`: picked in a menu, which stops a running automatic subtitle search. */
@@ -335,7 +350,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
 
     /** Saves the position and lets go of the player; returns the last report, still finishing. */
     fun release(): Job? {
-        if (!ended.value && advanceTo.value == null) report(paused = true)
+        if (!ended.value && advanceTo.value == null) report(paused = true, closing = true)
         clock.cancel()
         online.cancel()
         external.cancel()

@@ -17,10 +17,13 @@ suspend fun ApiClient.startPrequeue(body: JsonObject): PrequeueStartResponse =
 suspend fun ApiClient.prequeueStatus(id: String): PrequeueStatus =
     send("GET", "/api/playback/prequeue/${segment(id)}")
 
-/** Best effort; a failed report is retried by the next one. */
-suspend fun ApiClient.reportProgress(body: JsonObject) {
-    runCatching { sendRaw("POST", "$profilePath/history/progress", body = body, promptOnLock = false) }
-}
+/** What the server stored for a progress report, and its resume decision. */
+@Serializable
+data class ProgressReply(val percentWatched: Double = 0.0, val resume: ResumeState? = null)
+
+/** Throws on failure; the caller logs it, and the next report retries. */
+suspend fun ApiClient.reportProgress(body: JsonObject): ProgressReply =
+    send("POST", "$profilePath/history/progress", body = body, promptOnLock = false)
 
 /**
  * Raw-file stream URL for the player. transmux=0 keeps the backend from remuxing: ExoPlayer
