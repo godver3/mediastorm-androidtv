@@ -85,12 +85,15 @@ internal fun HomeRows(
     onMenu: (HomeShelf, HomeCard) -> Unit,
     refocus: Int,
     header: RowsHeader? = null,
-    /** The row shown, by ID, once the move to it is done: the full hero's rows area takes its height. */
-    onRow: (String) -> Unit = {},
     /**
-     * The full hero's page fade, set when it shows one shelf to a screen: moving from row to row,
-     * the page fades out, the next row takes the place unanimated and it fades back in, rather
-     * than the rows sliding up or down. Null: rows scroll.
+     * The row shown, by ID, once the move to it is done (null: the header): the full hero's rows
+     * area takes its height.
+     */
+    onRow: (String?) -> Unit = {},
+    /**
+     * The full hero's page fade, set when it shows one shelf to a screen: moving from row to row
+     * (or between the header and the first row), the page fades out, the next place takes over
+     * unanimated and it fades back in, rather than the rows sliding up or down. Null: rows scroll.
      */
     fade: Animatable<Float, AnimationVector1D>? = null,
 ) {
@@ -109,7 +112,7 @@ internal fun HomeRows(
     /** The row whose loading placeholder holds focus: it hands focus on when the row arrives. */
     var placeholderFocused by remember { mutableStateOf<String?>(null) }
     val focusedRow = slots.indexOfFirst { it.id == focusedId }.takeIf { it >= 0 } ?: focusedIndex.coerceIn(0, maxOf(slots.lastIndex, 0))
-    /** The row shown: until a fade has swapped rows, the row being left. Its card's info is the hero. */
+    /** The row shown (null: the header): until a fade has swapped, the place being left. Its card's info is the hero. */
     var shown by remember { mutableStateOf<String?>(null) }
     /** Each row's last focused card's info, kept back while its row fades in. */
     val heroes = remember { mutableMapOf<String, HeroContent>() }
@@ -117,21 +120,19 @@ internal fun HomeRows(
     LaunchedEffect(focusedRow, headerFocused) {
         val fromHeader = wasHeader[0]
         wasHeader[0] = headerFocused
-        if (headerFocused) {
-            state.animateScrollToItem(0)
-            return@LaunchedEffect
-        }
-        val id = slots.getOrNull(focusedRow)?.id
-        fun show() { shown = id; id?.let { onRow(it) }; id?.let(heroes::get)?.let(onHero) }
-        if (fade != null && !fromHeader && shown != null && shown != id) {
+        val id = if (headerFocused) null else slots.getOrNull(focusedRow)?.id
+        val item = if (headerFocused) 0 else focusedRow + lead
+        fun show() { shown = id; onRow(id); id?.let(heroes::get)?.let(onHero) }
+        val moved = fromHeader != headerFocused || (id != null && shown != null && shown != id)
+        if (fade != null && moved) {
             fade.animateTo(0f, tween(ROW_FADE_OUT_MS))
-            state.scrollToItem(focusedRow + lead)
+            state.scrollToItem(item)
             show()
             fade.animateTo(1f, tween(ROW_FADE_IN_MS))
         } else {
             fade?.snapTo(1f)
             show()
-            state.animateScrollToItem(focusedRow + lead)
+            state.animateScrollToItem(item)
         }
     }
     // After a title action the rows are rebuilt (a row appearing above the focused one, as Set

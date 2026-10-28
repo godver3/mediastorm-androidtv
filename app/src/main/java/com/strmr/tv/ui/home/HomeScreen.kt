@@ -235,9 +235,6 @@ private fun HomeStatus(store: HomeStore, modifier: Modifier): Boolean {
     return true
 }
 
-/** The full hero's rows area resizing as the carousel scrolls away or back, as long as that scroll. */
-internal const val ROW_RESIZE_MS = 300
-
 /** Room above a smaller hero for the tab bar (tvOS: the 60 pt safe area plus 90). */
 internal val TAB_BAR_CLEARANCE = 75.dp
 
