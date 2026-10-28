@@ -2,6 +2,9 @@ package com.strmr.tv.ui.home
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -46,6 +49,7 @@ import com.strmr.tv.home.HomeSlot
 import com.strmr.tv.home.HomeStore
 import com.strmr.tv.home.HomeViewStore
 import com.strmr.tv.home.HomeViews
+import com.strmr.tv.home.ShelfTransition
 import com.strmr.tv.library.TitleActions
 import com.strmr.tv.library.WatchlistStore
 import com.strmr.tv.player.PlaybackCoordinator
@@ -112,8 +116,9 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
     var refocus by remember { mutableIntStateOf(0) }
     /** The row shown, which sizes the rows area under the full hero. */
     var shownRow by remember { mutableStateOf<String?>(null) }
-    /** Focused Title Info with the full hero shows one shelf to a screen, fading from row to row. */
-    val oneShelf = layout.focusedInfo && layout.effectiveHeroSize == HeroSize.FULL
+    /** Focused Title Info with the full hero shows one shelf to a screen; with Swap it fades from row to row. */
+    val oneShelf = layout.focusedInfo && layout.effectiveHeroSize == HeroSize.FULL &&
+        layout.shelfTransition == ShelfTransition.SWAP
     val rowFade = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
@@ -213,7 +218,9 @@ private fun ClassicHome(hero: HeroContent?, rowHeight: Dp, fade: Animatable<Floa
             verticalArrangement = Arrangement.spacedBy(if (size == HeroSize.OFF) 0.dp else 18.dp, if (full) Alignment.Bottom else Alignment.Top),
         ) {
             HeroInfo(hero, size, layout.heroTextSize.scale, Modifier.padding(horizontal = ContentMargin))
-            rows(if (full) Modifier.height(rowHeight) else Modifier.weight(1f))
+            // Slide resizes the area with the scroll; Swap while the page is faded out.
+            val areaHeight by animateDpAsState(rowHeight, rowResize(layout.shelfTransition), label = "rowsArea")
+            rows(if (full) Modifier.height(areaHeight) else Modifier.weight(1f))
         }
     }
 }

@@ -32,6 +32,7 @@ import com.strmr.tv.home.HomeLayoutStore
 import com.strmr.tv.home.HomeLayoutOptions
 import com.strmr.tv.home.ShelfLayoutInfo
 import com.strmr.tv.home.ShelfStyle
+import com.strmr.tv.home.ShelfTransition
 import com.strmr.tv.ui.pageBackground
 
 /**
@@ -80,6 +81,12 @@ fun HomeLayoutSettings() {
             if (options.showsHeroSize) item {
                 Choice("Hero Size", label(s.heroSize?.label, profile.heroSize.label)) {
                     s.chooseHeroSize(cycleNullable(s.heroSize, HeroSize.entries))
+                }
+            }
+            // The full hero shows one shelf to a screen: Slide scrolls to the next, Swap fades to it.
+            if (options.showsHeroSize && s.effectiveHeroSize == HeroSize.FULL) item {
+                Choice("Shelf Transition", s.shelfTransition.label) {
+                    s.chooseShelfTransition(cycle(s.shelfTransition, ShelfTransition.entries))
                 }
             }
             if (options.showsTextSize) item {

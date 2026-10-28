@@ -2,6 +2,9 @@ package com.strmr.tv.ui.home
 
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -24,6 +28,7 @@ import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLayoutStore
 import com.strmr.tv.home.HomeShelf
 import com.strmr.tv.home.HomeSlot
+import com.strmr.tv.home.ShelfTransition
 import com.strmr.tv.ui.ContentMargin
 
 /** The Top Carousel's row, its slides and its page-held focus and slide. */
@@ -72,9 +77,9 @@ internal fun StackedHome(
         val full = size == HeroSize.FULL
         val gap = if (size == HeroSize.OFF) 0.dp else 18.dp
         // Where Classic puts the focused row: on the bottom safe area under the full hero, else under a smaller one.
-        // The shown row's height (as Classic's), the tallest row's on the carousel. It changes
-        // while the page is faded out between places, so nothing slides.
-        val rowHeight = layout.fullHeroRowHeight(slots, shownRow)
+        // The shown row's height (as Classic's), the tallest row's on the carousel: with Slide it
+        // resizes with the scroll, with Swap while the page is faded out between places.
+        val rowHeight by animateDpAsState(layout.fullHeroRowHeight(slots, shownRow), rowResize(layout.shelfTransition), label = "rowsArea")
         val infoRowTop = if (full) maxHeight - SAFE_BOTTOM - rowHeight else TAB_BAR_CLEARANCE + heroHeight(size, textScale) + gap
         // The rows area, clipped as Classic's: one row tall over the safe area under the full hero, else to the bottom.
         val areaTop = if (info) infoRowTop else menuTop
@@ -96,6 +101,13 @@ internal fun StackedHome(
         rows(slots, Modifier.fillMaxSize().padding(top = areaTop, bottom = areaBottom).graphicsLayer { alpha = fade.value }, onHero, header)
     }
 }
+
+/** The full hero's rows area changing size: with the scroll between rows (Slide), or at once while faded (Swap). */
+internal fun rowResize(transition: ShelfTransition): FiniteAnimationSpec<Dp> =
+    if (transition == ShelfTransition.SWAP) snap() else tween(ROW_RESIZE_MS)
+
+/** About as long as the column's scroll from row to row. */
+private const val ROW_RESIZE_MS = 300
 
 /** Runs the crossfade as focus crosses between the carousel and the rows, in its own scope. */
 @Composable

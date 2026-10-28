@@ -25,6 +25,13 @@ enum class HeroSize(val label: String) {
 
 enum class HeroTextSize(val label: String, val scale: Float) { SMALL("Small", 0.85f), MEDIUM("Medium", 1f), LARGE("Large", 1.15f) }
 
+/**
+ * How Focused Title Info's full hero, one shelf to a screen, moves between shelves (and from the
+ * carousel's controls into the first one): the rows scroll, or the page fades out, the next shelf
+ * takes the place and it fades back in.
+ */
+enum class ShelfTransition(val label: String) { SLIDE("Slide"), SWAP("Swap") }
+
 enum class CardSize(val label: String, val scale: Double) {
     SMALL("Small", 0.6), MEDIUM("Medium", 0.8), LARGE("Large", 1.0),
     /** About 1.25 × Large: a 169 dp poster (tvOS 225 × 338 pt). */
@@ -155,6 +162,9 @@ object HomeLayoutStore {
     /** "Focused Title Info": the Classic hero (backdrop, logo, line, synopsis) following the focused card. On by default. */
     var focusedInfo by mutableStateOf(prefs.getBoolean(FOCUSED_INFO, true))
         private set
+    /** "Shelf Transition" under the full hero (device only): Slide by default. */
+    var shelfTransition by mutableStateOf(enumOrNull<ShelfTransition>("shelfTransition") ?: ShelfTransition.SLIDE)
+        private set
     /** The row the carousel shows; null picks Top 10, else Trending, else the first row with titles. */
     var carouselRow by mutableStateOf(prefs.getString("carouselRow", null))
         private set
@@ -211,6 +221,7 @@ object HomeLayoutStore {
         AppLog.i(CAROUSEL_LOG, "carousel row ${v ?: "default"}")
     }
     fun chooseHeroTextSize(v: HeroTextSize) { heroTextSize = v; putEnum("heroTextSize", v) }
+    fun chooseShelfTransition(v: ShelfTransition) { shelfTransition = v; putEnum("shelfTransition", v) }
     fun chooseCardSize(v: CardSize?) { cardSize = v; putEnum("cardSize", v) }
     /** Sets one kind of row's card size; null follows Card Size. */
     fun chooseStyleCardSize(style: ShelfStyle, v: CardSize?) {
