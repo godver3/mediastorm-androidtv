@@ -36,7 +36,7 @@ import kotlinx.coroutines.withContext
  * `TVMultiscreen`: the enlarged tile, the control bar, the add / change channel picker, the
  * stability warning before a third screen (once per device), the stream-limit replacement
  * prompt and the exit that releases every stream. The channels on show are remembered for
- * Resume multiscreen ([resume] reopens them). Main thread only.
+ * Resume multiscreen ([resume] reopens them; [MultiscreenResume]). Main thread only.
  */
 @Stable
 class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?, private val finish: () -> Unit) {
@@ -81,12 +81,7 @@ class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?
     val streamInfo = mutableStateMapOf<Int, TileStreamInfo>()
     /** What the warning's Continue / Cancel go on to. */
     private var afterWarning: Pair<() -> Unit, () -> Unit>? = null
-    /** Reopening a saved multiscreen: nothing is saved until its screens are back. */
-    private var restoring = resume != null
-    private var lastSaved: SavedMultiscreen? = null
-    private val profileId = ApiClient.profileId
-    private var selecting = false
-    private var selectionRequest = 0
+    private val selections = MultiscreenSelections()
 
     private val state get() = session.state.value
     private val occupied get() = state.slots.indices.filter { state.slots[it].isOccupied }
@@ -102,22 +97,13 @@ class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?
             adding = true
             initialSetup = true
             picker = true
-        } else if (resume != null) {
-            AppLog.i("Multiscreen", "resuming ${resume.channels.size} screens")
-            scope.launch { restore(resume) }
-        } else {
+        } else if (resume == null) {
             adding = true
             initialSetup = true
             picker = true
         }
-        scope.launch {
-            session.state.collect { s ->
-                val selection = MultiscreenMemory.selection(s)
-                if (restoring || selection == null || selection == lastSaved) return@collect
-                lastSaved = selection
-                MultiscreenPrefs.save(profileId, selection)
-            }
-        }
+        MultiscreenResume(session, scope, selections, screenLimit = { screenLimit }, warn = ::showWarning,
+                          stopped = { exitError = it; actions = true }, saved = resume)
         scope.launch {
             while (isActive) {
                 delay(KEEPALIVE_MS)
@@ -274,15 +260,14 @@ class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?
     // Picker
 
     fun closePicker() {
-        ++selectionRequest
-        selecting = false
+        selections.cancel()
         picker = false
         reveal()
         if (initialSetup && adding && state.slots[1].channel == null) exit() else adding = false
     }
 
     fun choose(channel: LiveChannel) {
-        if (selecting) return
+        if (selections.busy) return
         val duplicate = session.indexOf(channel)
         if (duplicate != -1) {
             if (initialSetup && adding && state.slots[1].channel == null) return
@@ -293,14 +278,13 @@ class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?
         }
         val empty = state.slots.indexOfFirst { !it.isOccupied }
         val target = if (adding) (if (empty == -1) state.slots.size else empty) else state.focusedIndex
-        val generation = ++selectionRequest
-        selecting = true
+        val generation = selections.begin()
         scope.launch {
             try {
                 // Checked before a screen is added; a refused or failed check leaves the others alone.
                 if (adding) {
                     val usage = ApiClient.liveUsage(channel.sourceId)
-                    if (generation != selectionRequest) return@launch
+                    if (!selections.isCurrent(generation)) return@launch
                     if (!usage.hasCapacity) {
                         replacement = channel
                         adding = false
@@ -323,74 +307,11 @@ class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?
                 throw e
             } catch (e: Exception) {
                 AppLog.w("Multiscreen", "capacity check failed: ${e.message}")
-                if (generation == selectionRequest) pickerError = "Unable to check stream capacity. Retry before adding a screen."
+                if (selections.isCurrent(generation)) pickerError = "Unable to check stream capacity. Retry before adding a screen."
             } finally {
-                if (generation == selectionRequest) selecting = false
+                selections.end(generation)
             }
         }
-    }
-
-    // Resume
-
-    /** The saved screens: the first two at once, then each extra after a capacity check, as Expo's restoreExtras. */
-    private suspend fun restore(saved: SavedMultiscreen) {
-        val slotOf = mutableMapOf<Int, Int>()
-        fun listenIfAudible(position: Int) {
-            val slot = slotOf[position] ?: return
-            if (position == saved.audioIndex) {
-                session.listen(slot)
-                session.focus(slot)
-            }
-        }
-        saved.channels.take(2).mapIndexed { i, channel -> slotOf[i] = i; i to session.tune(i, channel) }
-            .forEach { (i, tune) -> tune.await(); listenIfAudible(i) }
-        val extras = saved.channels.withIndex().drop(2)
-        val addExtras: () -> Unit = { scope.launch { restoreExtras(extras, slotOf, ::listenIfAudible) } }
-        when {
-            extras.isEmpty() -> endRestore()
-            MultiscreenMemory.needsWarning(occupied.size, MultiscreenPrefs.warningShown) ->
-                showWarning(onContinue = addExtras, onCancel = ::endRestore)
-            else -> addExtras()
-        }
-    }
-
-    private suspend fun restoreExtras(extras: List<IndexedValue<LiveChannel>>, slotOf: MutableMap<Int, Int>, listen: (Int) -> Unit) {
-        val generation = ++selectionRequest
-        selecting = true
-        try {
-            for ((position, channel) in extras) {
-                if (session.indexOf(channel) != -1) continue
-                if (occupied.size >= screenLimit) break
-                val usage = ApiClient.liveUsage(channel.sourceId)
-                if (generation != selectionRequest) return
-                if (!usage.hasCapacity) {
-                    exitError = "Stream limit reached. Remaining screens were not added."
-                    actions = true
-                    return
-                }
-                slotOf[position] = state.slots.size
-                session.tune(state.slots.size, channel).await()
-                listen(position)
-                if (generation != selectionRequest) return
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.w("Multiscreen", "resume capacity check failed: ${e.message}")
-            if (generation == selectionRequest) {
-                exitError = "Unable to check stream capacity. Remaining screens were not added."
-                actions = true
-            }
-        } finally {
-            if (generation == selectionRequest) selecting = false
-            endRestore()
-        }
-    }
-
-    /** From here, changes are saved again (screens a stream limit left out don't overwrite the saved set). */
-    private fun endRestore() {
-        lastSaved = MultiscreenMemory.selection(state)
-        restoring = false
     }
 
     // Exit
@@ -398,8 +319,7 @@ class MultiscreenModel(handover: MultiscreenHandover?, resume: SavedMultiscreen?
     /** Releases every stream and closes; a failed release stays, with the reason in the control bar. */
     fun exit() {
         if (exiting) return
-        ++selectionRequest
-        selecting = false
+        selections.cancel()
         exiting = true
         scope.launch {
             try {
