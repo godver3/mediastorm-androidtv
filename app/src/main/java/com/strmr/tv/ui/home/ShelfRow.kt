@@ -71,6 +71,8 @@ internal class RowFocus(private val list: LazyListState) {
 
     var count = 0
     var expands = false
+    /** Whether an expanding row's cards open and fold in motion (Animate Expansion); off, they snap. */
+    var animates = true
     var position = FocusedCardPosition.LEFT
     /** In px: a card's width, the extra an open poster takes, the gap, the page inset, the row's width. */
     var card = 0f
@@ -83,13 +85,26 @@ internal class RowFocus(private val list: LazyListState) {
     fun open(index: Int): Float = if (!expands) 0f else inRow.value * max(0f, 1f - abs(at.value - index))
 
     suspend fun focus(index: Int) = coroutineScope {
+        if (expands && !animates) {
+            inRow.snapTo(1f)
+            at.snapTo(index.toFloat())
+            scroll()
+            return@coroutineScope
+        }
         // Coming into the row: the remembered card opens in place, no glide from the last one.
         if (inRow.value == 0f && !inRow.isRunning) at.snapTo(index.toFloat())
         launch { inRow.animateTo(1f, FocusMotion) { scroll() } }
         at.animateTo(index.toFloat(), FocusMotion) { scroll() }
     }
 
-    suspend fun leave() = inRow.animateTo(0f, FocusMotion) { scroll() }
+    suspend fun leave() {
+        if (expands && !animates) {
+            inRow.snapTo(0f)
+            scroll()
+        } else {
+            inRow.animateTo(0f, FocusMotion) { scroll() }
+        }
+    }
 
     /** Scrolls to where the focused card sits now, between the two cards [at] is between. */
     fun scroll() {
@@ -154,6 +169,8 @@ fun ShelfRow(
     metrics: CardMetrics,
     position: FocusedCardPosition,
     showTitles: Boolean,
+    /** Whether an expanding poster opens and folds in motion; off, it snaps. */
+    animateExpansion: Boolean,
     memory: ShelfMemory,
     entry: FocusRequester?,
     onFocus: (HomeCard?, ExploreCard?) -> Unit,
@@ -190,6 +207,7 @@ fun ShelfRow(
         with(density) {
             focus.count = count
             focus.expands = metrics.style == ShelfStyle.EXPANDING_POSTER
+            focus.animates = animateExpansion
             focus.position = position
             focus.card = metrics.width.roundToPx().toFloat()
             focus.extra = (metrics.focusedWidth.roundToPx() - metrics.width.roundToPx()).toFloat()

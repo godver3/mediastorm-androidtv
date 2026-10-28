@@ -116,6 +116,10 @@ fun HomeLayoutSettings() {
                     s.chooseExpandPosters(when (s.expandPosters) { null -> true; true -> false; false -> null })
                 }
             }
+            // Opening and folding in motion, the row gliding with it; off, they snap.
+            if (s.usesExpandingPosters) item {
+                Choice("Animate Expansion", onOff(s.animateExpansion)) { s.chooseAnimateExpansion(!s.animateExpansion) }
+            }
             if (s.shelves.isNotEmpty()) item { Header("Rows") }
             items(s.shelves, key = { it.id }) { shelf ->
                 val hidden = s.isHidden(shelf.id)

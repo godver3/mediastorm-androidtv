@@ -151,6 +151,12 @@ object HomeLayoutStore {
         private set
     var heroSize by mutableStateOf(enumOrNull<HeroSize>("heroSize"))
         private set
+    /**
+     * "Animate Expansion": an expanding poster opens and folds in motion, the row gliding with
+     * it (device only, on by default); off, the card and the row snap into place.
+     */
+    var animateExpansion by mutableStateOf(prefs.getBoolean(ANIMATE_EXPANSION, true))
+        private set
     init { migrateHomeStyle() }
 
     /**
@@ -194,6 +200,8 @@ object HomeLayoutStore {
 
     val effectiveFocusPosition get() = focusPosition ?: profile.focusPosition
     val effectiveExpandPosters get() = expandPosters ?: profile.expandPosters
+    /** Whether any row on Home draws expanding posters: by default, or set on a row. */
+    val usesExpandingPosters get() = effectiveExpandPosters || ShelfStyle.EXPANDING_POSTER in shelfStyles.values
     val effectiveHeroSize get() = heroSize ?: profile.heroSize
     /** The same Card Size in every Top Carousel / Focused Title Info combination. */
     val effectiveCardScale get() = cardSize?.scale ?: profile.cardScale
@@ -206,6 +214,7 @@ object HomeLayoutStore {
         expandPosters = v
         prefs.edit().apply { if (v == null) remove("expandPosters") else putBoolean("expandPosters", v) }.apply()
     }
+    fun chooseAnimateExpansion(v: Boolean) { animateExpansion = v; prefs.edit().putBoolean(ANIMATE_EXPANSION, v).apply() }
     fun chooseHeroSize(v: HeroSize?) { heroSize = v; putEnum("heroSize", v) }
     fun chooseTopCarousel(v: Boolean) {
         topCarousel = v; prefs.edit().putBoolean(TOP_CAROUSEL, v).apply()
@@ -271,6 +280,7 @@ object HomeLayoutStore {
     private const val TOP_CAROUSEL = "topCarousel"
     private const val FOCUSED_INFO = "focusedInfo"
     private const val STYLE_CARD_SIZES = "styleCardSizes"
+    private const val ANIMATE_EXPANSION = "animateExpansion"
 
     private inline fun <reified E : Enum<E>> enumOrNull(key: String): E? =
         prefs.getString(key, null)?.let { name -> enumValues<E>().firstOrNull { it.name == name } }

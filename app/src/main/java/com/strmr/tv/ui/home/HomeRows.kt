@@ -248,7 +248,7 @@ internal fun HomeRows(
                 ) {
                     when (slot) {
                         is HomeSlot.Shelf -> ShelfRow(
-                            slot.shelf, metrics, layout.effectiveFocusPosition, metrics.captions,
+                            slot.shelf, metrics, layout.effectiveFocusPosition, metrics.captions, layout.animateExpansion,
                             memory = memories.getOrPut(slot.id) { ShelfMemory() },
                             entry = if (index == firstRow) firstCard else null,
                             onFocus = { card, explore ->
