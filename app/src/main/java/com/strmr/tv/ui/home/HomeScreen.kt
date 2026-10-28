@@ -79,12 +79,10 @@ internal val NoAutoScroll = object : BringIntoViewSpec {
  * Shows or a custom page, each with its own rows.
  */
 @Composable
-fun HomeScreen(tabsFocused: () -> Boolean = { false }) {
-    val scope = rememberCoroutineScope()
+fun HomeScreen(home: HomeState, tabsFocused: () -> Boolean = { false }) {
     // A store per Home view: going back to a view shows its rows at once, reloading only if stale.
-    val stores = remember { mutableMapOf<String, HomeStore>() }
     val view = HomeViewStore.current
-    val store = stores.getOrPut(view) { HomeStore(scope, view) }
+    val store = home.store(view)
     val current by rememberUpdatedState(store)
     val sessionsEnded by PlaybackCoordinator.sessionsEnded.collectAsState()
     val wakes by AppSession.wakes.collectAsState()
@@ -96,20 +94,23 @@ fun HomeScreen(tabsFocused: () -> Boolean = { false }) {
             current.refreshIfStale()
         }
     }
-    // A new view starts at the top with fresh focus memory and its own hero.
-    key(view, HomeLayoutStore.topCarousel, HomeLayoutStore.focusedInfo) { HomePage(store, tabsFocused) }
+    // A new view (or layout) starts at the top with fresh focus memory and its own hero; one
+    // shown before comes back with the card left focused.
+    val topCarousel = HomeLayoutStore.topCarousel
+    val focusedInfo = HomeLayoutStore.focusedInfo
+    key(view, topCarousel, focusedInfo) { HomePage(store, home.page("$view/$topCarousel/$focusedInfo"), tabsFocused) }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
+private fun HomePage(store: HomeStore, memory: HomeFocusMemory, tabsFocused: () -> Boolean) {
     val scope = rememberCoroutineScope()
     val navigator = LocalNavigator.current
     val onCard = rememberCardHandler { store.settings }
     val layout = HomeLayoutStore
-    var hero by remember { mutableStateOf<HeroContent?>(null) }
+    var hero by memory::hero
     val firstCard = remember { FocusRequester() }
-    var focusedOnce by remember { mutableStateOf(false) }
+    var focusedOnce by memory::focusedOnce
     var menuFor by remember { mutableStateOf<Pair<HomeShelf, HomeCard>?>(null) }
     var menuError by remember { mutableStateOf<String?>(null) }
     /** Bumped after a title action reloads the rows: focus returns to the rows if the focused card left. */
@@ -159,7 +160,7 @@ private fun HomePage(store: HomeStore, tabsFocused: () -> Boolean) {
 
     val rows: @Composable (List<HomeSlot>, Modifier, (HeroContent) -> Unit, RowsHeader?) -> Unit = { slots, modifier, onHero, header ->
         if (!HomeStatus(store, modifier)) {
-            HomeRows(slots, firstCard, modifier, onHero, onCard = onCard, onExplore = onExplore, onMenu = onMenu, refocus = refocus, header = header,
+            HomeRows(slots, memory, firstCard, modifier, onHero, onCard = onCard, onExplore = onExplore, onMenu = onMenu, refocus = refocus, header = header,
                      onRow = { shownRow = it }, fade = rowFade.takeIf { oneShelf })
         }
     }

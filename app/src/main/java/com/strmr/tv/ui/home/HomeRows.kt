@@ -13,14 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -77,6 +75,8 @@ class RowsHeader(
 @Composable
 internal fun HomeRows(
     slots: List<HomeSlot>,
+    /** Where focus was on the page, kept while it is off screen. */
+    memory: HomeFocusMemory,
     firstCard: FocusRequester,
     modifier: Modifier,
     onHero: (HeroContent) -> Unit,
@@ -98,24 +98,24 @@ internal fun HomeRows(
     fade: Animatable<Float, AnimationVector1D>? = null,
 ) {
     val layout = HomeLayoutStore
-    val state = rememberLazyListState()
+    val state = memory.column
     val lead = if (header != null) 1 else 0
     // By row ID, not position: a row appearing above (Set Aside after a Set Aside action) or
     // leaving shifts positions, and the focused row must stay where it is on screen.
-    var focusedId by remember { mutableStateOf<String?>(null) }
+    var focusedId by memory::focusedId
     /** Where the focused row was, for when it has left (its position is then the next row's). */
-    var focusedIndex by remember { mutableIntStateOf(0) }
+    var focusedIndex by memory::focusedIndex
     /** Focus is in the header (or above it); it starts there (Home focuses the carousel at launch). */
     val noHeader = remember { mutableStateOf(false) }
     var headerFocused by (header?.active ?: noHeader)
-    val memories = remember { mutableMapOf<String, ShelfMemory>() }
+    val memories = memory.shelves
     /** The row whose loading placeholder holds focus: it hands focus on when the row arrives. */
     var placeholderFocused by remember { mutableStateOf<String?>(null) }
     val focusedRow = slots.indexOfFirst { it.id == focusedId }.takeIf { it >= 0 } ?: focusedIndex.coerceIn(0, maxOf(slots.lastIndex, 0))
     /** The row shown (null: the header): until a fade has swapped, the place being left. Its card's info is the hero. */
     var shown by remember { mutableStateOf<String?>(null) }
     /** Each row's last focused card's info, kept back while its row fades in. */
-    val heroes = remember { mutableMapOf<String, HeroContent>() }
+    val heroes = memory.heroes
     val wasHeader = remember { booleanArrayOf(headerFocused) }
     LaunchedEffect(focusedRow, headerFocused) {
         val fromHeader = wasHeader[0]

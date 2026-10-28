@@ -46,6 +46,7 @@ import com.strmr.tv.ui.live.LiveScreen
 import com.strmr.tv.ui.recordings.RecordingsScreen
 import com.strmr.tv.ui.sports.SportsScreen
 import com.strmr.tv.ui.search.SearchScreen
+import com.strmr.tv.ui.home.HomeState
 import com.strmr.tv.ui.settings.SettingsScreen
 import com.strmr.tv.ui.watchlist.WatchlistScreen
 import kotlinx.coroutines.launch
@@ -89,6 +90,8 @@ fun MainShell() {
     // Over Home's top, not part of its layout, so turning it on moves nothing.
     val showsSwitcher = onHomeTab && HomeLayoutStore.viewSwitcher && HomeViewTabs.untabbed(viewTabs).isNotEmpty()
     val scope = rememberCoroutineScope()
+    // Home's rows and focus memory outlive its page, which leaves composition while another tab is up.
+    val home = remember { HomeState(scope) }
     LaunchedEffect(Unit) { MenuTabs.refresh(ApiClient.profileId) }
     LaunchedEffect(Unit) { WatchlistStore.refresh() }
     LaunchedEffect(Unit) { ListsTabStore.refresh() }
@@ -146,7 +149,7 @@ fun MainShell() {
         ) {
             when (tabs[selected].page) {
                 // While the picker is open or the switcher focused, a new view's rows don't take focus.
-                MainTab.HOME -> HomeScreen(tabsFocused = { menuFocused || picking || switcherFocused })
+                MainTab.HOME -> HomeScreen(home, tabsFocused = { menuFocused || picking || switcherFocused })
                 MainTab.LIVE -> LiveScreen()
                 MainTab.WATCHLIST -> WatchlistScreen()
                 MainTab.LISTS -> ListsScreen()
