@@ -94,8 +94,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
     // A custom list shows its current name (it may have been renamed here or elsewhere).
     val title = current?.name ?: shown.title
     val manageable = current != null && !current.isSetAside
-    // A title action (Set Aside, hide / unhide, watched) re-reads the list, so its state and badges show.
-    val reloadKey = listOf(options, part, added, TitleActions.changes)
+    val reloadKey = listOf(options, part, added)
 
     suspend fun loadPage() {
         val requested = reloadKey
@@ -151,6 +150,24 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
         total = null
         loadError = null
         loadPage()
+    }
+    // A title action (Set Aside, hide / unhide, watched) re-reads the loaded part in place, so its
+    // state and badges show while focus stays on the card instead of jumping to the controls.
+    var seenChanges by remember { mutableIntStateOf(TitleActions.changes) }
+    LaunchedEffect(TitleActions.changes) {
+        if (TitleActions.changes == seenChanges) return@LaunchedEffect
+        seenChanges = TitleActions.changes
+        if (loadingFor != null || total == null) return@LaunchedEffect
+        val requested = reloadKey
+        val limit = maxOf(PAGE, fetched + 1)
+        val page = runCatching { ApiClient.browsePage(shown, limit = limit, offset = 0, extra = query, options = options) }.getOrNull()
+        if (page == null || requested != reloadKey) return@LaunchedEffect
+        val seen = mutableSetOf<String>()
+        entries = page.entries.filter { seen.add(HomeCard.from(it).id) }
+        fetched = page.entries.size
+        total = if (page.entries.size < limit) fetched else page.total
+        genres = page.genres
+        letters = page.letters
     }
     // Once the first cards are laid out (a frame after they arrive), focus the first.
     LaunchedEffect(entries.isNotEmpty()) {
