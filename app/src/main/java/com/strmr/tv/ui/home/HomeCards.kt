@@ -271,8 +271,11 @@ private val CardBadge.Symbol.icon: ImageVector
         CardBadge.Symbol.IN_PROGRESS -> AppIcons.WatchedPartial
     }
 
-/** Whether a card shows its resume progress: only between 5% and 90% watched. */
-fun showsProgress(progress: Float): Boolean = progress > 0.05f && progress < 0.9f
+/**
+ * Whether a card shows its resume progress: any started progress under 90% watched. Whether
+ * progress counts as started is the server's call (`ResumeState.eligible`); callers pass 0 when it doesn't.
+ */
+fun showsProgress(progress: Float): Boolean = progress > 0f && progress < 0.9f
 
 /**
  * Resume progress: a white capsule on a faint track, inset in the card (the tvOS bar). The

@@ -76,7 +76,7 @@ data class HomeCard(
                 else -> "Series"
             }
             // The server's resume state for the item the row plays; older servers send only percentages.
-            val progress = item.resume?.fraction
+            val progress = item.resume?.let { if (it.eligible) it.fraction else 0f }
                 ?: (((if (item.isMovie) item.percentWatched else item.resumePercent) ?: 0.0) / 100).toFloat().coerceIn(0f, 1f)
             // An unaired next episode beats the series status; movies use their release status.
             val airs = if (!item.isMovie && ep != null) ReleaseBadge.forEpisode(ep.airDate, ep.airDateTimeUTC) else null
