@@ -70,7 +70,7 @@ class PlayerActivity : ComponentActivity() {
                 LaunchedEffect(switch) {
                     switch?.let {
                         finish()
-                        PlaybackCoordinator.play(it.request, it.source, carried = it.carried)
+                        PlaybackCoordinator.play(it.request, it.source, carried = it.carried, resolved = it.resolved)
                     }
                 }
                 Box(Modifier.fillMaxSize().background(Color.Black)) {

@@ -87,6 +87,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** A downloaded or translated subtitle, drawn in place of ExoPlayer's cues while selected. */
     val external = ExternalSubtitles(scope, { player.currentPosition }) { cues.value = it }
     val online = OnlineSubtitles(this, scope)
+    private val autoSwitch = AutoSwitch(this)
 
     /** Seek previews, for a resolved stream (not trailers or live). */
     val thumbnails: PlaybackThumbnails? =
@@ -218,6 +219,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         request.startPosition?.let { player.seekTo((it * 1000).toLong()) }
         player.playWhenReady = true
         player.prepare()
+        autoSwitch.start()
         AppLog.i("Player", "play ${request.displayTitle} start=${request.start?.label ?: "0"}")
         thumbnails?.start(scope) {
             val video = tracks.value.ofType(C.TRACK_TYPE_VIDEO).firstOrNull { it.selected }?.format
@@ -282,7 +284,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) {
         if (!session.reportsProgress) return
         val (position, duration) = times() ?: return
-        val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath)
+        val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath, stream = streamHealth())
         val kind = when {
             ended -> ProgressLog.Kind.END
             closing -> ProgressLog.Kind.CLOSE
@@ -292,13 +294,23 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         lastReport = scope.launch {
             withContext(NonCancellable) {
                 try {
-                    progressLog.saved(kind, position, duration, ApiClient.reportProgress(body))
+                    val reply = ApiClient.reportProgress(body)
+                    progressLog.saved(kind, position, duration, reply)
+                    if (reply.migrationRequested && !ended && !closing) {
+                        autoSwitch.trigger("server: ${reply.migrationReason ?: "migration requested"}")
+                    }
                 } catch (e: Exception) {
                     progressLog.failed(kind, position, duration, e)
                 }
             }
         }
     }
+
+    private fun streamHealth() = StreamHealth(
+        buffering = player.playbackState == Player.STATE_BUFFERING,
+        bufferAheadSeconds = player.totalBufferedDuration / 1000.0,
+        requiredMbps = player.videoFormat?.bitrate?.takeIf { it > 0 }?.let { it / 1_000_000.0 },
+    )
 
     /** `byUser`: picked in a menu, which stops a running automatic subtitle search. */
     fun select(track: PlayerTrack, byUser: Boolean = true) {
@@ -356,6 +368,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         external.cancel()
         thumbnails?.cancel()
         upNext?.cancel()
+        autoSwitch.cancel()
         progressJob?.cancel()
         // Each stops its server session.
         recordingHls?.release()

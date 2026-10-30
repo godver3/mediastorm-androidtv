@@ -17,9 +17,14 @@ suspend fun ApiClient.startPrequeue(body: JsonObject): PrequeueStartResponse =
 suspend fun ApiClient.prequeueStatus(id: String): PrequeueStatus =
     send("GET", "/api/playback/prequeue/${segment(id)}")
 
-/** What the server stored for a progress report, and its resume decision. */
+/** What the server stored for a progress report, its resume decision, and whether it wants the player off this source. */
 @Serializable
-data class ProgressReply(val percentWatched: Double = 0.0, val resume: ResumeState? = null)
+data class ProgressReply(
+    val percentWatched: Double = 0.0,
+    val resume: ResumeState? = null,
+    val migrationRequested: Boolean = false,
+    val migrationReason: String? = null,
+)
 
 /** Throws on failure; the caller logs it, and the next report retries. */
 suspend fun ApiClient.reportProgress(body: JsonObject): ProgressReply =

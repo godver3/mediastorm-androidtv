@@ -9,9 +9,18 @@ import androidx.media3.common.util.UnstableApi
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.StartPoint
+import com.strmr.tv.api.TrackSelection
 
-/** What Switch Source hands the coordinator: the same title at the current position, on another source. */
-data class SourceSwitchRequest(val request: PlaybackRequest, val source: SourceResult, val carried: CarriedTracks)
+/**
+ * What Switch Source hands the coordinator: the same title at the current position, on another
+ * source. [resolved]: the source was already resolved ([AutoSwitch] resolves before leaving the player).
+ */
+data class SourceSwitchRequest(
+    val request: PlaybackRequest,
+    val source: SourceResult,
+    val carried: CarriedTracks,
+    val resolved: Pair<String, TrackSelection?>? = null,
+)
 
 /**
  * The audio and subtitle languages playing when the source was switched, re-applied on the new

@@ -111,7 +111,8 @@ class LibraryVersionsTest {
     @Test fun libraryProgressNamesItsSourcePath() {
         val target = DetailsTarget("tmdb:movie:9", "M", true, 2020, tmdbId = "9", posterUrl = "/api/library/items/x/artwork/poster")
         val request = PlaybackRequest(target)
-        assertNull(request.progressReport(10.0, 100.0, false, false, "debrid/x.mkv")["sourcePath"])
+        // A stream names its path too, so the server's migration signals stay with that source.
+        assertEquals("debrid/x.mkv", request.progressReport(10.0, 100.0, false, false, "debrid/x.mkv")["sourcePath"]?.jsonPrimitive?.content)
         val body = request.copy(libraryVersion = version("i")).progressReport(10.0, 100.0, false, false, "plexmedia:i")
         assertEquals("plexmedia:i", body["sourcePath"]?.jsonPrimitive?.content)
         assertEquals("tmdb:movie:9", body["itemId"]?.jsonPrimitive?.content)

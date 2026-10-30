@@ -183,6 +183,16 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 },
             )
         }
+        item {
+            val enabled = AutoSwitchSettings.enabled
+            ListItem(
+                selected = false,
+                onClick = { AutoSwitchSettings.set(!enabled) },
+                headlineContent = { Text("Auto Switch Sources") },
+                supportingContent = { Text("Move to another source when the current one fails or keeps stalling") },
+                trailingContent = { Text(if (enabled) "On" else "Off") },
+            )
+        }
         trackSettingRows()
         item {
             val enabled = DolbyVisionSettings.profile7Enabled

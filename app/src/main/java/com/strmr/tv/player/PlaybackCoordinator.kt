@@ -6,6 +6,7 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.PrequeueStatus
 import com.strmr.tv.api.SourceResult
+import com.strmr.tv.api.TrackSelection
 import com.strmr.tv.api.playbackSettings
 import com.strmr.tv.api.resolveSource
 import com.strmr.tv.api.streamUrl
@@ -89,12 +90,16 @@ object PlaybackCoordinator {
     /**
      * Plays a source picked by hand, bypassing the automatic prequeue. [manual] carries the
      * tracks chosen in its track panel; they replace the server's choice for those kinds.
-     * [carried] (Switch Source) re-applies the languages that were playing.
+     * [carried] (Switch Source) re-applies the languages that were playing; [resolved] skips the
+     * resolve (Auto Switch resolved it already).
      */
-    fun play(request: PlaybackRequest, source: SourceResult, manual: ManualSourceTracks? = null, carried: CarriedTracks? = null) =
+    fun play(
+        request: PlaybackRequest, source: SourceResult, manual: ManualSourceTracks? = null, carried: CarriedTracks? = null,
+        resolved: Pair<String, TrackSelection?>? = null,
+    ) =
         // A stream picked over a library copy (Switch Source) is no longer that copy.
         begin(request.copy(libraryVersion = null), "Preparing…", carried = carried, resolve = {
-            val (path, tracks) = ApiClient.resolveSource(source, request.title.titleId, request.startPosition)
+            val (path, tracks) = resolved ?: ApiClient.resolveSource(source, request.title.titleId, request.startPosition)
             val hints = SourceHints(source.serviceType.ifEmpty { null }, indexer = source.indexer.ifEmpty { null },
                                     attributes = source.attributes)
             if (manual == null || manual.choice.isEmpty) {

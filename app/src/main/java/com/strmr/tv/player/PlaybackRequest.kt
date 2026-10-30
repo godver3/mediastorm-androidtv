@@ -28,6 +28,12 @@ data class PlaybackRequest(
     val library: LibraryVersions? = null,
     /** The copy this playback uses (picked in the Versions list, or set as it starts). */
     val libraryVersion: LibraryVersion? = null,
+    /**
+     * Sources [AutoSwitch] has already moved off (or failed to start) for this title, by guid
+     * and release name, so a switch never goes back to one; and how many switches it has made.
+     */
+    val autoSwitchTried: Set<String> = emptySet(),
+    val autoSwitchCount: Int = 0,
 ) {
     data class EpisodeInfo(
         val season: Int,
@@ -115,10 +121,15 @@ data class PlaybackRequest(
         if (isUnmatchedLibraryFile) streamMetadataQuery - setOf("seriesId", "titleId") + ("itemId" to path) else streamMetadataQuery
 
     /**
-     * The `/history/progress` body for a position in this playback. A library file names its
-     * `sourcePath`, which is how the server knows to report the playback to Plex or Jellyfin.
+     * The `/history/progress` body for a position in this playback. A library file's
+     * `sourcePath` is how the server knows to report the playback to Plex or Jellyfin; a
+     * stream's, with [stream], is what the server weighs its stall and failure reports for that
+     * source against (answering with `migrationRequested`).
      */
-    fun progressReport(position: Double, duration: Double, paused: Boolean, ended: Boolean, sourcePath: String? = null): JsonObject = buildJsonObject {
+    fun progressReport(
+        position: Double, duration: Double, paused: Boolean, ended: Boolean, sourcePath: String? = null,
+        stream: StreamHealth = StreamHealth(),
+    ): JsonObject = buildJsonObject {
         val t = title
         put("mediaType", progressMediaType)
         put("position", position)
@@ -126,7 +137,10 @@ data class PlaybackRequest(
         put("timestamp", Instant.now().toString())
         put("isPaused", paused)
         put("playbackEnded", ended)
-        if (libraryVersion != null && sourcePath != null) put("sourcePath", sourcePath)
+        put("isBuffering", stream.buffering)
+        sourcePath?.let { put("sourcePath", it) }
+        stream.bufferAheadSeconds?.let { put("bufferAheadSeconds", it) }
+        stream.requiredMbps?.let { put("requiredBandwidthMbps", it) }
         if (isUnmatchedLibraryFile && sourcePath != null) {
             // Keyed by the stream path, with no catalog ids (the Expo app's rule).
             put("itemId", sourcePath)
@@ -161,3 +175,12 @@ data class PlaybackRequest(
         t.posterUrl?.takeIf { it.startsWith("http") }?.let { put("posterUrl", it) }
     }
 }
+
+/** How the stream is delivering, for the progress heartbeat. */
+data class StreamHealth(
+    val buffering: Boolean = false,
+    /** Seconds buffered ahead of the playhead. */
+    val bufferAheadSeconds: Double? = null,
+    /** The bitrate the source needs to keep up. */
+    val requiredMbps: Double? = null,
+)
