@@ -79,6 +79,8 @@ fun ProfilePickerScreen() {
     }
     LaunchedEffect(Unit) { if (profiles.isEmpty()) reload() }
     if (session.canCancelProfilePick && pinTarget == null) BackHandler { session.cancelProfilePick() }
+    // A Back while the pick is on its way (Home about to open) would otherwise leave the app.
+    BackHandler(enabled = busyId != null) {}
 
     // Current or last profile; in debug builds, the secrets.properties profile on a fresh start.
     val initialId = current?.id ?: session.lastProfileId

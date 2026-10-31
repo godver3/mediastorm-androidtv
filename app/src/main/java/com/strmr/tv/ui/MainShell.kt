@@ -49,6 +49,7 @@ import com.strmr.tv.ui.search.SearchScreen
 import com.strmr.tv.ui.home.HomeState
 import com.strmr.tv.ui.settings.SettingsScreen
 import com.strmr.tv.ui.watchlist.WatchlistScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -122,6 +123,14 @@ fun MainShell() {
     BackHandler(enabled = !menuFocused || listPickerPending) {
         if (listPickerPending) CustomListsStore.picking = null else runCatching { menuFocus.requestFocus() }
     }
+    // Just after a profile opens, a quick Back (or two) lands while Home is still loading: the first
+    // moves focus to the menu, which keeps Home from taking it, and the next would leave the app. Until
+    // focus first reaches the page (at most 10 s, so a Home that never loads can still be left), Back on
+    // the menu does nothing.
+    var settling by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { delay(10_000); settling = false }
+    LaunchedEffect(pageFocused) { if (pageFocused) settling = false }
+    BackHandler(enabled = settling && menuFocused && !listPickerPending) {}
 
     val switcher: (@Composable (Modifier) -> Unit)? = if (!showsSwitcher) null else { modifier ->
         HomeViewSwitcher(
