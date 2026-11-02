@@ -11,3 +11,4 @@ app/libdovi/
 app/.cxx/
 scripts/
 docs/
+.kotlin/
