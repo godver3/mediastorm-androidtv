@@ -37,9 +37,11 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.SubcomposeAsyncImage
 import com.strmr.tv.live.EpgProgram
+import com.strmr.tv.live.LiveCatchups
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.Recording
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
@@ -95,7 +97,12 @@ fun ChannelMenu(store: LiveStore, channel: LiveChannel, program: EpgProgram? = n
     ChoiceDialog(
         title = program?.takeIf { it.stopMs > now }?.title ?: channel.name,
         message = program?.takeIf { it.stopMs > now }?.let { "${channel.name} · ${if (it.isAiring(now)) "On now" else timeRange(it.startMs, it.endMs)}" },
-        choices = recordChoices + listOfNotNull(
+        choices = listOfNotNull(
+            // The provider's catch-up: a past programme, or the one on air from its start.
+            program?.takeIf { LiveCatchups.canReplay(channel, it, now) }?.let { p ->
+                DialogChoice(if (p.stopMs <= now) "Watch from Start" else "Start Over") { PlaybackCoordinator.playCatchup(channel, p) }
+            },
+        ) + recordChoices + listOfNotNull(
             DialogChoice("Record 2 Hour Block") { rec.recordTwoHours(channel) },
             if (channel.hasStremioSources) DialogChoice("Choose Source") { store.chooseSource(channel) } else null,
             DialogChoice(if (channel.id in store.favorites) "Remove from Favorites" else "Add to Favorites") { store.toggleFavorite(channel) },

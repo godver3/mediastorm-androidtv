@@ -12,6 +12,7 @@ import com.strmr.tv.api.resolveSource
 import com.strmr.tv.api.streamUrl
 import com.strmr.tv.app.App
 import com.strmr.tv.app.AppLog
+import com.strmr.tv.live.EpgProgram
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveHlsPreference
 import com.strmr.tv.live.LiveStream
@@ -20,6 +21,8 @@ import com.strmr.tv.live.RecordingRules
 import com.strmr.tv.live.recordingStreamUrl
 import com.strmr.tv.live.startRecordingHls
 import com.strmr.tv.live.startLive
+import com.strmr.tv.live.catchupStreamUrl
+import com.strmr.tv.live.liveCatchup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -151,6 +154,34 @@ object PlaybackCoordinator {
         pending = PlayerSession(request, ApiClient.recordingStreamUrl(recording, title), null, reportsProgress = false,
                                 sourceLabel = StreamInfo.recording(recording.channelName))
         launchPlayer()
+    }
+
+    /**
+     * A past (or airing) guide programme from the provider's catch-up, seekable, without progress
+     * (as recordings play): the server turns it into the provider's archive URL, which plays as a
+     * file through `/api/video/stream` (providers serve the archive whole, with byte ranges).
+     */
+    fun playCatchup(channel: LiveChannel, program: EpgProgram) {
+        if (_resolving.value != null) return
+        val request = PlaybackRequest(DetailsTarget("catchup:${channel.id}:${program.start}", program.title, isMovie = true))
+        AppLog.i("Catchup", "play ${channel.id} ${program.start} ${program.title}")
+        _resolving.value = request
+        stage.value = "Starting…"
+        detail.value = null
+        resolveJob = scope.launch {
+            try {
+                val archive = ApiClient.liveCatchup(channel, program)
+                AppLog.i("Catchup", "archive from ${archive.offsetSeconds}s for ${archive.durationSeconds}s")
+                pending = PlayerSession(request, ApiClient.catchupStreamUrl(archive, channel, program), null, reportsProgress = false,
+                                        sourceLabel = listOf("Catch-up", channel.name).joinToString(" · "))
+                launchPlayer()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _resolving.value = null
+                errorMessage.value = e.message ?: "Catch-up failed"
+            }
+        }
     }
 
     private fun launchPlayer() {

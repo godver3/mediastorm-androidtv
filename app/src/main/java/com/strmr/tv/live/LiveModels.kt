@@ -26,6 +26,8 @@ data class LiveChannel(
      * list; sent as `stremioStreamIndex` when tuning (null lets the server pick).
      */
     val stremioStreamIndex: Int? = null,
+    /** The provider's catch-up, when it replays this channel's past programmes ([LiveCatchup]). */
+    val catchup: LiveCatchup? = null,
 ) {
     /** A Stremio addon stream resource (`…/stream/….json`), which can list several streams (Expo `isStremioStreamResourceUrl`). */
     val hasStremioSources: Boolean

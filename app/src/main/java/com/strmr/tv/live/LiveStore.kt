@@ -312,8 +312,9 @@ class LiveStore(private val scope: CoroutineScope) {
     fun needSchedule(channel: LiveChannel, from: Long, to: Long) {
         if (epgEnabled != true) return
         val key = channel.guideKey
-        val first = maxOf(0, ((from - guideBase) / CHUNK).toInt())
-        val last = maxOf(first, ((to - guideBase - 1) / CHUNK).toInt())
+        // Negative chunks lie before [guideBase]: the past, paged into for catch-up.
+        val first = Math.floorDiv(from - guideBase, CHUNK).toInt()
+        val last = maxOf(first, Math.floorDiv(to - guideBase - 1, CHUNK).toInt())
         var queued = false
         for (index in first..last) {
             if (chunksLoaded.add("$index|$key")) {

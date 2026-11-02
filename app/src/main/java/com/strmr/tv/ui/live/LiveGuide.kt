@@ -50,11 +50,13 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.strmr.tv.live.EpgProgram
+import com.strmr.tv.live.LiveCatchups
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveRecordings
 import com.strmr.tv.live.LiveStore
 import com.strmr.tv.live.Recording
 import com.strmr.tv.player.PlaybackCoordinator
+import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.PageMargin
 
 private const val SPAN = 2 * 3_600_000L
@@ -108,7 +110,8 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
     var pending by remember { mutableStateOf<PendingFocus?>(null) }
     var menuFor by remember { mutableStateOf<Pair<LiveChannel, EpgProgram?>?>(null) }
     val channels = store.visibleChannels
-    val earliest = LiveStore.halfHour(now) - STEP
+    // Back as far as the provider's catch-up reaches, else half an hour.
+    val earliest = LiveStore.halfHour(now) - LiveCatchups.guideHistory(channels)
     val latest = LiveStore.halfHour(now) + 24 * 3_600_000L
 
     Column(modifier) {
@@ -141,15 +144,25 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                                         LaunchedEffect(p, cell.id) {
                                             if (p != null && p.channel == channel.id && p.at in cell.start until cell.end) {
                                                 pending = null
+                                                // A paged window can keep focus on the same cell
+                                                // without a focus change: update the panel here.
+                                                focused = channel to cell
                                                 runCatching { requester.requestFocus() }
                                             }
                                         }
                                         Cell(
                                             cell, now, cell.program?.let { LiveRecordings.matching(recordings, it, now) },
+                                            replayable = LiveCatchups.replaysOnSelect(channel, cell.program, now),
                                             width = maxOf(((cell.end - cell.start) * dpPerMs).dp - CELL_GAP, 16.dp),
                                             onClick = {
-                                                pick?.onPick?.invoke(channel)
-                                                    ?: PlaybackCoordinator.playLive(channel, cell.program?.takeIf { it.isAiring() }?.title)
+                                                val program = cell.program
+                                                when {
+                                                    pick?.onPick != null -> pick.onPick.invoke(channel)
+                                                    // A programme that has ended plays from the provider's archive.
+                                                    program != null && LiveCatchups.replaysOnSelect(channel, program) ->
+                                                        PlaybackCoordinator.playCatchup(channel, program)
+                                                    else -> PlaybackCoordinator.playLive(channel, program?.takeIf { it.isAiring() }?.title)
+                                                }
                                             },
                                             onLongClick = { menuFor = channel to cell.program },
                                             onFocus = { focused = channel to cell },
@@ -198,7 +211,7 @@ private fun ChannelColumn(channel: LiveChannel, favorite: Boolean, marked: Boole
 /** A flat cell that turns white under focus, the airing programme a shade lighter; no scale, so wide cells don't spill. */
 @Composable
 private fun Cell(
-    cell: GuideCell, now: Long, recording: Recording?, width: Dp,
+    cell: GuideCell, now: Long, recording: Recording?, replayable: Boolean, width: Dp,
     onClick: () -> Unit, onLongClick: () -> Unit, onFocus: () -> Unit, onEdge: (forward: Boolean) -> Boolean,
     modifier: Modifier,
 ) {
@@ -228,6 +241,7 @@ private fun Cell(
         Column(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalArrangement = Arrangement.Center) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 recording?.let { RecordingBadge(it) }
+                if (replayable) Icon(AppIcons.Restart, contentDescription = "Catch-up", modifier = Modifier.size(10.dp))
                 Text(
                     (if (cell.program != null && cell.program.startMs < cell.start) "‹ " else "") + (cell.program?.title ?: "No Information"),
                     fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -267,6 +281,10 @@ private fun InfoPanel(channel: LiveChannel?, program: EpgProgram?, now: Long) {
                         Text("LIVE", fontSize = 9.sp, fontWeight = FontWeight.Black,
                              modifier = Modifier.background(Color(0xFFE5332A), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 1.dp))
                     }
+                    if (channel != null && LiveCatchups.canReplay(channel, program, now)) {
+                        Text(if (program.stopMs <= now) "CATCH-UP" else "START OVER", fontSize = 9.sp, fontWeight = FontWeight.Black,
+                             modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 1.dp))
+                    }
                     Text(details(program, now), fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f), maxLines = 1)
                 }
                 program.description?.takeIf { it.isNotEmpty() }?.let {
@@ -287,9 +305,15 @@ private fun InfoPanel(channel: LiveChannel?, program: EpgProgram?, now: Long) {
 }
 
 private fun details(p: EpgProgram, now: Long): String {
-    val parts = mutableListOf(timeRange(p.startMs, p.endMs))
+    val zone = java.time.ZoneId.systemDefault()
+    val day = java.time.Instant.ofEpochMilli(p.startMs).atZone(zone).toLocalDate()
+    // Catch-up pages back days: name the day when it isn't today.
+    val range = timeRange(p.startMs, p.endMs)
+    val parts = mutableListOf(if (day == java.time.LocalDate.now(zone)) range else
+        "${day.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} $range")
     if (p.isAiring(now)) parts += "${(p.endMs - now) / 60_000} min left"
     else if (p.startMs > now) parts += "in ${(p.startMs - now) / 60_000} min"
+    else parts += "${(now - p.startMs) / 3_600_000}h ago"
     p.episode?.takeIf { it.isNotEmpty() }?.let { parts += it }
     p.categories?.firstOrNull()?.let { parts += it }
     return parts.joinToString(" · ")
