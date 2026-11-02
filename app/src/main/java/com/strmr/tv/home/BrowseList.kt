@@ -179,7 +179,15 @@ sealed interface BrowseEntry {
 }
 
 /** A page of a list, with the genre facets and first letters present when the source filters server-side. */
-data class BrowsePage(val entries: List<BrowseEntry>, val total: Int, val genres: List<String> = emptyList(), val letters: List<String> = emptyList())
+data class BrowsePage(val entries: List<BrowseEntry>, val total: Int, val genres: List<String> = emptyList(), val letters: List<String> = emptyList()) {
+    /**
+     * The list's size once [fetched] items have been read, this page's included. Servers return
+     * short pages mid-list (TMDB genre and decade pages are capped at 50; hidden, kids-rated and
+     * unreleased titles are dropped after the read), so a page shorter than asked for doesn't end
+     * the list: only an empty page, or reaching the total, does.
+     */
+    fun listSize(fetched: Int): Int = if (entries.isEmpty()) fetched else maxOf(total, fetched)
+}
 
 /** A custom list (`GET /api/users/{id}/custom-lists`). */
 @Serializable

@@ -33,6 +33,7 @@ import androidx.tv.material3.Text
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.home.BrowseEntry
 import com.strmr.tv.home.BrowseList
+import com.strmr.tv.home.BrowsePage
 import com.strmr.tv.home.BrowseOptions
 import com.strmr.tv.home.BrowseSort
 import com.strmr.tv.home.CardBadge
@@ -120,8 +121,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
             fetched += page.entries.size
             val seen = entries.map { HomeCard.from(it).id }.toMutableSet()
             entries = entries + page.entries.filter { seen.add(HomeCard.from(it).id) }
-            // A short page means the list ended, whatever the total said.
-            total = if (page.entries.size < PAGE) fetched else page.total
+            total = page.listSize(fetched)
             loadError = null
         } catch (e: Exception) {
             if (entries.isEmpty() && requested == reloadKey) loadError = e.message
@@ -159,15 +159,25 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
         seenChanges = TitleActions.changes
         if (loadingFor != null || total == null) return@LaunchedEffect
         val requested = reloadKey
-        val limit = maxOf(PAGE, fetched + 1)
-        val page = runCatching { ApiClient.browsePage(shown, limit = limit, offset = 0, extra = query, options = options) }.getOrNull()
-        if (page == null || requested != reloadKey) return@LaunchedEffect
+        // Pages as loadPage does (the server may cap a page below what is asked for), up to what
+        // was loaded, so the cards below the first page stay.
+        val wanted = fetched
+        val read = mutableListOf<BrowseEntry>()
+        var firstPage: BrowsePage? = null
+        var size: Int
+        do {
+            val page = runCatching { ApiClient.browsePage(shown, limit = PAGE, offset = read.size, extra = query, options = options) }.getOrNull()
+            if (page == null || requested != reloadKey) return@LaunchedEffect
+            if (firstPage == null) firstPage = page
+            read += page.entries
+            size = page.listSize(read.size)
+        } while (page.entries.isNotEmpty() && read.size < wanted && read.size < size)
         val seen = mutableSetOf<String>()
-        entries = page.entries.filter { seen.add(HomeCard.from(it).id) }
-        fetched = page.entries.size
-        total = if (page.entries.size < limit) fetched else page.total
-        genres = page.genres
-        letters = page.letters
+        entries = read.filter { seen.add(HomeCard.from(it).id) }
+        fetched = read.size
+        total = size
+        genres = firstPage?.genres.orEmpty()
+        letters = firstPage?.letters.orEmpty()
     }
     // Once the first cards are laid out (a frame after they arrive), focus the first.
     LaunchedEffect(entries.isNotEmpty()) {
