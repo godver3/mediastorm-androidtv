@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
@@ -45,10 +46,11 @@ import com.strmr.tv.ui.settings.LogoSettings
  * The slide's text, anchored just above the controls. Each slide is one natural-height column
  * (rank line, logo or name, metadata, overview; a part the title lacks takes no room), and a
  * new slide crossfades in over the last with their bottom edges lined up, so a change in
- * height moves nothing. One alpha read in the draw phase; the next slide's logo is fetched ahead.
+ * height moves nothing. [lift] raises it with the controls (Peek Next Row). One alpha read in
+ * the draw phase; the next slide's logo is fetched ahead.
  */
 @Composable
-fun CarouselInfo(slides: List<HomeCard>, state: CarouselState, rowTitle: String?, modifier: Modifier) {
+fun CarouselInfo(slides: List<HomeCard>, state: CarouselState, rowTitle: String?, modifier: Modifier, lift: Dp = 0.dp) {
     val slide = slides.getOrNull(state.index) ?: return
     val scale = HomeLayoutStore.heroTextSize.scale
     val context = LocalContext.current
@@ -67,7 +69,7 @@ fun CarouselInfo(slides: List<HomeCard>, state: CarouselState, rowTitle: String?
         under = null
     }
     Box(
-        modifier.padding(start = ContentMargin, end = ContentMargin, bottom = SAFE_BOTTOM + CONTROLS_HEIGHT + (8 * scale).dp),
+        modifier.padding(start = ContentMargin, end = ContentMargin, bottom = SAFE_BOTTOM + lift + CONTROLS_HEIGHT + (8 * scale).dp),
         contentAlignment = Alignment.BottomStart,
     ) {
         // Keyed, so the slide fading out keeps its composition (its logo drawn, not reloaded).

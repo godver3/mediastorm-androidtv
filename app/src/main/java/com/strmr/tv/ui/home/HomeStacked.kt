@@ -85,18 +85,30 @@ internal fun StackedHome(
         val areaTop = if (info) infoRowTop else menuTop
         val areaBottom = if (info && full) SAFE_BOTTOM else 0.dp
         val areaHeight = maxHeight - areaTop - areaBottom
+        // Peek Next Row: the first row's top half shows under the buttons, which rise with it
+        // (FOCUS_ROOM above that row); the controls' item then ends inside the rows area.
+        val peek = if (layout.peekNextRow) slots.firstOrNull()?.let { layout.metrics(it.id).rowHeight / 2 } ?: 0.dp else 0.dp
+        val peeking = peek > 0.dp
+        // The buttons' foot above the screen's bottom edge, and so how far the slide info rises.
+        val controlsBottom = if (peeking) areaBottom + peek + FOCUS_ROOM else SAFE_BOTTOM
         if (info) InfoBackdrop(hero, carousel, active, toRows)
         CarouselArt(carousel.slides, carousel.state, Modifier.fillMaxSize().graphicsLayer { alpha = 1f - toRows.value })
         CarouselInfo(
             carousel.slides, carousel.state, carousel.shelf?.title,
             Modifier.align(Alignment.BottomStart).graphicsLayer { alpha = 1f - toRows.value },
+            lift = controlsBottom - SAFE_BOTTOM,
         )
         if (info) InfoText(hero, size, textScale, infoRowTop - gap - heroHeight(size, textScale), toRows, fade)
         // The controls' item runs FOCUS_ROOM past the rows area under the buttons, so a focused
         // button isn't cut off at its foot (with the full hero that is the bottom safe area).
-        val header = RowsHeader(carousel.focus, active, tail = if (info) areaHeight else 0.dp, overflow = FOCUS_ROOM) { onDown ->
-            val bottom = if (areaBottom == 0.dp) SAFE_BOTTOM else 0.dp
-            CarouselControls(carousel.slides, carousel.state, carousel.focus, areaHeight + FOCUS_ROOM, bottom + FOCUS_ROOM, onDown)
+        // Peeking, the buttons sit inside the area and it is the plain clip.
+        val header = RowsHeader(carousel.focus, active, tail = if (info) areaHeight else 0.dp, overflow = if (peeking) 0.dp else FOCUS_ROOM) { onDown ->
+            if (peeking) {
+                CarouselControls(carousel.slides, carousel.state, carousel.focus, areaHeight - peek, FOCUS_ROOM, onDown)
+            } else {
+                val bottom = if (areaBottom == 0.dp) SAFE_BOTTOM else 0.dp
+                CarouselControls(carousel.slides, carousel.state, carousel.focus, areaHeight + FOCUS_ROOM, bottom + FOCUS_ROOM, onDown)
+            }
         }
         rows(slots, Modifier.fillMaxSize().padding(top = areaTop, bottom = areaBottom).graphicsLayer { alpha = fade.value }, onHero, header)
     }

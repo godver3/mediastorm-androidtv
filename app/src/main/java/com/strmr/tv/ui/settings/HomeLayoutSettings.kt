@@ -72,6 +72,8 @@ fun HomeLayoutSettings() {
                         s.chooseCarouselRow(cycleNullable(chosen, rows)?.id)
                     }
                 }
+                // The top half of the first row under the carousel's buttons.
+                item { Choice("Peek Next Row", onOff(s.peekNextRow)) { s.choosePeekNextRow(!s.peekNextRow) } }
             }
             item { Header("Hero") }
             item {

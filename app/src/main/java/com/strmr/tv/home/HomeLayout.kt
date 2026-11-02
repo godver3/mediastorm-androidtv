@@ -171,6 +171,12 @@ object HomeLayoutStore {
     /** "Shelf Transition" under the full hero (device only): Slide by default. */
     var shelfTransition by mutableStateOf(enumOrNull<ShelfTransition>("shelfTransition") ?: ShelfTransition.SLIDE)
         private set
+    /**
+     * "Peek Next Row" (device only, off by default): the carousel's buttons sit higher, over the
+     * top half of the first row, rather than on the bottom safe area with that row out of sight.
+     */
+    var peekNextRow by mutableStateOf(prefs.getBoolean(PEEK_NEXT_ROW, false))
+        private set
     /** The row the carousel shows; null picks Top 10, else Trending, else the first row with titles. */
     var carouselRow by mutableStateOf(prefs.getString("carouselRow", null))
         private set
@@ -223,6 +229,10 @@ object HomeLayoutStore {
     fun chooseFocusedInfo(v: Boolean) {
         focusedInfo = v; prefs.edit().putBoolean(FOCUSED_INFO, v).apply()
         AppLog.i(CAROUSEL_LOG, "focused title info ${onOff(v)}")
+    }
+    fun choosePeekNextRow(v: Boolean) {
+        peekNextRow = v; prefs.edit().putBoolean(PEEK_NEXT_ROW, v).apply()
+        AppLog.i(CAROUSEL_LOG, "peek next row ${onOff(v)}")
     }
     fun chooseCarouselRow(v: String?) {
         carouselRow = v
@@ -278,6 +288,7 @@ object HomeLayoutStore {
     private fun onOff(v: Boolean) = if (v) "on" else "off"
 
     private const val TOP_CAROUSEL = "topCarousel"
+    private const val PEEK_NEXT_ROW = "peekNextRow"
     private const val FOCUSED_INFO = "focusedInfo"
     private const val STYLE_CARD_SIZES = "styleCardSizes"
     private const val ANIMATE_EXPANSION = "animateExpansion"
