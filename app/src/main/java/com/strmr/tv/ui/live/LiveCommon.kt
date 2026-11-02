@@ -36,7 +36,9 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.SubcomposeAsyncImage
+import com.strmr.tv.live.EpgProgram
 import com.strmr.tv.live.LiveChannel
+import com.strmr.tv.live.Recording
 import com.strmr.tv.live.LiveStore
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ChoiceDialog
@@ -66,18 +68,53 @@ fun ChannelLogo(channel: LiveChannel, width: Dp, height: Dp, fontSize: TextUnit,
     }
 }
 
-/** Long-press actions shared by channel cards and guide cells: Choose Source (Stremio channels), favorite and hide. */
+/**
+ * Long-press actions shared by channel cards and guide cells (Expo's TV programme and channel
+ * menus). A guide [program] that hasn't ended leads with its recording: Stop / Cancel the one
+ * covering it, else Record (on now) or Record Once (later), then Record Series. Without one, the
+ * channel's: Record Current Program (or Stop Recording) and Record Every Airing. Then Record 2 Hour
+ * Block, Choose Source (Stremio channels), favorite and hide.
+ */
 @Composable
-fun ChannelMenu(store: LiveStore, channel: LiveChannel, onDismiss: () -> Unit) {
+fun ChannelMenu(store: LiveStore, channel: LiveChannel, program: EpgProgram? = null, onDismiss: () -> Unit) {
+    val rec = store.recordings
+    val now = System.currentTimeMillis()
+    val target = program?.takeIf { it.stopMs > now } ?: store.current(channel, now)
+    val recordChoices = target?.let { p ->
+        val existing = rec.on(channel, p, now)
+        val asProgram = program != null && program.stopMs > now
+        listOf(
+            if (existing != null) {
+                DialogChoice(if (existing.status == "pending") "Cancel Scheduled Recording" else "Stop Recording") { rec.cancel(existing) }
+            } else {
+                DialogChoice(if (!asProgram) "Record Current Program" else if (p.isAiring(now)) "Record" else "Record Once") { rec.record(p, channel) }
+            },
+            DialogChoice(if (asProgram) "Record Series" else "Record Every Airing") { rec.recordSeries(p, channel) },
+        )
+    }.orEmpty()
     ChoiceDialog(
-        title = channel.name,
-        choices = listOfNotNull(
+        title = program?.takeIf { it.stopMs > now }?.title ?: channel.name,
+        message = program?.takeIf { it.stopMs > now }?.let { "${channel.name} · ${if (it.isAiring(now)) "On now" else timeRange(it.startMs, it.endMs)}" },
+        choices = recordChoices + listOfNotNull(
+            DialogChoice("Record 2 Hour Block") { rec.recordTwoHours(channel) },
             if (channel.hasStremioSources) DialogChoice("Choose Source") { store.chooseSource(channel) } else null,
             DialogChoice(if (channel.id in store.favorites) "Remove from Favorites" else "Add to Favorites") { store.toggleFavorite(channel) },
             DialogChoice(if (channel.id in store.hidden) "Show Channel" else "Hide Channel") { store.toggleHidden(channel) },
             DialogChoice("Cancel") {},
         ),
         onDismiss = onDismiss,
+    )
+}
+
+/** A guide cell's or channel card's mark: a red dot while recording, a clock when scheduled. */
+@Composable
+fun RecordingBadge(recording: Recording, modifier: Modifier = Modifier) {
+    val running = recording.status == "running"
+    Icon(
+        if (running) AppIcons.Recordings else AppIcons.Scheduled,
+        contentDescription = com.strmr.tv.live.RecordingRules.statusLabel(recording.status),
+        tint = if (running) Color(0xFFFF5A52) else com.strmr.tv.ui.Accent,
+        modifier = modifier.size(10.dp),
     )
 }
 

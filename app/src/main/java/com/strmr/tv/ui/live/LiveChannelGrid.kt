@@ -2,6 +2,7 @@ package com.strmr.tv.ui.live
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -77,9 +78,12 @@ fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier
                     ) {
                         ChannelLogo(channel, 100.dp, 52.dp, 14.sp)
                         current?.let { AiringProgress(it.progress(now), Modifier.align(Alignment.BottomCenter).padding(8.dp).fillMaxWidth().height(3.dp)) }
-                        if (channel.id in store.favorites) {
-                            Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A),
-                                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(14.dp))
+                        Row(Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            store.recordings.on(channel, now = now)?.let { RecordingBadge(it, Modifier.size(14.dp)) }
+                            if (channel.id in store.favorites) {
+                                Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A), modifier = Modifier.size(14.dp))
+                            }
                         }
                         if (pick?.marked?.let { it.id == channel.id && it.sourceId == channel.sourceId } == true) {
                             Icon(AppIcons.Multiscreen, contentDescription = "On this screen", tint = com.strmr.tv.ui.Accent,

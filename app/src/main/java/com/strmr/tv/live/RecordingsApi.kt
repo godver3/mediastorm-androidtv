@@ -3,6 +3,7 @@ package com.strmr.tv.live
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.put
 
 @Serializable
 private data class HlsStart(val sessionId: String? = null, val playlistUrl: String? = null, val growing: Boolean? = null)
@@ -79,4 +80,54 @@ suspend fun ApiClient.startRecordingHls(recording: Recording, title: String): Li
     val path = start.playlistUrl?.ifEmpty { null } ?: throw ApiError.NotReady("The server did not return a playlist for this recording")
     com.strmr.tv.app.AppLog.i("Recordings", "growing HLS session ${start.sessionId} (growing=${start.growing})")
     return LiveStream(mediaUrl(path), start.sessionId)
+}
+
+// Scheduling (the Expo Live guide's programme and channel menus)
+
+/** Scheduled, starting and recording ones: what the guide marks. */
+suspend fun ApiClient.activeRecordings(): List<Recording> =
+    send<RecordingsResponse>("GET", "/api/live/recordings",
+                             mapOf("profileId" to profileId, "status" to "pending,starting,running"),
+                             promptOnLock = false).recordings.orEmpty()
+
+private fun ApiClient.recordingBody(channel: LiveChannel, title: String, description: String?, start: String, stop: String) =
+    kotlinx.serialization.json.buildJsonObject {
+        put("profileId", profileId)
+        put("channelId", channel.id)
+        channel.tvgId?.takeIf { it.isNotEmpty() }?.let { put("tvgId", it) }
+        put("channelName", channel.name)
+        put("title", title)
+        description?.takeIf { it.isNotEmpty() }?.let { put("description", it) }
+        put("sourceUrl", channel.url)
+        put("start", start)
+        put("stop", stop)
+    }
+
+/** Records one programme (`POST /api/live/recordings/epg`); the server adds the profile's padding. */
+suspend fun ApiClient.recordProgram(program: EpgProgram, channel: LiveChannel) {
+    sendRaw("POST", "/api/live/recordings/epg", body = recordingBody(channel, program.title, program.description, program.start, program.stop))
+}
+
+/** Records the channel from now for [durationMs] (`POST /api/live/recordings/time-block`). */
+suspend fun ApiClient.recordTimeBlock(channel: LiveChannel, durationMs: Long) {
+    val start = java.time.Instant.now()
+    sendRaw("POST", "/api/live/recordings/time-block", body = recordingBody(
+        channel, "${channel.name} Live Block", "Scheduled from the Live TV action menu.",
+        start.toString(), start.plusMillis(durationMs).toString(),
+    ))
+}
+
+/**
+ * Records every airing of [title] on this channel: a title rule scoped to the channel, so +1 /
+ * simulcast channels don't record it twice (Expo's Record Series).
+ */
+suspend fun ApiClient.recordSeries(title: String, channel: LiveChannel) {
+    sendRaw("POST", "/api/live/recording-rules", body = kotlinx.serialization.json.buildJsonObject {
+        put("profileId", profileId)
+        put("matchType", "title")
+        put("pattern", title)
+        put("channelId", channel.id)
+        channel.tvgId?.takeIf { it.isNotEmpty() }?.let { put("tvgId", it) }
+        put("channelName", channel.name)
+    })
 }

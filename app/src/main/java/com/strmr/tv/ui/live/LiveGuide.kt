@@ -51,7 +51,9 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.strmr.tv.live.EpgProgram
 import com.strmr.tv.live.LiveChannel
+import com.strmr.tv.live.LiveRecordings
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.live.Recording
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.PageMargin
 
@@ -97,14 +99,14 @@ private data class PendingFocus(val channel: String, val at: Long)
  * The channel guide: a two-hour window of programmes per channel under a panel for the focused
  * one. The window pages by half an hour when focus runs off either end of a row (as the Apple TV
  * guide does), from half an hour ago to a day ahead; more channels load near the end. Select
- * plays the channel, long press offers favorite / hide.
+ * plays the channel, long press offers recording (see [ChannelMenu]) and favorite / hide.
  */
 @Composable
 fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier, pick: LivePick? = null) {
     var windowStart by remember { mutableLongStateOf(LiveStore.halfHour(now)) }
     var focused by remember { mutableStateOf<Pair<LiveChannel, GuideCell>?>(null) }
     var pending by remember { mutableStateOf<PendingFocus?>(null) }
-    var menuFor by remember { mutableStateOf<LiveChannel?>(null) }
+    var menuFor by remember { mutableStateOf<Pair<LiveChannel, EpgProgram?>?>(null) }
     val channels = store.visibleChannels
     val earliest = LiveStore.halfHour(now) - STEP
     val latest = LiveStore.halfHour(now) + 24 * 3_600_000L
@@ -125,6 +127,7 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                         LaunchedEffect(channel.id, windowStart) { store.needSchedule(channel, windowStart, windowStart + SPAN) }
                         if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
                         val cells = layout(store.schedules[channel.guideKey].orEmpty(), windowStart, windowStart + SPAN)
+                        val recordings = store.recordings.active.filter { it.channelId == channel.id }
                         Row(Modifier.height(ROW_HEIGHT), verticalAlignment = Alignment.CenterVertically) {
                             ChannelColumn(channel, channel.id in store.favorites,
                                           marked = pick?.marked?.let { it.id == channel.id && it.sourceId == channel.sourceId } == true)
@@ -142,13 +145,13 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                                             }
                                         }
                                         Cell(
-                                            cell, now,
+                                            cell, now, cell.program?.let { LiveRecordings.matching(recordings, it, now) },
                                             width = maxOf(((cell.end - cell.start) * dpPerMs).dp - CELL_GAP, 16.dp),
                                             onClick = {
                                                 pick?.onPick?.invoke(channel)
                                                     ?: PlaybackCoordinator.playLive(channel, cell.program?.takeIf { it.isAiring() }?.title)
                                             },
-                                            onLongClick = { menuFor = channel },
+                                            onLongClick = { menuFor = channel to cell.program },
                                             onFocus = { focused = channel to cell },
                                             // Off either end of the row: page the window and keep the time.
                                             onEdge = { forward ->
@@ -174,7 +177,7 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
             }
         }
     }
-    menuFor?.let { ChannelMenu(store, it) { menuFor = null } }
+    menuFor?.let { (channel, program) -> ChannelMenu(store, channel, program) { menuFor = null } }
 }
 
 @Composable
@@ -195,7 +198,7 @@ private fun ChannelColumn(channel: LiveChannel, favorite: Boolean, marked: Boole
 /** A flat cell that turns white under focus, the airing programme a shade lighter; no scale, so wide cells don't spill. */
 @Composable
 private fun Cell(
-    cell: GuideCell, now: Long, width: Dp,
+    cell: GuideCell, now: Long, recording: Recording?, width: Dp,
     onClick: () -> Unit, onLongClick: () -> Unit, onFocus: () -> Unit, onEdge: (forward: Boolean) -> Boolean,
     modifier: Modifier,
 ) {
@@ -223,10 +226,13 @@ private fun Cell(
             },
     ) {
         Column(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalArrangement = Arrangement.Center) {
-            Text(
-                (if (cell.program != null && cell.program.startMs < cell.start) "‹ " else "") + (cell.program?.title ?: "No Information"),
-                fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                recording?.let { RecordingBadge(it) }
+                Text(
+                    (if (cell.program != null && cell.program.startMs < cell.start) "‹ " else "") + (cell.program?.title ?: "No Information"),
+                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
             cell.program?.let { Text(timeRange(it.startMs, it.endMs), fontSize = 9.sp, maxLines = 1, modifier = Modifier.padding(top = 1.dp)) }
         }
     }

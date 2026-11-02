@@ -96,6 +96,8 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
 
     // The first run loads favorites and the EPG status; every filter change reloads.
     LaunchedEffect(store.query) { store.start() }
+    // Scheduled / recording marks in the guide; not in the multiscreen picker.
+    LaunchedEffect(pick == null) { if (pick == null) store.recordings.poll() }
     // Moves progress bars and the guide's now line along.
     LaunchedEffect(Unit) {
         while (true) {

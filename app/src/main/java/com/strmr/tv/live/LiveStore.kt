@@ -73,6 +73,8 @@ class LiveStore(private val scope: CoroutineScope) {
     var sourceChoice by mutableStateOf<LiveSourceChoice?>(null)
     private var sourceChoiceJob: Job? = null
     private var noticeJob: Job? = null
+    /** Recording from the guide, and the scheduled / recording programmes it marks. */
+    val recordings = LiveRecordings(scope) { showNotice(it) }
     var favorites by mutableStateOf<Set<String>>(emptySet())
         private set
     var hidden by mutableStateOf<Set<String>>(emptySet())
