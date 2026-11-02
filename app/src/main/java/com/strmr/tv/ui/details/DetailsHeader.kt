@@ -1,5 +1,6 @@
 package com.strmr.tv.ui.details
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
@@ -81,6 +83,9 @@ fun BoxScope.DetailsHeader(
 
     Column(
         Modifier.align(Alignment.BottomStart).padding(start = ContentMargin, end = ContentMargin, bottom = 32.dp)
+            // Coming back up from the rows lands on Play, not the nearest action (often More).
+            .focusProperties { onEnter = { runCatching { playFocus.requestFocus() } } }
+            .focusGroup()
             .onFocusChanged { onFocusChanged(it.hasFocus) },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
