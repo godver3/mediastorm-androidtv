@@ -23,6 +23,42 @@ data class WarmPrequeue(val titleId: String, val profile: String, val phase: Pha
  */
 data class PrequeuePick(val streamPath: String, val episode: PrequeueStatus.TargetEpisode?, val tracks: ManualSourceTracks) {
     fun appliesTo(status: PrequeueStatus) = status.streamPath == streamPath && status.targetEpisode == episode
+
+    /**
+     * The picks for the stream Play resolved: as made for the same stream, else carried by
+     * intent (another episode, or a re-resolve that found another file).
+     */
+    fun tracksFor(status: PrequeueStatus): ManualSourceTracks {
+        if (appliesTo(status)) return tracks
+        val lists = status.trackLists
+        return ManualSourceTracks(tracks.carried(lists), lists.audio, lists.subtitles)
+    }
+}
+
+/**
+ * The picks moved to another file's lists: Off stays off; a track becomes that file's track in
+ * the same language (and forced / SDH / commentary kind), or the default when it has none.
+ */
+fun ManualSourceTracks.carried(lists: TrackProbe.Tracks): ManualTrackChoice {
+    val commentary = { title: String? -> ClientTrackSelector.isCommentary(title.orEmpty()) }
+    val sdh = { t: ProbedSubtitleTrack -> t.title.orEmpty().lowercase().let { "sdh" in it || "deaf" in it || "hard of hearing" in it } }
+    val audioPick = choice.audio?.let { index ->
+        val old = audio.firstOrNull { it.index == index }?.takeIf { it.language.isNotBlank() } ?: return@let null
+        val same = lists.audio.filter { TrackPreferences.sameLanguage(it.language, old.language) }
+        (same.firstOrNull { commentary(it.title) == commentary(old.title) } ?: same.firstOrNull())?.index
+    }
+    val subtitlePick = when (val index = choice.subtitle) {
+        null -> null
+        ManualTrackChoice.OFF -> ManualTrackChoice.OFF
+        else -> {
+            val old = subtitles.firstOrNull { it.index == index }?.takeIf { it.language.isNotBlank() }
+            val same = if (old == null) emptyList() else lists.subtitles.filter {
+                TrackPreferences.sameLanguage(it.language, old.language) && it.forced == old.forced
+            }
+            (same.firstOrNull { old != null && sdh(it) == sdh(old) } ?: same.firstOrNull())?.index
+        }
+    }
+    return ManualTrackChoice(audioPick, subtitlePick)
 }
 
 val PrequeueStatus.hasTrackLists: Boolean get() = !audioTracks.isNullOrEmpty() || !subtitleTracks.isNullOrEmpty()

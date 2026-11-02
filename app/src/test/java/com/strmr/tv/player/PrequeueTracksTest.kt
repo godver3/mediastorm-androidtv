@@ -2,8 +2,12 @@ package com.strmr.tv.player
 
 import com.strmr.tv.api.ApiJson
 import com.strmr.tv.api.PrequeueStatus
+import com.strmr.tv.api.ProbedAudioTrack
+import com.strmr.tv.api.ProbedSubtitleTrack
+import com.strmr.tv.api.TrackProbe
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,5 +49,35 @@ class PrequeueTracksTest {
         assertTrue(pick.appliesTo(status()))
         assertFalse(pick.appliesTo(status(path = "/debrid/y/Other.mkv")))
         assertFalse(pick.appliesTo(status(episode = """"targetEpisode": {"seasonNumber": 1, "episodeNumber": 2},""")))
+    }
+
+    /** Subtitles Off on details, then another episode played: Off still applies. */
+    @Test fun subtitlesOffCarriesToAnotherEpisode() {
+        val pick = PrequeuePick("/debrid/x/Show.S01E05.mkv", PrequeueStatus.TargetEpisode(1, 5),
+                                ManualSourceTracks(ManualTrackChoice(subtitle = ManualTrackChoice.OFF), emptyList(), emptyList()))
+        val other = status(path = "/debrid/x/Show.S01E01.mkv", episode = """"targetEpisode": {"seasonNumber": 1, "episodeNumber": 1},""")
+        assertFalse(pick.appliesTo(other))
+        val carried = pick.tracksFor(other)
+        assertEquals(ManualTrackChoice.OFF, carried.choice.subtitle)
+        val applied = ManualTracks.applied(other.trackSelection, carried.choice, carried.audio, carried.subtitles)
+        assertEquals("off", applied.subtitleMode)
+        assertNull(applied.subtitle)
+    }
+
+    /** A picked track moves to the other file's track in the same language and kind. */
+    @Test fun trackPicksCarryByLanguage() {
+        val picked = ManualSourceTracks(
+            ManualTrackChoice(audio = 2, subtitle = 5),
+            listOf(ProbedAudioTrack(1, "eng"), ProbedAudioTrack(2, "fre")),
+            listOf(ProbedSubtitleTrack(5, "spa")),
+        )
+        val lists = TrackProbe.Tracks(
+            listOf(ProbedAudioTrack(1, "en"), ProbedAudioTrack(3, "fra")),
+            listOf(ProbedSubtitleTrack(7, "spa", forced = true), ProbedSubtitleTrack(8, "spa")),
+        )
+        assertEquals(ManualTrackChoice(audio = 3, subtitle = 8), picked.carried(lists))
+        // A language the other file lacks follows its default.
+        val german = ManualSourceTracks(ManualTrackChoice(subtitle = 5), emptyList(), listOf(ProbedSubtitleTrack(5, "ger")))
+        assertTrue(german.carried(lists).isEmpty)
     }
 }

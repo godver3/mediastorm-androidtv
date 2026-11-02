@@ -70,14 +70,15 @@ object PlaybackCoordinator {
         val status = prequeue.resolve(request)
         val subtitles = status.subtitleTracks.orEmpty()
         val source = sourceHints(status)
+        // Another stream (another episode, or a re-resolve) takes the picks by intent.
+        val m = picks?.tracksFor(status)
+        if (picks != null && !picks.appliesTo(status)) {
+            AppLog.i("ManualTracks", "details picks carried to a different stream: ${picks.tracks.choice} -> ${m?.choice}")
+        }
         when {
-            picks == null -> ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles, source = source)
-            !picks.appliesTo(status) -> {
-                AppLog.i("ManualTracks", "details picks dropped: resolved a different stream")
+            m == null || m.choice.isEmpty ->
                 ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles, source = source)
-            }
             else -> {
-                val m = picks.tracks
                 val applied = ManualTracks.applied(status.trackSelection, m.choice, m.audio, m.subtitles)
                 AppLog.i("ManualTracks", "play prequeue with ${m.choice}: audio=${applied.audio?.streamIndex} " +
                     "subtitle=${applied.subtitle?.streamIndex} mode=${applied.subtitleMode} (server audio=" +
