@@ -227,7 +227,7 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
                 title = "Live TV",
                 choices = listOfNotNull(
                     DialogChoice(if (store.showHidden) "Hide Hidden Channels" else "Show Hidden Channels") { store.showHidden = !store.showHidden },
-                    DialogChoice("Refresh Channels") { scope.launch { store.refresh() } },
+                    DialogChoice(if (store.epgEnabled == true) "Refresh Guide & Channels" else "Refresh Channels") { scope.launch { store.refresh() } },
                     DialogChoice("Recordings") { navigator.open(Page.Recordings) },
                     saved?.let { DialogChoice("Resume multiscreen") { MultiscreenLauncher.resume(it) } },
                     DialogChoice("Multiscreen") { MultiscreenLauncher.open() },

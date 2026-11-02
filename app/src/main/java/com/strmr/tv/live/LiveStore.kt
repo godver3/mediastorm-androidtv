@@ -105,6 +105,8 @@ class LiveStore(private val scope: CoroutineScope) {
     private val chunksLoaded = mutableSetOf<String>()
     private val chunksPending = mutableMapOf<Int, MutableSet<String>>()
     private var chunkJob: Job? = null
+    /** Waits out a server guide refresh, then re-fetches the guide data. */
+    private var guideRefreshJob: Job? = null
 
     val query get() = Query(filter, sourceId, search)
     /** The channels to show: hidden ones only while [showHidden] is on. */
@@ -330,30 +332,113 @@ class LiveStore(private val scope: CoroutineScope) {
     }
 
     private suspend fun fetchChunk(index: Int, keys: List<String>) {
-        val start = guideBase + index * CHUNK
-        val offset = Math.floorDiv(start - System.currentTimeMillis(), 60_000L).toInt()
         for (batch in keys.chunked(40)) {
-            try {
-                // An hour over the chunk, so a clock skew can't leave a gap between chunks.
-                val result = ApiClient.epgSchedule(batch, offset, (CHUNK / 3_600_000).toInt() + 1)
+            val result = chunkPrograms(index, batch)
+            if (result != null) {
                 val merged = schedules.toMutableMap()
                 for (key in batch) merged[key] = merge(merged[key].orEmpty(), result[key].orEmpty())
                 schedules = merged
-            } catch (e: Exception) {
-                com.strmr.tv.app.AppLog.w("Live", "guide chunk $index failed: ${e.message}")
+            } else {
                 batch.forEach { chunksLoaded.remove("$index|$it") }
             }
         }
     }
 
-    /** Clears the server's channel cache and reloads. */
+    /** One chunk's programmes for up to 40 keys; null when the request failed. */
+    private suspend fun chunkPrograms(index: Int, keys: List<String>): Map<String, List<EpgProgram>>? {
+        val start = guideBase + index * CHUNK
+        val offset = Math.floorDiv(start - System.currentTimeMillis(), 60_000L).toInt()
+        return try {
+            // An hour over the chunk, so a clock skew can't leave a gap between chunks.
+            ApiClient.epgSchedule(keys, offset, (CHUNK / 3_600_000).toInt() + 1)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            com.strmr.tv.app.AppLog.w("Live", "guide chunk $index failed: ${e.message}")
+            null
+        }
+    }
+
+    // Refresh Guide & Channels
+
+    /**
+     * Clears the server's channel caches and reloads the list. With the EPG on, the server also
+     * re-downloads its guide; once that is done, the guide data shown here is fetched again and
+     * swapped in, so the guide doesn't blank while it waits.
+     */
     suspend fun refresh() {
+        guideRefreshJob?.cancel()
         ApiClient.clearLiveCache()
+        val guide = epgEnabled == true
+        var before: EpgStatus? = null
+        if (guide) {
+            before = runCatching { ApiClient.epgStatus() }.getOrNull()
+            showNotice("Refreshing the guide…", clears = false)
+            if (!ApiClient.startEpgRefresh()) {
+                showNotice("Couldn't start a guide refresh.")
+                before = null
+            }
+        }
         nowNext = emptyMap()
         nowNextFetched.clear()
-        schedules = emptyMap()
-        chunksLoaded.clear()
         reload(force = true)
+        if (!guide) {
+            showNotice("Channels refreshed.")
+            return
+        }
+        val start = before ?: return
+        guideRefreshJob = scope.launch { awaitGuideRefresh(start) }
+    }
+
+    /** Polls the guide status until the server's refresh finishes (ten minutes at most), then re-fetches. */
+    private suspend fun awaitGuideRefresh(before: EpgStatus) {
+        var sawRefreshing = before.refreshing
+        val started = System.currentTimeMillis()
+        var status: EpgStatus? = null
+        while (System.currentTimeMillis() - started < 600_000) {
+            delay(3_000)
+            val current = runCatching { ApiClient.epgStatus() }.getOrNull() ?: continue
+            status = current
+            if (current.refreshing) { sawRefreshing = true; continue }
+            // Done once a run was seen or a new guide landed; a run too quick to see (or one that
+            // never started) counts as done after a few polls.
+            if (sawRefreshing || current.lastRefresh != before.lastRefresh || System.currentTimeMillis() - started > 12_000) break
+        }
+        refetchGuideData()
+        val error = status?.lastError
+        if (!error.isNullOrEmpty() && status?.lastRefresh == before.lastRefresh) {
+            showNotice("Guide refresh failed: $error")
+        } else {
+            showNotice("Guide refreshed.")
+        }
+    }
+
+    /** Fetches every loaded guide chunk and now / next again, replacing what was there. */
+    private suspend fun refetchGuideData() {
+        val keysByChunk = chunksLoaded.mapNotNull { entry ->
+            val bar = entry.indexOf('|')
+            entry.take(bar).toIntOrNull()?.let { it to entry.substring(bar + 1) }
+        }.groupBy({ it.first }, { it.second })
+        val fresh = mutableMapOf<String, List<EpgProgram>>()
+        val failed = mutableSetOf<String>()
+        for ((index, keys) in keysByChunk.toSortedMap()) {
+            for (batch in keys.chunked(40)) {
+                val result = chunkPrograms(index, batch)
+                if (result == null) { failed += batch; continue }
+                for (key in batch) fresh[key] = merge(fresh[key].orEmpty(), result[key].orEmpty())
+            }
+        }
+        // Keys with a failed chunk keep their old programmes rather than losing part of the day.
+        schedules = schedules + fresh.filterKeys { it !in failed }
+
+        val updated = nowNext.toMutableMap()
+        for (batch in nowNext.keys.toList().chunked(50)) {
+            val entries = runCatching { ApiClient.epgNow(batch) }.getOrNull() ?: continue
+            for (entry in entries) {
+                updated[entry.channelId] = entry
+                nowNextFetched[entry.channelId] = System.currentTimeMillis()
+            }
+        }
+        nowNext = updated
     }
 
     companion object {

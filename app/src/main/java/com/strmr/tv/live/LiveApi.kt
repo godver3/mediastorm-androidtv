@@ -15,8 +15,14 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
+/** `GET /api/live/epg/status`: [enabled] is already resolved with the profile's override. */
 @Serializable
-private data class EpgStatus(val enabled: Boolean = false)
+data class EpgStatus(
+    val enabled: Boolean = false,
+    val refreshing: Boolean = false,
+    val lastRefresh: String? = null,
+    val lastError: String? = null,
+)
 
 @Serializable
 private data class LiveStart(val streamUrl: String? = null, val isDirect: Boolean? = null, val sessionId: String? = null, val playlistUrl: String? = null)
@@ -70,8 +76,12 @@ suspend fun ApiClient.liveChannels(
     return send("POST", "/api/live/channels", body = body, timeoutMs = 60_000)
 }
 
-suspend fun ApiClient.epgEnabled(): Boolean =
-    runCatching { send<EpgStatus>("GET", "/api/live/epg/status", mapOf("profileId" to profileId)).enabled }.getOrDefault(false)
+suspend fun ApiClient.epgStatus(): EpgStatus = send("GET", "/api/live/epg/status", mapOf("profileId" to profileId))
+
+suspend fun ApiClient.epgEnabled(): Boolean = runCatching { epgStatus().enabled }.getOrDefault(false)
+
+/** Has the server re-download its guide in the background; false when it couldn't start. */
+suspend fun ApiClient.startEpgRefresh(): Boolean = runCatching { sendRaw("POST", "/api/live/epg/refresh") }.isSuccess
 
 /** Now / next for up to 50 EPG keys. */
 suspend fun ApiClient.epgNow(keys: List<String>): List<EpgNowPlaying> = send(
