@@ -197,14 +197,6 @@ private fun EpisodeCard(
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Filled.Check, contentDescription = "Watched", tint = Color.White, modifier = Modifier.size(14.dp)) }
                 }
-                // The air date, released or not, on the still's bottom left (Expo's releaseDateOverlay).
-                ReleaseBadge.airDateLabel(episode.airedDate)?.let {
-                    Text(
-                        it, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = if (showsProgress(progress)) 16.dp else 8.dp)
-                            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
-                    )
-                }
                 if (inLibrary) {
                     Box(
                         Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = if (showsProgress(progress)) 16.dp else 8.dp)
@@ -222,6 +214,10 @@ private fun EpisodeCard(
                 formatRuntime(episode.runtimeMinutes)?.let {
                     Text(it, fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
                 }
+            }
+            // The air date, released or not, heads the overview (not spoiler-hidden).
+            ReleaseBadge.airDateLabel(episode.airedDate)?.let {
+                Text(it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
             }
             episode.overview?.let {
                 val color = Color.White.copy(alpha = 0.6f)
