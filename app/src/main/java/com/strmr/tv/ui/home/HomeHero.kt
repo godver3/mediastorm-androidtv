@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,11 +34,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.home.HeroSize
+import com.strmr.tv.ui.TitleLogo
 import kotlinx.coroutines.delay
 
 /** What the hero shows for the focused card (or explore card). */
@@ -123,11 +124,15 @@ fun HeroInfo(hero: HeroContent?, size: HeroSize, textScale: Float, modifier: Mod
     Column(modifier.height(m.height * textScale), verticalArrangement = Arrangement.spacedBy((7 * textScale).dp, Alignment.Bottom)) {
         val logo = Artwork.logo(hero?.logoUrl)
         if (logo != null && m.logoHeight > 0.dp) {
-            SubcomposeAsyncImage(
-                model = logo, contentDescription = hero?.title, contentScale = ContentScale.Fit, alignment = Alignment.BottomStart,
-                error = { HeroTitle(hero?.title ?: "", m.title * textScale) },
-                modifier = Modifier.height(m.logoHeight * textScale).width(m.logoWidth * textScale),
-            )
+            val logoWidth = m.logoWidth * textScale
+            val logoHeight = m.logoHeight * textScale
+            // A logo larger than 100% (Title Logo Size) rises out of the slot, so the block's
+            // fixed height and the rows below stay put.
+            Box(Modifier.height(logoHeight).width(logoWidth), contentAlignment = Alignment.BottomStart) {
+                TitleLogo(logo, hero?.title ?: "", logoWidth, logoHeight, Modifier.wrapContentSize(Alignment.BottomStart, unbounded = true)) {
+                    Box(Modifier.width(logoWidth)) { HeroTitle(hero?.title ?: "", m.title * textScale) }
+                }
+            }
         } else {
             HeroTitle(hero?.title ?: "", m.title * textScale)
         }

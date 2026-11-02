@@ -31,7 +31,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,7 +41,6 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil.compose.SubcomposeAsyncImage
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.library.CustomListsStore
 import com.strmr.tv.library.WatchlistStore
@@ -50,6 +48,7 @@ import com.strmr.tv.player.WarmPrequeue
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ContentMargin
 import com.strmr.tv.ui.ExpandableText
+import com.strmr.tv.ui.TitleLogo
 import com.strmr.tv.ui.home.BadgeLabel
 import kotlinx.coroutines.launch
 
@@ -87,14 +86,7 @@ fun BoxScope.DetailsHeader(
     ) {
         val logo = Artwork.logo(model.title?.logo?.url ?: target.logoUrl)
         if (logo != null) {
-            SubcomposeAsyncImage(
-                model = logo,
-                contentDescription = target.name,
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.BottomStart,
-                error = { TitleText(target.name) },
-                modifier = Modifier.height(96.dp).widthIn(max = 340.dp),
-            )
+            TitleLogo(logo, target.name, width = 340.dp, height = 96.dp) { TitleText(target.name) }
         } else {
             TitleText(target.name)
         }

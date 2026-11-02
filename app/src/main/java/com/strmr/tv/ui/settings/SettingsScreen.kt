@@ -92,6 +92,12 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
         PickerDialog("Background", options.map { it.label }, AppearanceSettings.background.ordinal,
                      onPick = { AppearanceSettings.choose(options[it]) }, onDismiss = { pickingBackground = false })
     }
+    var pickingLogoScale by remember { mutableStateOf(false) }
+    if (pickingLogoScale) {
+        val options = LogoSettings.Scale.entries
+        PickerDialog("Title Logo Size", options.map { it.label }, LogoSettings.scale.ordinal,
+                     onPick = { LogoSettings.set(options[it]) }, onDismiss = { pickingLogoScale = false })
+    }
     LazyColumn(
         // Clipped below the tab bar, so rows never scroll under it.
         modifier.fillMaxHeight().clipVertically(),
@@ -145,6 +151,14 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 selected = false, onClick = { navigator.open(Page.TopMenu) },
                 headlineContent = { Text("Menu") },
                 supportingContent = { Text("Top bar or side menu, and which entries show") },
+            )
+        }
+        item {
+            ListItem(
+                selected = false, onClick = { pickingLogoScale = true },
+                headlineContent = { Text("Title Logo Size") },
+                supportingContent = { Text("Titles' logos on Home and details pages") },
+                trailingContent = { Text(LogoSettings.scale.label) },
             )
         }
         item { Header("Appearance") }

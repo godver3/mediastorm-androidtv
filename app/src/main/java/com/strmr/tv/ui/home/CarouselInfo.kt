@@ -39,6 +39,7 @@ import com.strmr.tv.api.Artwork
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLayoutStore
 import com.strmr.tv.ui.ContentMargin
+import com.strmr.tv.ui.settings.LogoSettings
 
 /**
  * The slide's text, anchored just above the controls. Each slide is one natural-height column
@@ -109,11 +110,12 @@ private fun SlideInfo(slide: HomeCard, rowTitle: String?, scale: Float, modifier
  */
 @Composable
 private fun SlideLogo(url: String, title: String, scale: Float) {
-    val boxW = 400f * scale
-    val boxH = 96f * scale
+    // Title Logo Size scales the box; the name fallback keeps the text scale.
+    val boxW = 400f * scale * LogoSettings.scale.factor
+    val boxH = 96f * scale * LogoSettings.scale.factor
     val context = LocalContext.current
     val density = LocalDensity.current
-    val request = remember(url, scale) {
+    val request = remember(url, boxW, boxH) {
         with(density) { ImageRequest.Builder(context).data(url).size(boxW.dp.roundToPx(), boxH.dp.roundToPx()).build() }
     }
     SubcomposeAsyncImage(model = request, contentDescription = title) {
