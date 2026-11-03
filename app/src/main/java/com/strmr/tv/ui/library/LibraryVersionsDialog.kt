@@ -25,19 +25,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.strmr.tv.api.LibrarySource
 import com.strmr.tv.library.LibraryVersion
+import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.BrandBackground
 
 /**
- * Full-screen list of a movie's or episode's library copies, best first (the one Play uses), laid
- * out like the source list: where the copy lives, its quality, the file and its size.
+ * Full-screen list of a movie's or episode's library copies in the server's order (local first; the
+ * first is the one autoplay uses), laid out like the source list: where the copy lives, its quality,
+ * the file and its size. Opened by Play, it ends with Stream Instead ([onStream]).
  */
 @Composable
-fun LibraryVersionsDialog(heading: String, versions: List<LibraryVersion>, onPick: (LibraryVersion) -> Unit, onDismiss: () -> Unit) {
+fun LibraryVersionsDialog(
+    heading: String,
+    versions: List<LibraryVersion>,
+    onPick: (LibraryVersion) -> Unit,
+    onDismiss: () -> Unit,
+    onStream: (() -> Unit)? = null,
+) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -56,26 +65,41 @@ fun LibraryVersionsDialog(heading: String, versions: List<LibraryVersion>, onPic
                 }
                 if (versions.isEmpty()) item { Text("No library copies", color = Color.White.copy(alpha = 0.6f)) }
                 itemsIndexed(versions, key = { _, v -> v.id }) { index, version ->
+                    LibraryVersionItem(version, if (index == 0) Modifier.focusRequester(first) else Modifier) {
+                        onDismiss()
+                        onPick(version)
+                    }
+                }
+                if (onStream != null) item {
                     ListItem(
                         selected = false,
                         onClick = {
                             onDismiss()
-                            onPick(version)
+                            onStream()
                         },
-                        overlineContent = {
-                            Text(version.quality + if (index == 0) "  ·  Play uses this" else "", fontWeight = FontWeight.Bold)
-                        },
-                        headlineContent = { Text(version.item.fileName ?: version.quality, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = {
-                            Text(listOfNotNull(version.origin, version.size).joinToString("  ·  "), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        },
-                        leadingContent = { LibrarySourceBadge(version.source) },
-                        modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
+                        headlineContent = { Text("Stream Instead", fontWeight = FontWeight.SemiBold) },
+                        leadingContent = { Icon(AppIcons.CloudDownload, contentDescription = null) },
                     )
                 }
             }
         }
     }
+}
+
+/** One copy: its source badge and quality, then the file name, where it lives and its size. */
+@Composable
+fun LibraryVersionItem(version: LibraryVersion, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    ListItem(
+        selected = false,
+        onClick = onClick,
+        overlineContent = { Text(version.quality, fontWeight = FontWeight.Bold) },
+        headlineContent = { Text(version.item.fileName ?: version.quality, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            Text(listOfNotNull(version.origin, version.size).joinToString("  ·  "), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = { LibrarySourceBadge(version.source) },
+        modifier = modifier,
+    )
 }
 
 /** "Local" / "Plex" / "Jellyfin" in the Expo badge colours (green, amber, violet). */

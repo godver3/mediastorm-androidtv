@@ -137,7 +137,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     // prompt, Audio & Subtitles, Add to List…, the watch-state screen, or More. They are dialog windows, so the
     // header keeps its focus state under them; this one flag stops the trailer for the visit
     // instead (as the Expo page's dismissTrailerAutoPlay; it doesn't restart when they close).
-    val menuOpen = picker != null || pendingSource != null || versionsFor != null || pendingVersion != null ||
+    val menuOpen = picker != null || pendingSource != null || versionsFor != null || pendingVersion != null || model.playChoice != null ||
         prequeueTracks.open || watchState || more || customizingButtons || CustomListsStore.picking != null
     LaunchedEffect(menuOpen) { if (menuOpen) trailer.dismiss("menu open") }
 
@@ -239,12 +239,22 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     }
     if (customizingButtons) DetailsButtonsDialog(onDismiss = { customizingButtons = false })
     picker?.let { p ->
-        SourcePicker(target, p.episode, onPick = { source, manual -> choose(source, p.episode, manual) }, onDismiss = { picker = null })
+        SourcePicker(
+            target, p.episode, onPick = { source, manual -> choose(source, p.episode, manual) }, onDismiss = { picker = null },
+            libraryVersions = model.libraryVersions(p.episode), onPickLibrary = { chooseVersion(it, p.episode) },
+        )
     }
     versionsFor?.let { v ->
         LibraryVersionsDialog(
             v.episode?.let { "${target.name} · ${it.code}" } ?: target.name, model.libraryVersions(v.episode),
             onPick = { chooseVersion(it, v.episode) }, onDismiss = { versionsFor = null },
+        )
+    }
+    model.playChoice?.let { choice ->
+        LibraryVersionsDialog(
+            choice.episode?.let { "${target.name} · ${it.code}" } ?: target.name, model.libraryVersions(choice.episode),
+            onPick = { model.playVersion(it, choice.episode, choice.start) }, onDismiss = { model.playChoice = null },
+            onStream = { model.streamInstead(choice) },
         )
     }
     pendingVersion?.let { pending ->

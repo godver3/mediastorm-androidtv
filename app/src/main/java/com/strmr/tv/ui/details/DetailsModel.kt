@@ -83,8 +83,9 @@ class DetailsModel(val target: DetailsTarget) {
     private val artSeed = Random.nextLong()
     /**
      * The title's copies in the profile's local, Plex and Jellyfin libraries (null: none, or not
-     * looked up yet). Play uses the best copy of the movie or episode (local first, by user
-     * decision); Versions lists them all, and Choose Source still searches for streams.
+     * looked up yet). They win over the prequeue: Play plays a single copy straight away and asks
+     * which one when there are several ([playChoice], with Stream Instead), as the Expo app does.
+     * Versions lists them all, and Choose Source lists them above the stream results.
      */
     var library by mutableStateOf<LibraryVersions?>(null)
         private set
@@ -99,7 +100,12 @@ class DetailsModel(val target: DetailsTarget) {
         libraryLookup.complete(versions)
     }
 
-    /** The copies of a movie (no episode) or of one episode, best first. */
+    /** Play found several copies: the details page lists them to pick from (null: no question). */
+    var playChoice by mutableStateOf<PlayChoice?>(null)
+
+    data class PlayChoice(val episode: Episode?, val start: StartPoint?, val picks: PrequeuePick?)
+
+    /** The copies of a movie (no episode) or of one episode, in the server's order. */
     fun libraryVersions(episode: Episode?): List<LibraryVersion> {
         val all = library ?: return emptyList()
         return if (episode == null) { if (target.isMovie) all.movie else emptyList() } else all.versions(episode.seasonNumber, episode.episodeNumber)
@@ -222,16 +228,28 @@ class DetailsModel(val target: DetailsTarget) {
         }
 
     /**
-     * Play, through the library when it has the movie or episode. A press while the lookup is still
-     * running waits for it, so a library title never starts a search by mistake.
+     * Play, through the library when it has the movie or episode: one copy plays, several are
+     * listed to pick from. A press while the lookup is still running waits for it, so a library
+     * title never starts a search by mistake.
      */
     fun play(episode: Episode?, start: StartPoint?, picks: PrequeuePick? = null) {
-        if (libraryLookup.isCompleted) return PlaybackCoordinator.play(request(episode, start), picks)
-        MainScope().launch {
-            val versions = withTimeoutOrNull(8_000) { libraryLookup.await() }
-            PlaybackCoordinator.play(request(episode, start).copy(library = versions), picks)
-        }
+        if (libraryLookup.isCompleted) return playOrAsk(episode, start, picks, library)
+        MainScope().launch { playOrAsk(episode, start, picks, withTimeoutOrNull(8_000) { libraryLookup.await() }) }
     }
+
+    private fun playOrAsk(episode: Episode?, start: StartPoint?, picks: PrequeuePick?, versions: LibraryVersions?) {
+        val copies = if (episode == null && !target.isMovie) emptyList()
+                     else versions?.versions(episode?.seasonNumber, episode?.episodeNumber).orEmpty()
+        if (copies.size > 1) {
+            playChoice = PlayChoice(episode, start, picks)
+            return
+        }
+        PlaybackCoordinator.play(request(episode, start).copy(library = versions), picks)
+    }
+
+    /** Stream Instead, from the list Play opened: the prequeue, with no library copy for this title or the episodes after it. */
+    fun streamInstead(choice: PlayChoice) =
+        PlaybackCoordinator.play(request(choice.episode, choice.start).copy(library = null), choice.picks)
 
     /** A copy picked in Versions. */
     fun playVersion(version: LibraryVersion, episode: Episode?, start: StartPoint?) =

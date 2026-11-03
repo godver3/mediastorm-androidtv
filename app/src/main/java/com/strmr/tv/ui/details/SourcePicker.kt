@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,19 +47,29 @@ import com.strmr.tv.api.SourceHealth
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.searchSources
 import com.strmr.tv.api.sourceHealth
+import com.strmr.tv.library.LibraryVersion
 import com.strmr.tv.player.ManualSourceTracks
 import com.strmr.tv.player.SourceSwitchRules
 import com.strmr.tv.ui.Accent
 import com.strmr.tv.ui.BrandBackground
+import com.strmr.tv.ui.library.LibraryVersionItem
 
 /**
  * Full-screen list of the backend's indexer / scraper results for one movie or episode, with
  * debrid cache / usenet health badges (pending ones long-polled until they settle). Long press
  * on a result opens its track panel ([SourceTracks]); the tracks chosen there are remembered
- * for this visit and also apply when the result is selected directly.
+ * for this visit and also apply when the result is selected directly. The movie's or episode's
+ * library copies are listed first, as the Expo app does.
  */
 @Composable
-fun SourcePicker(title: DetailsTarget, episode: Episode?, onPick: (SourceResult, ManualSourceTracks?) -> Unit, onDismiss: () -> Unit) {
+fun SourcePicker(
+    title: DetailsTarget,
+    episode: Episode?,
+    onPick: (SourceResult, ManualSourceTracks?) -> Unit,
+    onDismiss: () -> Unit,
+    libraryVersions: List<LibraryVersion> = emptyList(),
+    onPickLibrary: (LibraryVersion) -> Unit = {},
+) {
     val tracks = rememberSourceTracks()
     var results by remember { mutableStateOf<List<SourceResult>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -66,7 +77,16 @@ fun SourcePicker(title: DetailsTarget, episode: Episode?, onPick: (SourceResult,
     val health = remember { mutableStateMapOf<Int, SourceHealth>() }
     val heading = episode?.let { "${title.name} · ${it.code}" } ?: title.name
     val first = remember { FocusRequester() }
-    LaunchedEffect(results.isNotEmpty()) { if (results.isNotEmpty()) runCatching { first.requestFocus() } }
+    val firstCopy = remember { FocusRequester() }
+    // Focus starts on the first library copy, else the first result, whichever arrives first
+    // (the library lookup can finish after the picker opens); once placed it isn't moved again.
+    var focusPlaced by remember { mutableStateOf(false) }
+    LaunchedEffect(libraryVersions.isNotEmpty(), results.isNotEmpty()) {
+        if (focusPlaced) return@LaunchedEffect
+        val target = if (libraryVersions.isNotEmpty()) firstCopy else if (results.isNotEmpty()) first else return@LaunchedEffect
+        withFrameNanos { }
+        focusPlaced = runCatching { target.requestFocus() }.isSuccess
+    }
 
     LaunchedEffect(Unit) {
         val query = SourceSwitchRules.query(title, episode?.code)
@@ -103,6 +123,22 @@ fun SourcePicker(title: DetailsTarget, episode: Episode?, onPick: (SourceResult,
                         if (!loading && error == null && results.isNotEmpty()) {
                             Text(if (results.size == 1) "1 source" else "${results.size} sources", color = Color.White.copy(alpha = 0.6f))
                         }
+                    }
+                }
+                if (libraryVersions.isNotEmpty()) {
+                    item {
+                        Text(if (libraryVersions.size == 1) "In your libraries" else "${libraryVersions.size} in your libraries",
+                             color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.SemiBold)
+                    }
+                    items(libraryVersions, key = { "library:${it.id}" }) { version ->
+                        LibraryVersionItem(version, if (version == libraryVersions.first()) Modifier.focusRequester(firstCopy) else Modifier) {
+                            onDismiss()
+                            onPickLibrary(version)
+                        }
+                    }
+                    item {
+                        Text("Streams", color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.SemiBold,
+                             modifier = Modifier.padding(top = 18.dp))
                     }
                 }
                 when {

@@ -13,6 +13,10 @@ import androidx.compose.ui.unit.dp
 object AppIcons {
     /** Material "swap_horiz", for the player's Switch Source. */
     val SwapSource = icon("SwapSource", "M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z")
+    val CloudDownload = icon(
+        "CloudDownload",
+        "M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z",
+    )
     val Pause = icon("Pause", "M6 19h4V5H6v14zm8-14v14h4V5h-4z")
     val SkipNext = icon("SkipNext", "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z")
     val Speed = icon(

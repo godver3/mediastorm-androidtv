@@ -21,8 +21,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Library copies (local, Plex, Jellyfin): decoding the server's shapes, the best-first order Play
- * uses, episode mapping, the catalog ids a library card opens, library shelves and the progress a
+ * Library copies (local, Plex, Jellyfin): decoding the server's shapes, the server's order (local
+ * first) Play uses, episode mapping, the catalog ids a library card opens, library shelves and the progress a
  * library file reports.
  */
 class LibraryVersionsTest {
@@ -31,7 +31,7 @@ class LibraryVersionsTest {
     ) = """{"id":"$id","fileName":"$id.mkv","sourceType":"$source","sizeBytes":${(gb * 1_000_000_000).toLong()},
            "probe":{"durationSeconds":6000,"videoCodec":"$codec","width":$width,"height":$height${hdr?.let { ",\"hdrFormat\":\"$it\"" } ?: ""}}}"""
 
-    @Test fun versionsSortBestFirstWithQualityLabels() {
+    @Test fun versionsKeepServerOrderWithQualityLabels() {
         val page = ApiJson.decodeFromString<LibraryGroupPage>(
             """{"groups":[{"id":"757910","groupType":"title","libraryType":"movie","title":"Example","tmdbId":1081003,
                 "items":[${item("hd", 1920, 800, "h264", gb = 6.0)},${item("uhd", 3840, 1608, "hevc", "HDR10", 21.0)}]}],
@@ -40,13 +40,14 @@ class LibraryVersionsTest {
         assertEquals(1, page.total)
         assertEquals(listOf("E"), page.alphabetBuckets)
         val versions = LibraryVersions.of(page.groups[0], "Films")
-        assertEquals(listOf("uhd", "hd"), versions.movie.map { it.id })
+        // The server's order, as Expo lists them: no re-sort by quality.
+        assertEquals(listOf("hd", "uhd"), versions.movie.map { it.id })
         // Wide 4K counts as 4K by its width, not "1608p".
-        assertEquals("4K · HEVC · HDR10", versions.movie[0].quality)
-        assertEquals("1080p · H.264", versions.movie[1].quality)
-        assertEquals("Plex · Films", versions.movie[0].origin)
-        assertEquals("21.0 GB · 28 Mbps", versions.movie[0].size)
-        assertEquals("uhd", versions.best(null, null)?.id)
+        assertEquals("4K · HEVC · HDR10", versions.movie[1].quality)
+        assertEquals("1080p · H.264", versions.movie[0].quality)
+        assertEquals("Plex · Films", versions.movie[1].origin)
+        assertEquals("21.0 GB · 28 Mbps", versions.movie[1].size)
+        assertEquals("hd", versions.best(null, null)?.id)
     }
 
     @Test fun episodesMapBySeasonAndEpisode() {
@@ -71,8 +72,9 @@ class LibraryVersionsTest {
                   "items":[${item("b", 3840, 2160, "hevc", gb = 40.0, source = "jellyfin")},${item("a", 1920, 1080, "h264", gb = 8.0)}]}}]""",
         )
         val versions = LibraryVersions.of(matches)
-        assertEquals(listOf("b", "a"), versions.movie.map { it.id })
-        assertEquals(LibrarySource.JELLYFIN, versions.movie[0].source)
+        // Libraries in the server's order (local before Plex / Jellyfin there), repeats dropped.
+        assertEquals(listOf("a", "b"), versions.movie.map { it.id })
+        assertEquals(LibrarySource.JELLYFIN, versions.movie[1].source)
     }
 
     private fun group(ids: String, show: Boolean = false) =

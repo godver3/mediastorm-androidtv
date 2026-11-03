@@ -67,19 +67,13 @@ data class LibraryVersion(val item: LibraryItem, val libraryName: String) {
                 else -> raw.uppercase()
             }
         }
-
-    companion object {
-        /** Better copies sort first: more pixels, then HDR, then the larger file. */
-        val best: Comparator<LibraryVersion> = compareByDescending<LibraryVersion> { (it.item.probe?.width ?: 0) * (it.item.probe?.height ?: 0) }
-            .thenByDescending { it.hdr != null }
-            .thenByDescending { it.item.sizeBytes ?: 0 }
-    }
 }
 
 /**
  * A title's copies in the profile's libraries, from `/api/library/matches` or a library group: a
  * movie's versions, or a series' episodes by season and episode number (the library's numbering,
- * as the Expo app maps them). Best copy first.
+ * as the Expo app maps them). In the server's order, as the Expo app lists them: local libraries
+ * first, then Plex and Jellyfin. Play and autoplay use the first.
  */
 data class LibraryVersions(val movie: List<LibraryVersion>, val episodes: Map<Key, List<LibraryVersion>>) {
     data class Key(val season: Int, val episode: Int)
@@ -107,8 +101,8 @@ data class LibraryVersions(val movie: List<LibraryVersion>, val episodes: Map<Ke
                 }
             }
             return LibraryVersions(
-                movie.values.sortedWith(LibraryVersion.best),
-                episodes.mapValues { (_, copies) -> copies.values.sortedWith(LibraryVersion.best) },
+                movie.values.toList(),
+                episodes.mapValues { (_, copies) -> copies.values.toList() },
             )
         }
     }
