@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import com.strmr.tv.ui.MarqueeText
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -192,15 +195,18 @@ private fun SourceRow(result: SourceResult, health: SourceHealth?, tracksChosen:
         attrs["languages"]?.takeIf { it.isNotEmpty() }?.let { add(it.replace(",", " ").replace("⚙", "").trim()) }
         if (tracksChosen) add("Tracks chosen")
     }.filter { it.isNotBlank() }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     ListItem(
         selected = false,
         onClick = onClick,
         onLongClick = onLongClick,
         overlineContent = if (badges.isNotEmpty()) { { Text(badges.joinToString("  ·  "), fontWeight = FontWeight.Bold) } } else null,
-        headlineContent = { Text(release, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { MarqueeText(release, active = focused) },
         supportingContent = { Text(details.joinToString("  ·  "), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = health?.let { { HealthBadge(it) } },
         modifier = modifier,
+        interactionSource = interaction,
     )
 }
 
