@@ -109,4 +109,11 @@ private fun parse(text: String) = runCatching { OffsetDateTime.parse(text).toIns
 data class EpgNowPlaying(val channelId: String, val current: EpgProgram? = null, val next: EpgProgram? = null)
 
 /** A tuned channel: the URL to play, and the server HLS session to keep alive (none when direct). */
-data class LiveStream(val url: String, val sessionId: String?)
+data class LiveStream(
+    val url: String,
+    val sessionId: String?,
+    /** An HLS session of a Stremio channel: the stream the server tuned (a direct stream reports none). */
+    val stremioStreamIndex: Int? = null,
+    /** …and every playable stream, in the addon's order. */
+    val stremioStreamIndexes: List<Int>? = null,
+)

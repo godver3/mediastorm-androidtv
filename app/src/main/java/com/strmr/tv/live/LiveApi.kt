@@ -25,7 +25,14 @@ data class EpgStatus(
 )
 
 @Serializable
-private data class LiveStart(val streamUrl: String? = null, val isDirect: Boolean? = null, val sessionId: String? = null, val playlistUrl: String? = null)
+private data class LiveStart(
+    val streamUrl: String? = null,
+    val isDirect: Boolean? = null,
+    val sessionId: String? = null,
+    val playlistUrl: String? = null,
+    val stremioStreamIndex: Int? = null,
+    val stremioStreamIndexes: List<Int>? = null,
+)
 
 /** The profile's settings document, read raw so writes keep every field this app doesn't model. */
 private suspend fun ApiClient.userSettingsObject(): JsonObject =
@@ -146,7 +153,7 @@ suspend fun ApiClient.startLive(channel: LiveChannel, programTitle: String?, for
     val direct = start.isDirect == true
     val path = (if (direct) start.streamUrl else start.playlistUrl)?.ifEmpty { null }
         ?: throw ApiError.NotReady("The server did not return a stream for this channel")
-    return LiveStream(mediaUrl(path), if (direct) null else start.sessionId)
+    return LiveStream(mediaUrl(path), if (direct) null else start.sessionId, start.stremioStreamIndex, start.stremioStreamIndexes)
 }
 
 @Serializable

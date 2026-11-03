@@ -13,6 +13,7 @@ import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveHlsPreference
 import com.strmr.tv.live.LiveStream
 import com.strmr.tv.live.keepLiveSessionAlive
+import com.strmr.tv.live.liveStremioStreams
 import com.strmr.tv.live.stopLiveSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -35,20 +36,36 @@ import kotlinx.coroutines.withContext
  * [giveUp]'s message. A direct stream that fails before it plays is opened once more as HLS
  * ([LiveHlsFallback]), and [channel]'s source remembered as needing it once that has played
  * [HLS_PROOF_MS] with no stall; a source whose direct stream has played here never falls back.
+ *
+ * Stremio failover, as Expo's live recovery: a Stremio addon channel lists several streams of
+ * the same broadcast, so when the one playing is lost for good (an error nothing above fixes,
+ * a spent budget, a retune the server refuses, or an end before it ever played) the channel is
+ * tuned on the next stream it hasn't tried, with "Trying another stream source…" on the cover
+ * ([note]). Only once every stream has been tried does playback end. The playable streams come
+ * from the HLS session's `stremioStreamIndexes`, or for a direct stream from the addon's list
+ * (`GET /api/live/stremio/streams`), fetched on the first failure.
  */
 @OptIn(UnstableApi::class)
 class LiveRetune(
     private val player: ExoPlayer,
     private val scope: CoroutineScope,
     private var sessionId: String?,
-    private val channel: LiveChannel?,
-    /** Opens the channel; `true` asks for an HLS session (`format=hls`). */
-    private val tune: suspend (forceHls: Boolean) -> LiveStream,
+    channel: LiveChannel?,
+    /** Opens the channel; `true` asks for an HLS session (`format=hls`), an index that Stremio stream. */
+    private val tune: suspend (forceHls: Boolean, stremioStreamIndex: Int?) -> LiveStream,
     private val giveUp: (String) -> Unit,
+    first: LiveStream? = null,
 ) {
+    /** The channel playing; its `stremioStreamIndex` moves on under Stremio failover. */
+    var channel: LiveChannel? = channel
+        private set
     /** A retune is under way: the player covers the channel with "Reconnecting…". */
     val reconnecting = MutableStateFlow(false)
-    private val policy = LiveRetunePolicy().apply { tuned(now()) }
+    /** What the cover says instead of "Reconnecting…" (Stremio failover). */
+    val note = MutableStateFlow<String?>(null)
+    private var policy = LiveRetunePolicy().apply { tuned(now()) }
+    private val stremio = StremioFailover().apply { first?.let { tuned(it.stremioStreamIndex ?: channel?.stremioStreamIndex, it.stremioStreamIndexes) } }
+    private var failoverJob: Job? = null
     private var retuneJob: Job? = null
     private var released = false
     private val hls = LiveHlsFallback(direct = sessionId == null)
@@ -73,6 +90,7 @@ class LiveRetune(
         policy.playing(now())
         if (hls.playing()) rememberDirectWorked()
         reconnecting.value = false
+        note.value = null
         if (hls.mode == LiveHlsFallback.Mode.FALLBACK && hlsProof?.isActive != true) {
             hlsProof = scope.launch {
                 delay(HLS_PROOF_MS)
@@ -91,7 +109,7 @@ class LiveRetune(
 
     /** The stream ended, which a live channel doesn't: its source dropped. */
     fun ended() {
-        if (!fallBackToHls("end of stream") && !sourceLost("end of stream")) giveUp(NEVER_PLAYED)
+        if (!fallBackToHls("end of stream") && !sourceLost("end of stream")) failOverOrGiveUp("end of stream", NEVER_PLAYED)
     }
 
     /**
@@ -99,7 +117,8 @@ class LiveRetune(
      * played (retried as HLS), else a source error (retuned).
      */
     fun failed(e: PlaybackException): Boolean =
-        fallBackToHls(e.errorCodeName) || LiveRetunePolicy.isSourceError(e.errorCode) && sourceLost(e.errorCodeName)
+        fallBackToHls(e.errorCodeName) || LiveRetunePolicy.isSourceError(e.errorCode) && sourceLost(e.errorCodeName) ||
+            failOver(e.errorCodeName, e.message ?: e.errorCodeName)
 
     /** A direct stream that never played: tunes once more as HLS. */
     private fun fallBackToHls(reason: String): Boolean {
@@ -133,7 +152,7 @@ class LiveRetune(
             is LiveRetunePolicy.Decision.Retune -> retune(decision, reason)
             LiveRetunePolicy.Decision.Exhausted -> {
                 AppLog.e("Live", "retune budget spent ($reason)")
-                giveUp(EXHAUSTED)
+                failOverOrGiveUp(reason, EXHAUSTED)
             }
             LiveRetunePolicy.Decision.NeverPlayed -> return false
         }
@@ -158,6 +177,9 @@ class LiveRetune(
             try {
                 val next = open() ?: return@launch
                 hls.tuned(direct = next.sessionId == null)
+                if (channel?.hasStremioSources == true) {
+                    stremio.tuned(next.stremioStreamIndex ?: channel?.stremioStreamIndex, next.stremioStreamIndexes)
+                }
                 AppLog.i("Live", "$label: tuned (${if (next.sessionId == null) "direct" else "hls session"})")
                 player.setMediaItem(MediaItem.fromUri(next.url))
                 player.playWhenReady = true
@@ -167,7 +189,7 @@ class LiveRetune(
             } catch (e: Exception) {
                 AppLog.e("Live", "$label failed: ${e.message}")
                 // The server's own reason; a network failure's message is a socket's, not the viewer's.
-                if (!released) giveUp((e as? ApiError)?.message ?: RETUNE_FAILED)
+                if (!released) failOverOrGiveUp("$label failed", (e as? ApiError)?.message ?: RETUNE_FAILED)
             }
         }
     }
@@ -177,11 +199,50 @@ class LiveRetune(
      * closes is stopped, not left holding the source.
      */
     private suspend fun open(): LiveStream? = withContext(NonCancellable) {
-        val next = tune(hls.forcesHls)
+        val next = tune(hls.forcesHls, channel?.stremioStreamIndex)
         if (released) {
             next.sessionId?.let { ApiClient.stopLiveSession(it) }
             null
         } else next.also { sessionId = it.sessionId }
+    }
+
+    private fun failOverOrGiveUp(reason: String, message: String) {
+        if (!failOver(reason, message)) giveUp(message)
+    }
+
+    /**
+     * Stremio failover: tunes the channel's next untried stream, or gives up with [message]
+     * once every one has been tried. False when the channel isn't a Stremio one.
+     */
+    private fun failOver(reason: String, message: String): Boolean {
+        val current = channel?.takeIf { it.hasStremioSources } ?: return false
+        if (released) return true
+        if (failoverJob?.isActive == true) return true
+        failoverJob = scope.launch {
+            if (stremio.available == null) {
+                try {
+                    stremio.learn(ApiClient.liveStremioStreams(current).map { it.index })
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLog.e("Live", "stremio failover: stream list failed (${e.message})")
+                }
+            }
+            if (released) return@launch
+            val index = stremio.next()
+            if (index == null) {
+                AppLog.w("Live", "stremio failover: no untried streams left ($reason)")
+                giveUp(message)
+                return@launch
+            }
+            AppLog.w("Live", "stremio failover: stream $index after $reason")
+            channel = current.copy(stremioStreamIndex = index)
+            // A new stream gets the full retune budget.
+            policy = LiveRetunePolicy()
+            note.value = TRYING_ANOTHER
+            restart("stremio stream $index", HLS_FALLBACK_DELAY_MS)
+        }
+        return true
     }
 
     /** Stops the current HLS session (a direct stream has none). */
@@ -200,6 +261,7 @@ class LiveRetune(
         val id = sessionId?.takeIf { retuneJob?.isActive != true }
         released = true
         retuneJob?.cancel()
+        failoverJob?.cancel()
         keepalive.cancel()
         if (id != null) sessionId = null
         return id
@@ -209,6 +271,7 @@ class LiveRetune(
         released = true
         hlsProof?.cancel()
         retuneJob?.cancel()
+        failoverJob?.cancel()
         keepalive.cancel()
         endSession()
     }
@@ -223,6 +286,7 @@ class LiveRetune(
         const val HLS_PROOF_MS = 30_000L
         const val EXHAUSTED = "The channel keeps dropping out. Try it again in a moment."
         const val NEVER_PLAYED = "The channel stopped before it started playing. Try it again in a moment."
+        const val TRYING_ANOTHER = "Trying another stream source…"
         const val RETUNE_FAILED = "The channel dropped out and couldn't be tuned again. Try it again in a moment."
     }
 }

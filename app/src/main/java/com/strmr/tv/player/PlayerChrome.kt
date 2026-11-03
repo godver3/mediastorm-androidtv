@@ -74,6 +74,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
     val error by controller.error.collectAsState()
     val skip by (controller.upNext?.action ?: remember { kotlinx.coroutines.flow.MutableStateFlow<SkipAction?>(null) }).collectAsState()
     val reconnecting by (controller.liveRetune?.reconnecting ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsState()
+    val reconnectNote by (controller.liveRetune?.note ?: remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }).collectAsState()
     val scope = rememberCoroutineScope()
     val scrub = remember { ScrubState(controller, scope) }
     var visible by remember { mutableStateOf(true) }
@@ -183,7 +184,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                 },
         )
         if (reconnecting && error == null) {
-            LiveReconnectingCover(controller.request)
+            LiveReconnectingCover(controller.request, note = reconnectNote)
         } else if (buffering && error == null && !scrub.active) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White, strokeWidth = 3.dp)
         }

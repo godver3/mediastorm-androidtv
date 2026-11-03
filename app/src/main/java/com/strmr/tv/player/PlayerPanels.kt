@@ -136,7 +136,7 @@ fun InfoPanel(controller: PlayerController, modifier: Modifier = Modifier) {
  * "Reconnecting…" on black, like the tvOS player's loading cover. Not focusable.
  */
 @Composable
-fun LiveReconnectingCover(request: PlaybackRequest, modifier: Modifier = Modifier) {
+fun LiveReconnectingCover(request: PlaybackRequest, modifier: Modifier = Modifier, note: String? = null) {
     Column(
         modifier.fillMaxSize().background(Color.Black),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -152,7 +152,7 @@ fun LiveReconnectingCover(request: PlaybackRequest, modifier: Modifier = Modifie
              maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 64.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
-            Text("Reconnecting…", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.75f))
+            Text(note ?: "Reconnecting…", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.75f))
         }
     }
 }

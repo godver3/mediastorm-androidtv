@@ -108,7 +108,8 @@ class PlayerActivity : ComponentActivity() {
      * with the player and the first screen tunes the channel again.
      */
     private fun addScreen(c: PlayerController) {
-        val channel = c.session.liveChannel ?: return
+        // After Stremio failover, the stream now playing.
+        val channel = c.liveRetune?.channel ?: c.session.liveChannel ?: return
         if (handover != null) return
         val url = c.player.currentMediaItem?.localConfiguration?.uri?.toString()
         val sessionId = url?.let { c.liveRetune?.handOver() }

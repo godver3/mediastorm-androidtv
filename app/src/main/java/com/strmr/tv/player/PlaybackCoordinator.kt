@@ -129,8 +129,10 @@ object PlaybackCoordinator {
         if (_resolving.value != null) return
         val request = PlaybackRequest(DetailsTarget(channel.id, programTitle ?: channel.name, isMovie = true, backdropUrl = null, logoUrl = channel.logoUrl))
         // A source remembered as needing HLS asks for it from the first tune (LiveHlsPreference).
-        val live: suspend (Boolean) -> LiveStream = { force ->
-            ApiClient.startLive(channel, programTitle, forceHls = force || LiveHlsPreference.prefersHls(channel))
+        // Stremio failover tunes another of the channel's streams ([LiveRetune]).
+        val live: suspend (Boolean, Int?) -> LiveStream = { force, stremioIndex ->
+            val tuned = stremioIndex?.let { channel.copy(stremioStreamIndex = it) } ?: channel
+            ApiClient.startLive(tuned, programTitle, forceHls = force || LiveHlsPreference.prefersHls(channel))
         }
         begin(request, "Tuning…", live = live, liveChannel = channel,
               liveLabel = StreamInfo.live(channel.name))
@@ -147,7 +149,7 @@ object PlaybackCoordinator {
         val request = PlaybackRequest(DetailsTarget(recording.id, title, isMovie = true))
         AppLog.i("Recordings", "play ${recording.id} status=${recording.status}")
         if (RecordingRules.isRecording(recording)) {
-            begin(request, "Starting…", live = { _ -> ApiClient.startRecordingHls(recording, title) }, growing = true,
+            begin(request, "Starting…", live = { _, _ -> ApiClient.startRecordingHls(recording, title) }, growing = true,
                   liveLabel = StreamInfo.recording(recording.channelName))
             return
         }
@@ -200,7 +202,7 @@ object PlaybackCoordinator {
     internal fun begin(
         request: PlaybackRequest,
         firstStage: String,
-        live: (suspend (forceHls: Boolean) -> LiveStream)? = null,
+        live: (suspend (forceHls: Boolean, stremioStreamIndex: Int?) -> LiveStream)? = null,
         carried: CarriedTracks? = null,
         growing: Boolean = false,
         liveChannel: LiveChannel? = null,
@@ -215,9 +217,10 @@ object PlaybackCoordinator {
         resolveJob = scope.launch {
             try {
                 pending = if (live != null) {
-                    val stream = live(false)
+                    val stream = live(false, null)
                     PlayerSession(request, stream.url, null, reportsProgress = false, liveSessionId = stream.sessionId,
-                                  isLive = !growing, growingRestart = if (growing) suspend { live(false) } else null,
+                                  liveStream = stream,
+                                  isLive = !growing, growingRestart = if (growing) suspend { live(false, null) } else null,
                                   retuneLive = live.takeIf { !growing }, liveChannel = liveChannel, sourceLabel = liveLabel)
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
