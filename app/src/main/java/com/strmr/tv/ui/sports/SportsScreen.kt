@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -157,6 +158,12 @@ private fun SectionRow(section: SportsSection, state: SportsHubState, navigator:
     var focused by remember { mutableStateOf(false) }
     LaunchedEffect(section.items.firstOrNull()?.key) {
         if (!focused && rowState.firstVisibleItemIndex > 0) rowState.scrollToItem(0)
+    }
+    // A lazy row composes the next card only as it scrolls in; warm the row's logos up front so
+    // that card draws with them instead of popping them in a moment later.
+    val context = LocalContext.current
+    LaunchedEffect(section.items.map { it.key }) {
+        prefetchSportsLogos(context, section.items.mapNotNull { (it as? SportsHubItem.Match)?.game })
     }
     // Every card in the row as tall as the tallest seen (race and cycling cards list finishers).
     val spoilers = SportsSpoilers.hidden
