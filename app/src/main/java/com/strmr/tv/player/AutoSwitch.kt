@@ -73,7 +73,7 @@ class AutoSwitch(private val controller: PlayerController) {
         AppLog.i(TAG, "$reason at ${controller.player.currentPosition / 1000}s on \"${session.releaseName}\"")
         controller.online.setStatus("Switching to another source…")
         controller.scope.launch {
-            val results = sources ?: runCatching { ApiClient.searchSources(SourceSwitchRules.query(request), request.title) }
+            val results = sources ?: runCatching { ApiClient.searchSources(SourceSwitchRules.query(request), request.title, request.episode?.numbering) }
                 .onFailure { AppLog.w(TAG, "source search failed: ${it.message}") }.getOrNull()?.also { sources = it }.orEmpty()
             val candidates = results.filter { r ->
                 !SourceSwitchRules.isCurrent(r.title, r.attributes["raw_title"], session.releaseName) &&

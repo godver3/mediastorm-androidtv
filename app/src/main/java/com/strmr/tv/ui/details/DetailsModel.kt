@@ -12,6 +12,7 @@ import com.strmr.tv.api.Episode
 import com.strmr.tv.api.EpisodeRef
 import com.strmr.tv.api.ResumeState
 import com.strmr.tv.api.Season
+import com.strmr.tv.api.SeriesOrdering
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.StartPoint
 import com.strmr.tv.api.Title
@@ -20,6 +21,7 @@ import com.strmr.tv.api.collectionMovies
 import com.strmr.tv.api.detailsBundle
 import com.strmr.tv.api.formatRuntime
 import com.strmr.tv.api.libraryMatches
+import com.strmr.tv.api.setSeriesOrdering
 import com.strmr.tv.api.setWatched
 import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.ReleaseBadge
@@ -73,6 +75,13 @@ class DetailsModel(val target: DetailsTarget) {
     /** Movies: the rest of the movie's collection, in release order. */
     var collectionMovies by mutableStateOf<List<Title>>(emptyList())
         private set
+    /** Series: the episode orderings on offer (more than one = a choice in More). */
+    var orderings by mutableStateOf<List<SeriesOrdering>>(emptyList())
+        private set
+    /** The ordering the seasons are in, as the server reported it. */
+    private var activeOrdering by mutableStateOf<String?>(null)
+    /** The ordering picked this visit, asked for explicitly on reload (as the Expo app does). */
+    private var pickedOrdering by mutableStateOf<String?>(null)
     private var watchedBusy = false
     // State, so the primary button follows a reload after playback (a movie's page has nothing
     // else that changes then).
@@ -120,13 +129,15 @@ class DetailsModel(val target: DetailsTarget) {
 
     suspend fun load() {
         try {
-            val bundle = ApiClient.detailsBundle(target)
+            val bundle = ApiClient.detailsBundle(target, pickedOrdering)
             if (target.isMovie) {
                 title = bundle.movieDetails ?: throw ApiError.NotReady("Details unavailable")
             } else {
                 val details = bundle.seriesDetails ?: throw ApiError.NotReady("Details unavailable")
                 title = details.title
                 seasons = details.seasons
+                orderings = details.availableOrderings
+                activeOrdering = details.activeOrdering
                 upNext = bundle.upNextEpisode
                 primaryEpisode = findPrimaryEpisode(details.seasons, bundle.upNextEpisode)
                 privacyEpisode = EpisodePrivacy.currentEpisode(details.seasons, bundle.upNextEpisode)
@@ -145,6 +156,27 @@ class DetailsModel(val target: DetailsTarget) {
         title?.collection?.let { c ->
             if (collectionMovies.isEmpty()) collectionMovies = runCatching { ApiClient.collectionMovies(c.id) }.getOrDefault(emptyList()).distinctBy { it.id }
         }
+    }
+
+    /** Only series with more than one ordering offer the choice. */
+    val offersOrderings: Boolean get() = !target.isMovie && orderings.size > 1
+
+    /** The ordering the page shows (the one picked this visit, else the server's). */
+    val currentOrdering: SeriesOrdering?
+        get() = (pickedOrdering ?: activeOrdering).let { type -> orderings.firstOrNull { it.type == type } }
+
+    /**
+     * Shows the page in [ordering] (asked for explicitly, so a failed save still applies for the
+     * visit) and saves it for the profile. Season numbers mean something else in the new
+     * ordering, so the season chips start again from Up Next's.
+     */
+    suspend fun pickOrdering(ordering: SeriesOrdering) {
+        if (ordering.type == currentOrdering?.type) return
+        pickedOrdering = ordering.type
+        selectedSeason = null
+        val tvdbId = title?.tvdbId ?: target.tvdbId?.toLongOrNull()
+        if (tvdbId != null) runCatching { ApiClient.setSeriesOrdering(tvdbId, ordering.type) }
+        load()
     }
 
     /** The top-billed cast, as many as the Expo TV row shows. */
@@ -274,7 +306,7 @@ class DetailsModel(val target: DetailsTarget) {
     }
 
     private fun episodeInfo(e: Episode) = PlaybackRequest.EpisodeInfo(
-        e.seasonNumber, e.episodeNumber, e.absoluteEpisodeNumber, e.name, e.itemId, e.image?.url, e.overview,
+        e.seasonNumber, e.episodeNumber, e.absoluteEpisodeNumber, e.name, e.itemId, e.image?.url, e.overview, e.numbering,
     )
 
     /** The aired regular-season episodes after `after`, for Up Next. */

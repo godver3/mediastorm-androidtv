@@ -181,6 +181,12 @@ internal class PrequeueResolver(
             put("seasonNumber", ep.season)
             put("episodeNumber", ep.episode)
             ep.absolute?.takeIf { it > 0 }?.let { put("absoluteEpisodeNumber", it) }
+            ep.numbering?.let { n ->
+                put("numbering", buildJsonObject {
+                    put("seriesId", n.seriesId)
+                    n.ordering?.takeIf { it.isNotEmpty() }?.let { put("ordering", it) }
+                })
+            }
         }
         request.startPosition?.let { put("startOffset", it) }
     }

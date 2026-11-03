@@ -1,6 +1,7 @@
 package com.strmr.tv.player
 
 import com.strmr.tv.api.DetailsTarget
+import com.strmr.tv.api.EpisodeNumbering
 import com.strmr.tv.api.StartPoint
 import com.strmr.tv.api.episodeCode
 import com.strmr.tv.library.LibraryVersion
@@ -44,6 +45,8 @@ data class PlaybackRequest(
         val itemId: String? = null,
         val imageUrl: String? = null,
         val overview: String? = null,
+        /** The ordering [season] / [episode] are in (the details page's episode order). */
+        val numbering: EpisodeNumbering? = null,
     ) {
         val code: String get() = episodeCode(season, episode)
     }
@@ -70,9 +73,10 @@ data class PlaybackRequest(
      */
     val progressItemId: String? get() = if (episode == null) title.titleId else episode.itemId
 
-    /** Identifies what a prequeue resolves: the title, the episode and the start point. */
+    /** Identifies what a prequeue resolves: the title, the episode (in its ordering) and the start point. */
     val prequeueKey: String
-        get() = listOf(title.titleId, episode?.code ?: "", startPosition?.toLong()?.toString() ?: "").joinToString("|")
+        get() = listOf(title.titleId, episode?.code ?: "", episode?.numbering?.ordering ?: "",
+                       startPosition?.toLong()?.toString() ?: "").joinToString("|")
 
     /** The next episode from the start, its still leading the loading art; null when there is none. */
     val nextEpisode: PlaybackRequest?

@@ -121,8 +121,35 @@ data class Title(
 @Serializable
 data class Rating(val source: String, val value: Double, val max: Double = 10.0)
 
+/**
+ * [availableOrderings]: the TVDB season types the series can be shown in (none or one = no
+ * choice); [activeOrdering]: the one these seasons use. The server applies the profile's saved
+ * choice (`series-ordering`).
+ */
 @Serializable
-data class SeriesDetails(val title: Title, val seasons: List<Season> = emptyList())
+data class SeriesDetails(
+    val title: Title,
+    val seasons: List<Season> = emptyList(),
+    val availableOrderings: List<SeriesOrdering> = emptyList(),
+    val activeOrdering: String? = null,
+)
+
+/** One of a series' alternate episode orderings (TVDB season types: aired, DVD, absolute, …). */
+@Serializable
+data class SeriesOrdering(
+    /** Lowercase season-type key (`official`, `dvd`, `absolute`, `alternate`, …). */
+    val type: String,
+    val name: String = "",
+    val seasonCount: Int? = null,
+    val isOfficial: Boolean = false,
+)
+
+/**
+ * The provider series and ordering an episode's season / episode numbers belong to. Sent back
+ * with prequeue and source searches so the server resolves them in the same ordering.
+ */
+@Serializable
+data class EpisodeNumbering(val seriesId: String, val ordering: String? = null)
 
 @Serializable
 data class Season(val id: String, val name: String = "", val number: Int, val episodes: List<Episode> = emptyList())
@@ -142,6 +169,8 @@ data class Episode(
     val itemId: String? = null,
     val watched: Boolean? = null,
     val resume: ResumeState? = null,
+    /** The ordering these numbers are in (stamped by the server on every episode). */
+    val numbering: EpisodeNumbering? = null,
 ) {
     val code: String get() = episodeCode(seasonNumber, episodeNumber)
 }

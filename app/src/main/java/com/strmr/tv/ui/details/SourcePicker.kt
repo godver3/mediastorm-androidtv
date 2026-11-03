@@ -94,7 +94,7 @@ fun SourcePicker(
     LaunchedEffect(Unit) {
         val query = SourceSwitchRules.query(title, episode?.code)
         try {
-            results = ApiClient.searchSources(query, title)
+            results = ApiClient.searchSources(query, title, episode?.numbering)
             results.forEach { r -> r.health?.let { health[r.index] = it } }
         } catch (e: Exception) {
             error = e.message

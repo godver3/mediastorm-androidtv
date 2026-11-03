@@ -41,6 +41,8 @@ fun DetailsMoreMenu(
     target: DetailsTarget,
     scope: CoroutineScope,
     moved: List<DialogChoice>,
+    /** Series with alternate orderings: "Episode Order: <current>", opening its picker. */
+    episodeOrder: DialogChoice? = null,
     onCustomize: () -> Unit,
     onHidden: () -> Unit,
     onDismiss: () -> Unit,
@@ -62,6 +64,7 @@ fun DetailsMoreMenu(
         } else {
             add(DialogChoice("Hide from this profile") { scope.launch { if (TitleActions.hide(target)) onHidden() } })
         }
+        episodeOrder?.let(::add)
         add(DialogChoice("Customize Buttons…", onCustomize))
     }
     val first = remember { FocusRequester() }

@@ -34,7 +34,7 @@ fun SourceSwitchMenu(controller: PlayerController, onDone: () -> Unit, modifier:
     LaunchedEffect(Unit) {
         val query = SourceSwitchRules.query(request)
         try {
-            val found = ApiClient.searchSources(query, request.title)
+            val found = ApiClient.searchSources(query, request.title, request.episode?.numbering)
             found.forEach { r -> r.health?.let { health[r.index] = it } }
             results = found
             AppLog.i("SourceSwitch", "candidates query=\"$query\" count=${found.size} " +
