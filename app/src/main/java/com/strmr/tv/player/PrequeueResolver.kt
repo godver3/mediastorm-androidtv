@@ -10,6 +10,7 @@ import com.strmr.tv.api.startPrequeue
 import com.strmr.tv.app.AppLog
 import com.strmr.tv.app.Config
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -61,14 +62,21 @@ internal class PrequeueResolver(
                 runCatching { ApiClient.startPrequeue(body).prequeueId }.getOrNull()
             } else null
             if (id == null) settleWarm(target.titleId, profile, WarmPrequeue.Phase.UNAVAILABLE, null)
-            else scope.launch { watchWarm(id, target.titleId, profile) }
+            else scope.launch { watchWarm(id, body, target.titleId, profile) }
             id
         }
         warmed = Warmed(target.titleId, profile, System.currentTimeMillis(), task)
     }
 
-    /** Follows the details prequeue until it settles, for the page's Audio & Subtitles button. */
-    private suspend fun watchWarm(id: String, titleId: String, profile: String) {
+    /**
+     * Follows the details prequeue until it settles, for the page's Audio & Subtitles button.
+     * If the server drops it (404: replaced by another prequeue for the same title, or
+     * restarted), asks once more, since the server hands back whatever entry now holds that
+     * title, then gives up rather than polling a dead id until the deadline.
+     */
+    private suspend fun watchWarm(firstId: String, body: JsonObject, titleId: String, profile: String) {
+        var id = firstId
+        var restarted = false
         val deadline = System.currentTimeMillis() + 180_000
         while (System.currentTimeMillis() < deadline && _warm.value?.let { it.titleId == titleId && it.profile == profile } == true) {
             try {
@@ -81,13 +89,30 @@ internal class PrequeueResolver(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                AppLog.w("Prequeue", "details prequeue $id status failed: ${e.message}")
+                if (!isGone(e)) {
+                    AppLog.w("Prequeue", "details prequeue $id status failed: ${e.message}")
+                } else if (restarted) {
+                    AppLog.w("Prequeue", "details prequeue $id gone again after restart")
+                    break
+                } else {
+                    restarted = true
+                    val next = runCatching { ApiClient.startPrequeue(body).prequeueId }.getOrNull() ?: break
+                    AppLog.w("Prequeue", "details prequeue $id gone on the server; following $next")
+                    id = next
+                    // Play adopts the live prequeue, not the dropped one.
+                    warmed?.takeIf { it.titleId == titleId && it.profile == profile && it.prequeue != null }
+                        ?.prequeue = CompletableDeferred(next)
+                    continue
+                }
             }
             delay(1500)
         }
         AppLog.i("Prequeue", "details prequeue $id unavailable")
         settleWarm(titleId, profile, WarmPrequeue.Phase.UNAVAILABLE, null)
     }
+
+    /** The server no longer has the prequeue (404 "not found or expired"). */
+    private fun isGone(e: Exception): Boolean = e is ApiError && e.statusCode == 404
 
     private fun settleWarm(titleId: String, profile: String, phase: WarmPrequeue.Phase, status: PrequeueStatus?) {
         val w = _warm.value ?: return
@@ -127,7 +152,16 @@ internal class PrequeueResolver(
                 }
             }
         }
-        return await(ApiClient.startPrequeue(body(request)).prequeueId)
+        val body = body(request)
+        return try {
+            await(ApiClient.startPrequeue(body).prequeueId)
+        } catch (e: ApiError) {
+            // Dropped on the server mid-resolve: ask once more; the server returns whichever
+            // entry now holds this title (an in-flight one is reused, not restarted).
+            if (!isGone(e)) throw e
+            AppLog.w("Prequeue", "prequeue gone on the server; restarting once")
+            await(ApiClient.startPrequeue(body).prequeueId)
+        }
     }
 
     private fun body(request: PlaybackRequest): JsonObject = buildJsonObject {
