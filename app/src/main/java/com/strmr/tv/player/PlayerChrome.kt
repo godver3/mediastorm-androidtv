@@ -91,7 +91,13 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
     // A live channel with the server's timeshift window: a scrubber over the window and Go Live.
     val timeshift by controller.timeshift.collectAsState()
     val behindLive by controller.behindLive.collectAsState()
-    val showGoLive = live && timeshift && !Timeshift.isAtLive(behindLive)
+    // A channel with provider catch-up: the bar spans the programme, and rewinding past what the
+    // player holds plays the archive (CatchupJoin).
+    val programme by (controller.catchup?.timeline ?: remember { kotlinx.coroutines.flow.MutableStateFlow<ProgrammeTimeline?>(null) }).collectAsState()
+    val switching by controller.switching.collectAsState()
+    val notice by controller.notice.collectAsState()
+    val showGoLive = live && (timeshift || programme != null) && !Timeshift.isAtLive(behindLive)
+    val showStartOver = live && programme.let { it != null && it.positionMs > START_OVER_MIN_MS }
     val switchable = !live && controller.session.reportsProgress && controller.session.streamPath != null
     val skipShown = skip != null && error == null
 
@@ -167,8 +173,8 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                 e.key == Key.MediaPlayPause -> { togglePlay(); show(); true }
                 e.key == Key.MediaPlay -> { player.play(); true }
                 e.key == Key.MediaPause -> { player.pause(); show(); true }
-                e.key == Key.MediaFastForward -> { controller.seekTo(player.currentPosition + 30_000); show(); true }
-                e.key == Key.MediaRewind -> { controller.seekTo(player.currentPosition - 10_000); show(); true }
+                e.key == Key.MediaFastForward -> { controller.skip(30_000); show(); true }
+                e.key == Key.MediaRewind -> { controller.skip(-10_000); show(); true }
                 else -> false
             }
         },
@@ -190,10 +196,16 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
         )
         if (reconnecting && error == null) {
             LiveReconnectingCover(controller.request, note = reconnectNote)
-        } else if (buffering && error == null && !scrub.active) {
+        } else if ((buffering || switching) && error == null && !scrub.active) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White, strokeWidth = 3.dp)
         }
         error?.let { ErrorPanel(it, onExit, Modifier.align(Alignment.Center)) }
+        notice?.let { text ->
+            LaunchedEffect(text) { delay(4_000); controller.notice.value = null }
+            Text(text, style = MaterialTheme.typography.titleMedium,
+                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp)
+                     .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(50)).padding(horizontal = 20.dp, vertical = 8.dp))
+        }
 
         AnimatedVisibility(visible && error == null, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.9f)))) {
@@ -224,6 +236,10 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                             if (live && onAddScreen != null) {
                                 TransportButton(AppIcons.Multiscreen, "Add Screen", transportFocusable) { onAddScreen() }
                             }
+                            // Catch-up: the programme from its start, through the provider's archive.
+                            if (showStartOver) {
+                                TransportButton(AppIcons.Restart, "Start Over", transportFocusable) { controller.seekTo(0) }
+                            }
                             // Timeshift: back to the live edge from a pause or a seek back.
                             if (showGoLive) {
                                 TransportButton(AppIcons.SkipNext, "Go Live", transportFocusable) { controller.goLive() }
@@ -231,13 +247,13 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                         }
                     }
                     Box(Modifier.padding(top = 20.dp)) {
-                        if (live && !timeshift) {
+                        if (live && !timeshift && programme == null) {
                             LiveBadge(transportFocusable.focusRequester(scrubber).onKeyEvent { e ->
                                 if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) { open(Menu.INFO, scrubber); true } else false
                             })
                         } else {
                             ScrubBar(
-                                controller, scrub.target, live = live,
+                                controller, scrub.target, live = live, timeline = programme,
                                 barModifier = transportFocusable.focusRequester(scrubber).onKeyEvent { e ->
                                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                                     if (scrubKey(e)) return@onKeyEvent true
@@ -313,3 +329,6 @@ private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier) 
         androidx.tv.material3.Button(onClick = onExit, modifier = Modifier.focusRequester(focus)) { Text("Close") }
     }
 }
+
+/** Start Over shows once the playhead is this far into the programme. */
+private const val START_OVER_MIN_MS = 60_000L

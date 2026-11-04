@@ -23,6 +23,7 @@ import com.strmr.tv.api.StartPoint
 import com.strmr.tv.api.mediaHeaders
 import com.strmr.tv.api.reportProgress
 import com.strmr.tv.app.AppLog
+import com.strmr.tv.live.LiveCatchups
 import com.strmr.tv.player.dv7.Dv7Playback
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -59,6 +60,10 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val timeshift = MutableStateFlow(session.isLive && session.liveStream?.timeshift == true)
     /** How far behind the live edge a timeshift channel plays, in ms (0 at the edge), ticked by the clock. */
     val behindLive = MutableStateFlow(0L)
+    /** A switch between the channel and its catch-up archive is loading. */
+    val switching = MutableStateFlow(false)
+    /** A short message over the player (a catch-up that couldn't open), cleared by the chrome. */
+    val notice = MutableStateFlow<String?>(null)
     /** Set when playback moves on to the next episode; the activity closes and starts it. */
     val advanceTo = MutableStateFlow<PlaybackRequest?>(null)
     /** Set by Switch Source; the activity closes and resumes on the chosen source. */
@@ -103,6 +108,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** A live channel: its server session, and tuning it again when the source drops (set as the player is built). */
     var liveRetune: LiveRetune? = null
         private set
+    /** A live channel with provider catch-up: rewinding past what the player holds plays the archive. */
+    var catchup: CatchupJoin? = null
+        private set
     val upNext: UpNext? = if (session.reportsProgress && !session.isLive) {
         UpNext(request, scope) { next ->
             report(ended = true)
@@ -125,6 +133,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             if (state == Player.STATE_BUFFERING) liveRetune?.buffering()
             if (state == Player.STATE_ENDED && advanceTo.value == null) {
                 if (upNext?.ended() == true) return
+                if (catchup?.ended() == true) return
                 recordingHls?.let { hls ->
                     hls.ended { ended.value = true }
                     return
@@ -180,6 +189,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 player.prepare()
                 return
             }
+            if (catchup?.failed(e.message ?: e.errorCodeName) == true) return
             // A live stream that fell behind its window rejoins at the live edge.
             if (session.isLive && e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                 AppLog.w("Player", "behind the live window; rejoining")
@@ -222,6 +232,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 timeshift.value = next.timeshift
             }
         }
+        catchup = session.liveChannel?.takeIf { session.isLive && LiveCatchups.window(it) > 0 }?.let { CatchupJoin(this, it) }
         // Debug builds log every player event under the EventLogger tag.
         if (com.strmr.tv.BuildConfig.DEBUG) player.addAnalyticsListener(androidx.media3.exoplayer.util.EventLogger())
         // A growing recording's playlist plays from its start (0), not its live edge.
@@ -244,17 +255,29 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         while (isActive) {
             position.value = player.currentPosition
             duration.value = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
-            if (timeshift.value) behindLive.value = Timeshift.behindLiveMs(player)
+            if (timeshift.value && catchup?.inArchive?.value != true) behindLive.value = Timeshift.behindLiveMs(player)
+            catchup?.tick()
             upNext?.tick(position.value, duration.value, player.isPlaying)
             delay(250)
         }
     }
 
-    /** Seeking is possible: anything but live, or live with a timeshift window. */
-    val seekable: Boolean get() = !session.isLive || timeshift.value
+    /** Seeking is possible: anything but live, or live with a timeshift window or catch-up. */
+    val seekable: Boolean get() = !session.isLive || timeshift.value || catchup?.timeline?.value != null
 
-    /** A timeshift channel back to its live edge. */
+    /** The bar's programme on a catch-up channel; scrubbing then works in ms from its start. */
+    private val programme: ProgrammeTimeline? get() = catchup?.timeline?.value
+
+    /** Where a scrub starts, and how far it can go, in the bar's terms. */
+    fun scrubPosition(): Long = programme?.positionMs ?: player.currentPosition
+    fun scrubEnd(): Long = programme?.availableMs ?: duration.value.let { if (it > 0) it - 1_000 else Long.MAX_VALUE }
+
+    /** Remote rewind / fast forward. */
+    fun skip(deltaMs: Long) = seekTo(scrubPosition() + deltaMs)
+
+    /** Back to the live edge: a timeshift channel's, or the channel again from its catch-up archive. */
     fun goLive() {
+        catchup?.let { return it.goLive() }
         if (!timeshift.value) return
         AppLog.i("Player", "timeshift: back to live from ${behindLive.value / 1000}s behind")
         player.seekToDefaultPosition()
@@ -264,6 +287,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
 
     fun seekTo(ms: Long) {
         if (!seekable) return
+        programme?.let { return catchup!!.seek(ms.coerceIn(0, it.availableMs)) }
         val end = duration.value.takeIf { it > 0 } ?: Long.MAX_VALUE
         player.seekTo(ms.coerceIn(0, end))
         position.value = player.currentPosition
@@ -396,6 +420,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         progressJob?.cancel()
         // Each stops its server session.
         recordingHls?.release()
+        catchup?.release()
         liveRetune?.release()
         player.removeListener(listener)
         player.release()

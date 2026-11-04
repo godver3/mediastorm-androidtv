@@ -38,10 +38,8 @@ class ScrubState(private val controller: PlayerController, private val scope: Co
             repeatCount < 100 -> 60_000L
             else -> 120_000L
         }
-        val duration = controller.duration.value
-        val from = target ?: controller.player.currentPosition
-        val end = if (duration > 0) duration - 1_000 else Long.MAX_VALUE
-        target = (from + direction * step).coerceIn(0, end.coerceAtLeast(0))
+        val from = target ?: controller.scrubPosition()
+        target = (from + direction * step).coerceIn(0, controller.scrubEnd().coerceAtLeast(0))
         scheduleCommit(if (repeatCount > 0) 1_200 else 900)
     }
 

@@ -55,6 +55,10 @@ import java.time.format.FormatStyle
  * how far behind live it is on the right ("LIVE" at the edge). While scrubbing the bar shows a
  * second, white playhead at the target with a seek preview above it (the backend's thumbnail
  * nearest the target, or just the time when there is none). Focusing it thickens it.
+ *
+ * A channel with provider catch-up ([timeline]) shows the programme at the playhead, start to
+ * stop: played up to the playhead, aired (and so reachable, through the archive) up to now, and
+ * the rest still to come; its title and times sit between the labels.
  */
 @Composable
 fun ScrubBar(
@@ -65,18 +69,24 @@ fun ScrubBar(
     live: Boolean = false,
     /** Focus requester and keys, applied to the bar itself. */
     barModifier: Modifier = Modifier,
+    /** A catch-up channel's programme: the bar spans it, in ms from its start. */
+    timeline: ProgrammeTimeline? = null,
 ) {
-    val position by controller.position.collectAsState()
-    val duration by controller.duration.collectAsState()
+    val playerPosition by controller.position.collectAsState()
+    val playerDuration by controller.duration.collectAsState()
+    val position = timeline?.positionMs ?: playerPosition
+    val duration = timeline?.lengthMs ?: playerDuration
     val speed by controller.speed.collectAsState()
-    val behindLive by controller.behindLive.collectAsState()
+    val playerBehindLive by controller.behindLive.collectAsState()
+    val behindLive = timeline?.behindLiveMs ?: playerBehindLive
     val thumbnails = controller.thumbnails
     val thumbList = thumbnails?.thumbnails?.collectAsState()?.value.orEmpty()
     var focused by remember { mutableStateOf(false) }
     val barHeight by animateDpAsState(if (focused) 10.dp else 6.dp, label = "bar")
 
     fun fraction(ms: Long) = if (duration > 0) (ms.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val buffered = fraction(controller.player.bufferedPosition)
+    // A programme's bar shades what has aired; a file's, what is buffered.
+    val buffered = timeline?.let { fraction(it.availableMs) } ?: fraction(controller.player.bufferedPosition)
     val shown = scrubTarget ?: position
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -121,7 +131,7 @@ fun ScrubBar(
             if (live) {
                 // The target's distance from live while scrubbing, else the playhead's.
                 val behind = if (scrubTarget != null) (behindLive + position - scrubTarget).coerceAtLeast(0) else behindLive
-                LiveTimes(behind)
+                LiveTimes(behind, timeline?.program)
             } else Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                 Text(formatTimestamp(shown / 1000.0), weight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
@@ -137,12 +147,21 @@ fun ScrubBar(
 
 /** A timeshift bar's labels: the time of day at the playhead, and how far behind live it is. */
 @Composable
-private fun LiveTimes(behindMs: Long) {
+private fun LiveTimes(behindMs: Long, program: com.strmr.tv.live.EpgProgram? = null) {
     val atLive = Timeshift.isAtLive(behindMs)
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(LocalTime.now().minusSeconds(behindMs / 1000).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)),
              weight = FontWeight.SemiBold)
         Spacer(Modifier.weight(1f))
+        program?.let {
+            androidx.tv.material3.Text(
+                "${it.title}  ·  ${clockTime(it.startMs)} – ${clockTime(it.stopMs)}",
+                color = Color.White.copy(alpha = 0.6f), style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(2f, fill = false).padding(horizontal = 24.dp),
+            )
+            Spacer(Modifier.weight(1f))
+        }
         if (atLive) {
             androidx.tv.material3.Text(
                 "LIVE", color = Color.White, fontWeight = FontWeight.Black,
@@ -208,6 +227,10 @@ private fun thumbnailRequest(url: String, context: android.content.Context) = Im
 /** Keeps the preview centred on the target, inside the bar's ends. */
 private fun previewOffset(width: Dp, fraction: Float): Dp =
     (width * fraction - PreviewWidth / 2).coerceIn(0.dp, (width - PreviewWidth).coerceAtLeast(0.dp))
+
+private fun clockTime(epochMs: Long): String =
+    java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
 
 private fun endsAt(leftMs: Long): String =
     LocalTime.now().plusSeconds(leftMs / 1000).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))

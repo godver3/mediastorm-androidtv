@@ -86,8 +86,16 @@ class LiveRetune(
         }
     }
 
+    /**
+     * The channel is off the air here while the provider's archive plays in its place
+     * ([CatchupJoin]): its session stopped (a provider may allow one connection), no retunes.
+     */
+    var parked = false
+        private set
+
     /** The stream is playing. */
     fun playing() {
+        if (parked) return
         policy.playing(now())
         if (hls.playing()) rememberDirectWorked()
         reconnecting.value = false
@@ -100,6 +108,27 @@ class LiveRetune(
         }
     }
 
+    /** Stops the channel's session for the archive; [unpark] tunes it again. */
+    fun park() {
+        if (released || parked) return
+        parked = true
+        hlsProof?.cancel()
+        retuneJob?.cancel()
+        failoverJob?.cancel()
+        reconnecting.value = false
+        note.value = null
+        endSession()
+    }
+
+    /** Back to live from the archive: the channel tuned afresh, with a full retune budget. */
+    fun unpark() {
+        if (released || !parked) return
+        parked = false
+        policy = LiveRetunePolicy()
+        restart("back to live", 0)
+        note.value = BACK_TO_LIVE
+    }
+
     /** The player is buffering: a stall while the fallback is on probation. */
     fun buffering() {
         if (hlsProof?.isActive != true) return
@@ -110,6 +139,7 @@ class LiveRetune(
 
     /** The stream ended, which a live channel doesn't: its source dropped. */
     fun ended() {
+        if (parked) return
         if (!fallBackToHls("end of stream") && !sourceLost("end of stream")) failOverOrGiveUp("end of stream", NEVER_PLAYED)
     }
 
@@ -117,9 +147,8 @@ class LiveRetune(
      * A playback error; true when this took it over: any error of a direct stream that never
      * played (retried as HLS), else a source error (retuned).
      */
-    fun failed(e: PlaybackException): Boolean =
-        fallBackToHls(e.errorCodeName) || LiveRetunePolicy.isSourceError(e.errorCode) && sourceLost(e.errorCodeName) ||
-            failOver(e.errorCodeName, e.message ?: e.errorCodeName)
+    fun failed(e: PlaybackException): Boolean = !parked && (fallBackToHls(e.errorCodeName) || LiveRetunePolicy.isSourceError(e.errorCode) && sourceLost(e.errorCodeName) ||
+            failOver(e.errorCodeName, e.message ?: e.errorCodeName))
 
     /** A direct stream that never played: tunes once more as HLS. */
     private fun fallBackToHls(reason: String): Boolean {
@@ -289,6 +318,7 @@ class LiveRetune(
         const val HLS_PROOF_MS = 30_000L
         const val EXHAUSTED = "The channel keeps dropping out. Try it again in a moment."
         const val NEVER_PLAYED = "The channel stopped before it started playing. Try it again in a moment."
+        const val BACK_TO_LIVE = "Back to live…"
         const val TRYING_ANOTHER = "Trying another stream source…"
         const val RETUNE_FAILED = "The channel dropped out and couldn't be tuned again. Try it again in a moment."
     }
