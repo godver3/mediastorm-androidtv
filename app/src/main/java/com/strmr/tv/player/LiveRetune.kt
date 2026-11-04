@@ -2,7 +2,6 @@ package com.strmr.tv.player
 
 import android.os.SystemClock
 import androidx.annotation.OptIn
-import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -55,6 +54,8 @@ class LiveRetune(
     private val tune: suspend (forceHls: Boolean, stremioStreamIndex: Int?) -> LiveStream,
     private val giveUp: (String) -> Unit,
     first: LiveStream? = null,
+    /** Each fresh stream a retune or failover opens (it may keep a timeshift window, or not). */
+    private val tuned: (LiveStream) -> Unit = {},
 ) {
     /** The channel playing; its `stremioStreamIndex` moves on under Stremio failover. */
     var channel: LiveChannel? = channel
@@ -180,8 +181,10 @@ class LiveRetune(
                 if (channel?.hasStremioSources == true) {
                     stremio.tuned(next.stremioStreamIndex ?: channel?.stremioStreamIndex, next.stremioStreamIndexes)
                 }
-                AppLog.i("Live", "$label: tuned (${if (next.sessionId == null) "direct" else "hls session"})")
-                player.setMediaItem(MediaItem.fromUri(next.url))
+                AppLog.i("Live", "$label: tuned (${if (next.sessionId == null) "direct" else "hls session"}" +
+                    "${if (next.timeshift) ", timeshift ${next.timeshiftWindowSeconds / 60} min" else ""})")
+                tuned(next)
+                player.setMediaItem(Timeshift.mediaItem(next.url, next.timeshift))
                 player.playWhenReady = true
                 player.prepare()
             } catch (e: CancellationException) {

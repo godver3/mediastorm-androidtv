@@ -26,7 +26,7 @@ class ScrubState(private val controller: PlayerController, private val scope: Co
 
     /** One press (or key repeat, `repeatCount` > 0) in `direction` (-1 or 1). */
     fun step(direction: Int, repeatCount: Int) {
-        if (controller.session.isLive) return
+        if (!controller.seekable) return
         val now = System.currentTimeMillis()
         // Key repeat arrives about every 50 ms; ten steps a second is fast enough to steer.
         if (repeatCount > 0 && now - lastRepeatAt < 100) return

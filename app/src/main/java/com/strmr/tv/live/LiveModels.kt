@@ -116,4 +116,11 @@ data class LiveStream(
     val stremioStreamIndex: Int? = null,
     /** …and every playable stream, in the addon's order. */
     val stremioStreamIndexes: List<Int>? = null,
-)
+    /**
+     * The server keeps this much of the channel in the HLS session (timeshift: pause, seek back
+     * and return to live); 0 when it keeps only the live edge.
+     */
+    val timeshiftWindowSeconds: Int = 0,
+) {
+    val timeshift: Boolean get() = sessionId != null && timeshiftWindowSeconds > 0
+}

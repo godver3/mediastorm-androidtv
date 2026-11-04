@@ -5,7 +5,6 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Format
-import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
@@ -53,6 +52,13 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val position = MutableStateFlow(0L)
     val duration = MutableStateFlow(0L)
     val speed = MutableStateFlow(1f)
+    /**
+     * A live channel whose server session keeps a timeshift window: it pauses, seeks inside the
+     * window and returns to live ([goLive]). False for a direct stream or with timeshift off.
+     */
+    val timeshift = MutableStateFlow(session.isLive && session.liveStream?.timeshift == true)
+    /** How far behind the live edge a timeshift channel plays, in ms (0 at the edge), ticked by the clock. */
+    val behindLive = MutableStateFlow(0L)
     /** Set when playback moves on to the next episode; the activity closes and starts it. */
     val advanceTo = MutableStateFlow<PlaybackRequest?>(null)
     /** Set by Switch Source; the activity closes and resumes on the chosen source. */
@@ -211,11 +217,16 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             .build()
         player.addListener(listener)
         recordingHls = session.growingRestart?.let { RecordingHls(player, scope, session.liveSessionId, it) }
-        liveRetune = session.retuneLive?.let { LiveRetune(player, scope, session.liveSessionId, session.liveChannel, it, ::liveGaveUp, session.liveStream) }
+        liveRetune = session.retuneLive?.let {
+            LiveRetune(player, scope, session.liveSessionId, session.liveChannel, it, ::liveGaveUp, session.liveStream) { next ->
+                timeshift.value = next.timeshift
+            }
+        }
         // Debug builds log every player event under the EventLogger tag.
         if (com.strmr.tv.BuildConfig.DEBUG) player.addAnalyticsListener(androidx.media3.exoplayer.util.EventLogger())
         // A growing recording's playlist plays from its start (0), not its live edge.
-        recordingHls?.let { player.setMediaItem(it.mediaItem(session.url), 0) } ?: player.setMediaItem(MediaItem.fromUri(session.url))
+        recordingHls?.let { player.setMediaItem(it.mediaItem(session.url), 0) }
+            ?: player.setMediaItem(Timeshift.mediaItem(session.url, timeshift.value))
         request.startPosition?.let { player.seekTo((it * 1000).toLong()) }
         player.playWhenReady = true
         player.prepare()
@@ -233,13 +244,26 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         while (isActive) {
             position.value = player.currentPosition
             duration.value = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+            if (timeshift.value) behindLive.value = Timeshift.behindLiveMs(player)
             upNext?.tick(position.value, duration.value, player.isPlaying)
             delay(250)
         }
     }
 
+    /** Seeking is possible: anything but live, or live with a timeshift window. */
+    val seekable: Boolean get() = !session.isLive || timeshift.value
+
+    /** A timeshift channel back to its live edge. */
+    fun goLive() {
+        if (!timeshift.value) return
+        AppLog.i("Player", "timeshift: back to live from ${behindLive.value / 1000}s behind")
+        player.seekToDefaultPosition()
+        player.play()
+        behindLive.value = 0
+    }
+
     fun seekTo(ms: Long) {
-        if (session.isLive) return
+        if (!seekable) return
         val end = duration.value.takeIf { it > 0 } ?: Long.MAX_VALUE
         player.seekTo(ms.coerceIn(0, end))
         position.value = player.currentPosition

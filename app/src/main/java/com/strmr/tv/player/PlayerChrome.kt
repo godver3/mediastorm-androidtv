@@ -88,6 +88,10 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
     val buttons = remember { Menu.entries.associateWith { FocusRequester() } }
     var openedFrom by remember { mutableStateOf<FocusRequester?>(null) }
     val live = controller.session.isLive
+    // A live channel with the server's timeshift window: a scrubber over the window and Go Live.
+    val timeshift by controller.timeshift.collectAsState()
+    val behindLive by controller.behindLive.collectAsState()
+    val showGoLive = live && timeshift && !Timeshift.isAtLive(behindLive)
     val switchable = !live && controller.session.reportsProgress && controller.session.streamPath != null
     val skipShown = skip != null && error == null
 
@@ -120,7 +124,8 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
         menu = m
     }
 
-    fun togglePlay() = if (player.isPlaying) player.pause() else player.play()
+    // playWhenReady, not isPlaying: a press while buffering (a live join, a seek) must pause.
+    fun togglePlay() = if (player.playWhenReady) player.pause() else player.play()
     fun show() { visible = true }
 
     fun activate(action: SkipAction) {
@@ -133,7 +138,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
     /** Left / Right scrub; true when handled. */
     fun scrubKey(e: KeyEvent): Boolean {
         val dir = when (e.key) { Key.DirectionLeft -> -1; Key.DirectionRight -> 1; else -> return false }
-        if (live) return false
+        if (!controller.seekable) return false
         scrub.step(dir, e.nativeKeyEvent.repeatCount)
         show()
         return true
@@ -219,16 +224,20 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                             if (live && onAddScreen != null) {
                                 TransportButton(AppIcons.Multiscreen, "Add Screen", transportFocusable) { onAddScreen() }
                             }
+                            // Timeshift: back to the live edge from a pause or a seek back.
+                            if (showGoLive) {
+                                TransportButton(AppIcons.SkipNext, "Go Live", transportFocusable) { controller.goLive() }
+                            }
                         }
                     }
                     Box(Modifier.padding(top = 20.dp)) {
-                        if (live) {
+                        if (live && !timeshift) {
                             LiveBadge(transportFocusable.focusRequester(scrubber).onKeyEvent { e ->
                                 if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) { open(Menu.INFO, scrubber); true } else false
                             })
                         } else {
                             ScrubBar(
-                                controller, scrub.target,
+                                controller, scrub.target, live = live,
                                 barModifier = transportFocusable.focusRequester(scrubber).onKeyEvent { e ->
                                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                                     if (scrubKey(e)) return@onKeyEvent true

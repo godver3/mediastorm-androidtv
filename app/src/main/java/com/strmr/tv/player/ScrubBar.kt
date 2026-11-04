@@ -50,7 +50,9 @@ import java.time.format.FormatStyle
 
 /**
  * The transport's progress bar: played (accent), buffered and remaining, elapsed under the
- * playhead and the time left (with the end time) on the right. While scrubbing the bar shows a
+ * playhead and the time left (with the end time) on the right. On a live channel with a
+ * timeshift window ([live]) the bar is the window: the playhead's time of day on the left and
+ * how far behind live it is on the right ("LIVE" at the edge). While scrubbing the bar shows a
  * second, white playhead at the target with a seek preview above it (the backend's thumbnail
  * nearest the target, or just the time when there is none). Focusing it thickens it.
  */
@@ -59,12 +61,15 @@ fun ScrubBar(
     controller: PlayerController,
     scrubTarget: Long?,
     modifier: Modifier = Modifier,
+    /** A live channel's timeshift window rather than a programme's timeline. */
+    live: Boolean = false,
     /** Focus requester and keys, applied to the bar itself. */
     barModifier: Modifier = Modifier,
 ) {
     val position by controller.position.collectAsState()
     val duration by controller.duration.collectAsState()
     val speed by controller.speed.collectAsState()
+    val behindLive by controller.behindLive.collectAsState()
     val thumbnails = controller.thumbnails
     val thumbList = thumbnails?.thumbnails?.collectAsState()?.value.orEmpty()
     var focused by remember { mutableStateOf(false) }
@@ -81,8 +86,13 @@ fun ScrubBar(
             Box(Modifier.fillMaxWidth().height(0.dp)) {
                 if (scrubTarget != null) {
                     val thumb = if (thumbList.isEmpty()) null else thumbnails?.at(scrubTarget)
+                    // Live: the target's distance from the edge, not its place in the window.
+                    val label = if (live) {
+                        val behind = (behindLive + position - scrubTarget).coerceAtLeast(0)
+                        if (Timeshift.isAtLive(behind)) "LIVE" else "-" + formatTimestamp(behind / 1000.0)
+                    } else formatTimestamp(scrubTarget / 1000.0)
                     ScrubPreview(
-                        thumb?.url, scrubTarget, thumbList.isNotEmpty(),
+                        thumb?.url, label, thumbList.isNotEmpty(),
                         Modifier.wrapContentHeight(Alignment.Bottom, unbounded = true)
                             .offset(x = previewOffset(width, fraction(scrubTarget)), y = (-8).dp),
                     )
@@ -108,7 +118,11 @@ fun ScrubBar(
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            if (live) {
+                // The target's distance from live while scrubbing, else the playhead's.
+                val behind = if (scrubTarget != null) (behindLive + position - scrubTarget).coerceAtLeast(0) else behindLive
+                LiveTimes(behind)
+            } else Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                 Text(formatTimestamp(shown / 1000.0), weight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
                 if (duration > 0) {
@@ -121,9 +135,29 @@ fun ScrubBar(
     }
 }
 
+/** A timeshift bar's labels: the time of day at the playhead, and how far behind live it is. */
+@Composable
+private fun LiveTimes(behindMs: Long) {
+    val atLive = Timeshift.isAtLive(behindMs)
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(LocalTime.now().minusSeconds(behindMs / 1000).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)),
+             weight = FontWeight.SemiBold)
+        Spacer(Modifier.weight(1f))
+        if (atLive) {
+            androidx.tv.material3.Text(
+                "LIVE", color = Color.White, fontWeight = FontWeight.Black,
+                style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
+                modifier = Modifier.background(Color(0xFFE5332A), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 2.dp),
+            )
+        } else {
+            Text("-" + formatTimestamp(behindMs / 1000.0) + " behind live", weight = FontWeight.SemiBold)
+        }
+    }
+}
+
 /** A frame of the target (or a time-only card when there are no thumbnails) and its time. */
 @Composable
-private fun ScrubPreview(url: String?, targetMs: Long, hasThumbnails: Boolean, modifier: Modifier) {
+private fun ScrubPreview(url: String?, label: String, hasThumbnails: Boolean, modifier: Modifier) {
     Column(modifier.width(PreviewWidth), horizontalAlignment = Alignment.CenterHorizontally) {
         if (hasThumbnails) {
             Box(
@@ -144,7 +178,7 @@ private fun ScrubPreview(url: String?, targetMs: Long, hasThumbnails: Boolean, m
             Spacer(Modifier.height(PreviewHeight))
         }
         Text(
-            formatTimestamp(targetMs / 1000.0), weight = FontWeight.Bold,
+            label, weight = FontWeight.Bold,
             modifier = Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
                 .padding(horizontal = 8.dp, vertical = 2.dp),
         )

@@ -32,6 +32,7 @@ private data class LiveStart(
     val playlistUrl: String? = null,
     val stremioStreamIndex: Int? = null,
     val stremioStreamIndexes: List<Int>? = null,
+    val timeshiftWindowSeconds: Int? = null,
 )
 
 /** The profile's settings document, read raw so writes keep every field this app doesn't model. */
@@ -128,11 +129,16 @@ suspend fun ApiClient.clearLiveCache() {
  * Opens a channel on the server and returns the URL to play: a direct stream, or an HLS
  * session (kept alive with [keepLiveSessionAlive]). `token=` / `profileUnlock=` ride in the
  * query as on every header-less media URL. [forceHls]: an HLS session even when the source is
- * configured direct (multiscreen tiles, which each own and stop their session).
+ * configured direct (multiscreen tiles, which each own and stop their session). [timeshift]: an
+ * HLS session that keeps the server's timeshift window (`timeshift=1`), so the channel can be
+ * paused and rewound; with timeshift off on the server it tunes as usual.
  */
-suspend fun ApiClient.startLive(channel: LiveChannel, programTitle: String?, forceHls: Boolean = false): LiveStream {
+suspend fun ApiClient.startLive(
+    channel: LiveChannel, programTitle: String?, forceHls: Boolean = false, timeshift: Boolean = false,
+): LiveStream {
     val q = buildMap {
         if (forceHls) put("format", "hls")
+        if (timeshift) put("timeshift", "1")
         put("url", channel.url)
         put("target", "native")
         put("profileId", profileId)
@@ -153,7 +159,8 @@ suspend fun ApiClient.startLive(channel: LiveChannel, programTitle: String?, for
     val direct = start.isDirect == true
     val path = (if (direct) start.streamUrl else start.playlistUrl)?.ifEmpty { null }
         ?: throw ApiError.NotReady("The server did not return a stream for this channel")
-    return LiveStream(mediaUrl(path), if (direct) null else start.sessionId, start.stremioStreamIndex, start.stremioStreamIndexes)
+    return LiveStream(mediaUrl(path), if (direct) null else start.sessionId, start.stremioStreamIndex, start.stremioStreamIndexes,
+                      timeshiftWindowSeconds = if (direct) 0 else start.timeshiftWindowSeconds ?: 0)
 }
 
 @Serializable

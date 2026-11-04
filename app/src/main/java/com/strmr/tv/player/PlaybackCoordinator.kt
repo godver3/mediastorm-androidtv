@@ -124,7 +124,11 @@ object PlaybackCoordinator {
         launchPlayer()
     }
 
-    /** A live channel: the server tunes it (a direct stream or an HLS session) and the player plays it. */
+    /**
+     * A live channel: the server tunes it (a direct stream or an HLS session) and the player plays
+     * it. It asks for timeshift, so with the server's window on (30 minutes by default) the channel
+     * plays from an HLS session that can be paused, rewound and returned to live.
+     */
     fun playLive(channel: LiveChannel, programTitle: String?) {
         if (_resolving.value != null) return
         val request = PlaybackRequest(DetailsTarget(channel.id, programTitle ?: channel.name, isMovie = true, backdropUrl = null, logoUrl = channel.logoUrl))
@@ -132,7 +136,7 @@ object PlaybackCoordinator {
         // Stremio failover tunes another of the channel's streams ([LiveRetune]).
         val live: suspend (Boolean, Int?) -> LiveStream = { force, stremioIndex ->
             val tuned = stremioIndex?.let { channel.copy(stremioStreamIndex = it) } ?: channel
-            ApiClient.startLive(tuned, programTitle, forceHls = force || LiveHlsPreference.prefersHls(channel))
+            ApiClient.startLive(tuned, programTitle, forceHls = force || LiveHlsPreference.prefersHls(channel), timeshift = true)
         }
         begin(request, "Tuning…", live = live, liveChannel = channel,
               liveLabel = StreamInfo.live(channel.name))
