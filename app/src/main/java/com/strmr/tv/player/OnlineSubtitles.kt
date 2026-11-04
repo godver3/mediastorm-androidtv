@@ -105,7 +105,10 @@ class OnlineSubtitles(private val controller: PlayerController, private val scop
             return
         }
         autoJob = scope.launch {
-            val (language, mode) = preference()
+            val (language, preferredMode) = preference()
+            // foreign-audio searches only when the audio playing is not in the subtitle language.
+            val playing = tracks.ofType(C.TRACK_TYPE_AUDIO).firstOrNull { it.selected }?.format?.language
+            val mode = ClientTrackSelector.resolveMode(preferredMode, playing, language)
             log(TAG, "trigger_check", "mode=$mode language=$language pick=${pick?.format?.language}")
             if (mode != "on") return@launch log(TAG, "trigger_skip_mode_off", "mode=$mode")
             if (language == null) return@launch log(TAG, "trigger_skip_no_language")

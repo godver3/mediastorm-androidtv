@@ -2,6 +2,7 @@ package com.strmr.tv.api
 
 import com.strmr.tv.adaptive.ThroughputStore
 import com.strmr.tv.app.Config
+import com.strmr.tv.player.ClientTrackSelector
 import com.strmr.tv.player.SubtitleStyle
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -71,7 +72,7 @@ data class PlaybackSettings(
     val subtitleStyle: SubtitleStyle.Server? = null,
     /** Subtitle language (`playback.preferredSubtitleLanguage`), for when the server sent no track choice. */
     val preferredSubtitleLanguage: String? = null,
-    /** off | forced-only | on (the older always / auto mapped), for when the server sent no track choice. */
+    /** off | forced-only | foreign-audio | on (the older always / auto mapped), for when the server sent no track choice. */
     val preferredSubtitleMode: String? = null,
     /** Audio language (`playback.preferredAudioLanguage`). */
     val preferredAudioLanguage: String? = null,
@@ -134,6 +135,7 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
         preferredSubtitleMode = when (val mode = d?.preferredSubtitleMode?.ifEmpty { null } ?: u?.preferredSubtitleMode) {
             "always" -> "on"
             "auto" -> "forced-only"
+            "smart", "foreign" -> ClientTrackSelector.FOREIGN_AUDIO
             "" -> null
             else -> mode
         },

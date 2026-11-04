@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import com.strmr.tv.app.App
 
 /**
- * Settings › Playback's track choices on this device: Subtitles (off / forced-only / on),
+ * Settings › Playback's track choices on this device: Subtitles (off / forced-only / foreign-audio / on),
  * Subtitle Translation, Subtitle Language, Audio Language and Audio Format. Each is null for Default, which
  * follows the server (the profile's playback settings, `/api/settings` for translation);
  * a value overrides it here. The player picks tracks itself when an override differs from
@@ -22,7 +22,7 @@ object TrackOverrides {
     private const val AUDIO_LANGUAGE = "audioLanguage"
     private const val LOSSLESS_AUDIO = "losslessAudio"
 
-    val modes = listOf("off", "forced-only", "on")
+    val modes = listOf("off", "forced-only", ClientTrackSelector.FOREIGN_AUDIO, "on")
 
     var subtitleMode by mutableStateOf(string(MODE))
         private set
@@ -59,6 +59,8 @@ object TrackOverrides {
     fun modeName(mode: String?): String = when (mode) {
         "off" -> "Off"
         "forced-only" -> "Forced Only"
+        // Forced subtitles for audio in your language, full ones for any other.
+        ClientTrackSelector.FOREIGN_AUDIO -> "Foreign Audio"
         "on" -> "On"
         else -> "Not set"
     }

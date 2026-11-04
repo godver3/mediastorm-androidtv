@@ -86,9 +86,12 @@ object ManualTracks {
         "sdh" in it || "deaf" in it || "hard of hearing" in it
     }
 
-    /** The subtitle track preselected for the language and mode (off when unset); null is Off. */
-    fun defaultSubtitle(tracks: List<ProbedSubtitleTrack>, preferred: String?, mode: String?): Int? {
-        val m = mode ?: "off"
+    /**
+     * The subtitle track preselected for the language and mode (off when unset); null is Off.
+     * `audioLanguage`, the preselected audio's, resolves foreign-audio.
+     */
+    fun defaultSubtitle(tracks: List<ProbedSubtitleTrack>, preferred: String?, mode: String?, audioLanguage: String? = null): Int? {
+        val m = ClientTrackSelector.resolveMode(mode, audioLanguage, preferred) ?: "off"
         if (m == "off" || tracks.isEmpty() || preferred.isNullOrBlank()) return null
         fun matches(t: ProbedSubtitleTrack) = matchesLanguage(t.language, t.title, preferred)
         if (m == "forced-only") return tracks.firstOrNull { it.forced && matches(it) }?.index

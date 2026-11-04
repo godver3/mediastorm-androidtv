@@ -15,7 +15,7 @@ import com.strmr.tv.api.TrackSelection
 data class EffectiveTracks(
     val audioLanguage: String?,
     val subtitleLanguage: String?,
-    /** off | forced-only | on */
+    /** off | forced-only | foreign-audio | on (foreign-audio is resolved against the playing audio) */
     val subtitleMode: String?,
     val allowedLanguages: List<String>,
     val clientAudio: Boolean,
@@ -35,7 +35,9 @@ data class EffectiveTracks(
         ): EffectiveTracks {
             val serverAudio = if (selection != null) selection.audioLanguage?.ifEmpty { null } else playback?.preferredAudioLanguage
             val serverLanguage = if (selection != null) selection.subtitleLanguage?.ifEmpty { null } else playback?.preferredSubtitleLanguage
-            val serverMode = selection?.subtitleMode?.ifEmpty { null } ?: playback?.preferredSubtitleMode
+            // A server mode resolved from foreign-audio is resolved again against this device's audio.
+            val serverMode = selection?.subtitleModePreference?.ifEmpty { null } ?: selection?.subtitleMode?.ifEmpty { null }
+                ?: playback?.preferredSubtitleMode
             fun differs(override: String?, server: String?) =
                 override != null && (server == null || !ClientTrackSelector.matchesLanguage(server, "", override))
             // French (Canada) here and plain French on the server (or the reverse) pick different dubs.

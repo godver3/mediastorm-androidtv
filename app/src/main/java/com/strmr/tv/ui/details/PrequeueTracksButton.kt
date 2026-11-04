@@ -108,7 +108,10 @@ class PrequeueTracks(val model: DetailsModel) {
         val d = defaults(status)
         val audioIndex = chosen.audio ?: pre?.audio ?: ManualTracks.defaultAudio(lists.audio, d.audioLanguage, d.losslessAudio)
         val subtitleIndex = when (chosen.subtitle) {
-            null -> if (pre != null) pre.subtitle else ManualTracks.defaultSubtitle(lists.subtitles, d.subtitleLanguage, d.subtitleMode)
+            null -> if (pre != null) pre.subtitle else ManualTracks.defaultSubtitle(
+                lists.subtitles, d.subtitleLanguage, d.subtitleMode,
+                (lists.audio.firstOrNull { it.index == audioIndex } ?: lists.audio.firstOrNull())?.language,
+            )
             ManualTrackChoice.OFF -> null
             else -> chosen.subtitle
         }

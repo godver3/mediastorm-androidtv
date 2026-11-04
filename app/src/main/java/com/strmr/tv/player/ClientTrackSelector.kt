@@ -10,9 +10,26 @@ import java.util.Locale
  * Lossless puts TrueHD, then DTS / FLAC / PCM, first) and
  * subtitle priorities (forced tracks only for forced-only; for on, non-forced SDH, then
  * full / plain or dubtitles depending on the audio language, then non-signs, then signs,
- * then a forced track). Indices are positions in the given lists; -1 is none.
+ * then a forced track; foreign-audio is forced-only or on by [resolveMode]). Indices are
+ * positions in the given lists; -1 is none.
  */
 object ClientTrackSelector {
+    /** Forced subtitles when the audio is in the viewer's language, full ones when it is not. */
+    const val FOREIGN_AUDIO = "foreign-audio"
+
+    /**
+     * The server's `ResolveForeignAudioMode` for [FOREIGN_AUDIO] (other modes unchanged): `on`
+     * when the audio's language is known and is not the subtitle language (else the preferred
+     * audio language), otherwise `forced-only`. Untagged audio counts as the viewer's language.
+     */
+    fun resolveMode(mode: String?, audioLanguage: String?, subtitleLanguage: String?, preferredAudio: String? = null): String? {
+        if (mode != FOREIGN_AUDIO) return mode
+        val mine = subtitleLanguage?.trim()?.ifEmpty { null } ?: preferredAudio?.trim()?.ifEmpty { null }
+        val audio = audioLanguage.orEmpty().trim().lowercase()
+        if (mine == null || audio.isEmpty() || audio == "und" || matchesLanguage(audio, "", mine)) return "forced-only"
+        return "on"
+    }
+
     data class Audio(val language: String?, val title: String, val codec: String)
     data class Subtitle(val language: String?, val title: String, val codec: String, val forced: Boolean)
 
@@ -117,6 +134,7 @@ object ClientTrackSelector {
     private fun forced(s: Subtitle) = s.forced || "forced" in s.title.lowercase()
 
     fun findSubtitle(tracks: List<Subtitle>, preferred: String?, mode: String?, audioLanguage: String?): Int {
+        val mode = resolveMode(mode, audioLanguage, preferred)
         if (tracks.isEmpty() || mode == null || mode == "off") return -1
         val selectable = tracks.withIndex().filter { !isUnsupported(it.value.codec) }
         if (selectable.isEmpty()) return -1

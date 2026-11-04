@@ -55,8 +55,12 @@ class TrackPreferences(private val selection: TrackSelection?, private val effec
         val text = tracks.ofType(C.TRACK_TYPE_TEXT).filter { it.supported && !isClosedCaption(it.format) }
         val pick = if (effective?.clientSubtitles == true) {
             val audioLanguage = audioPick?.format?.language ?: selection?.audio?.language ?: effective.audioLanguage
+            // foreign-audio follows what plays: with no pick, ExoPlayer's first audio track.
+            val playing = audioPick?.format?.language ?: selection?.audio?.language ?: audio.firstOrNull()?.format?.language
+            val mode = ClientTrackSelector.resolveMode(effective.subtitleMode, playing, effective.subtitleLanguage,
+                                                       effective.audioLanguage)
             text.getOrNull(ClientTrackSelector.findSubtitle(text.map { it.format.subtitleCandidate() },
-                                                            effective.subtitleLanguage, effective.subtitleMode, audioLanguage))
+                                                            effective.subtitleLanguage, mode, audioLanguage))
         } else {
             subtitle?.let { match(it, text) }
         }

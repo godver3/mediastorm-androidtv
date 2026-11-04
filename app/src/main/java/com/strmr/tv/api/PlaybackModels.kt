@@ -91,8 +91,10 @@ data class TrackSelection(
     val textSubtitle: SelectedTrack? = null,
     val audioLanguage: String? = null,
     val subtitleLanguage: String? = null,
-    /** off | forced-only | on */
+    /** off | forced-only | on (a `foreign-audio` preference arrives resolved to one of these) */
     val subtitleMode: String? = null,
+    /** `foreign-audio` when [subtitleMode] was resolved from it, to re-resolve on other audio. */
+    val subtitleModePreference: String? = null,
 )
 
 /**

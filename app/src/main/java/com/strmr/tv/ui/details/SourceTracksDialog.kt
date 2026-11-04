@@ -82,7 +82,8 @@ fun SourceTracksDialog(
     val subtitles = tracks?.subtitles?.let { list -> ManualTracks.allowed(list, defaults?.allowed.orEmpty()) { it.language } }.orEmpty()
     val defaultAudio = if (preselected != null) preselected.audio else ManualTracks.defaultAudio(audio, defaults?.audioLanguage, defaults?.losslessAudio == true)
     val defaultSubtitle = if (preselected != null) preselected.subtitle
-        else ManualTracks.defaultSubtitle(subtitles, defaults?.subtitleLanguage, defaults?.subtitleMode)
+        else ManualTracks.defaultSubtitle(subtitles, defaults?.subtitleLanguage, defaults?.subtitleMode,
+                                          (audio.firstOrNull { it.index == defaultAudio } ?: audio.firstOrNull())?.language)
     val selectedAudio = choice.audio ?: defaultAudio
     val selectedSubtitle = when (choice.subtitle) {
         null -> defaultSubtitle
