@@ -52,6 +52,7 @@ import androidx.tv.material3.Text
 import com.strmr.tv.live.EpgProgram
 import com.strmr.tv.live.LiveCatchups
 import com.strmr.tv.live.LiveChannel
+import com.strmr.tv.live.LiveGuideData
 import com.strmr.tv.live.LiveRecordings
 import com.strmr.tv.live.LiveStore
 import com.strmr.tv.live.Recording
@@ -60,7 +61,7 @@ import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.PageMargin
 
 private const val SPAN = 2 * 3_600_000L
-private const val STEP = LiveStore.HALF_HOUR
+private const val STEP = LiveGuideData.HALF_HOUR
 private val CHANNEL_WIDTH = 150.dp
 private val ROW_HEIGHT = 40.dp
 private val INSET = PageMargin
@@ -105,14 +106,14 @@ private data class PendingFocus(val channel: String, val at: Long)
  */
 @Composable
 fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier, pick: LivePick? = null) {
-    var windowStart by remember { mutableLongStateOf(LiveStore.halfHour(now)) }
+    var windowStart by remember { mutableLongStateOf(LiveGuideData.halfHour(now)) }
     var focused by remember { mutableStateOf<Pair<LiveChannel, GuideCell>?>(null) }
     var pending by remember { mutableStateOf<PendingFocus?>(null) }
     var menuFor by remember { mutableStateOf<Pair<LiveChannel, EpgProgram?>?>(null) }
     val channels = store.visibleChannels
     // Back as far as the provider's catch-up reaches, else half an hour.
-    val earliest = LiveStore.halfHour(now) - LiveCatchups.guideHistory(channels)
-    val latest = LiveStore.halfHour(now) + 24 * 3_600_000L
+    val earliest = LiveGuideData.halfHour(now) - LiveCatchups.guideHistory(channels)
+    val latest = LiveGuideData.halfHour(now) + 24 * 3_600_000L
 
     Column(modifier) {
         InfoPanel(focused?.first ?: channels.firstOrNull(), focused?.second?.program, now)

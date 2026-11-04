@@ -33,8 +33,7 @@ sealed interface LiveFilter {
  * are dropped here. Favorites are listed only under the Favorites filter, not pinned to the top
  * of the others. Favorites and hidden channels live in the
  * profile's settings (`liveTV`), shared with the Expo app; the category selection is kept on
- * this device, per profile, and restored on return. Now / next and guide schedules are fetched
- * in batches for the channels on screen. Main thread only.
+ * this device, per profile, and restored on return. Guide data is [LiveGuideData]. Main thread only.
  */
 class LiveStore(private val scope: CoroutineScope) {
     data class Query(val filter: LiveFilter, val sourceId: String?, val search: String)
@@ -82,12 +81,9 @@ class LiveStore(private val scope: CoroutineScope) {
     /** null until known; the guide is offered only when the EPG is on. */
     var epgEnabled by mutableStateOf<Boolean?>(null)
         private set
-    /** Now / next by guide key. */
-    var nowNext by mutableStateOf<Map<String, EpgNowPlaying>>(emptyMap())
-        private set
-    /** Guide programmes by guide key, sorted, de-duplicated by start. */
-    var schedules by mutableStateOf<Map<String, List<EpgProgram>>>(emptyMap())
-        private set
+    /** Now / next and guide schedules for the channels on screen. */
+    val guide = LiveGuideData(scope) { epgEnabled == true }
+    val schedules get() = guide.schedules
 
     var hasMore = true
         private set
@@ -95,16 +91,6 @@ class LiveStore(private val scope: CoroutineScope) {
     private var loadedFor: Query? = null
     private var listsLoaded = false
     private var searchJob: Job? = null
-
-    private val nowNextFetched = mutableMapOf<String, Long>()
-    private val nowNextPending = mutableSetOf<String>()
-    private var nowNextJob: Job? = null
-
-    /** Guide data is fetched in fixed six-hour chunks from [guideBase], per key. */
-    val guideBase: Long = halfHour(System.currentTimeMillis()) - HALF_HOUR
-    private val chunksLoaded = mutableSetOf<String>()
-    private val chunksPending = mutableMapOf<Int, MutableSet<String>>()
-    private var chunkJob: Job? = null
     /** Waits out a server guide refresh, then re-fetches the guide data. */
     private var guideRefreshJob: Job? = null
 
@@ -276,88 +262,11 @@ class LiveStore(private val scope: CoroutineScope) {
         }
     }
 
-    // Now / next
+    // Guide data
 
-    /** Queues `channel` for a now / next fetch (re-fetched after two minutes). */
-    fun needNowNext(channel: LiveChannel) {
-        if (epgEnabled != true) return
-        val key = channel.tvgId?.ifEmpty { null } ?: return
-        val fetched = nowNextFetched[key]
-        if (fetched != null && System.currentTimeMillis() - fetched < 120_000) return
-        nowNextFetched[key] = System.currentTimeMillis()
-        nowNextPending += key
-        if (nowNextJob != null) return
-        nowNextJob = scope.launch {
-            delay(120)
-            val keys = nowNextPending.toList()
-            nowNextPending.clear()
-            nowNextJob = null
-            for (batch in keys.chunked(50)) {
-                try {
-                    nowNext = nowNext + ApiClient.epgNow(batch).associateBy { it.channelId }
-                } catch (e: Exception) {
-                    batch.forEach { nowNextFetched.remove(it) }
-                }
-            }
-        }
-    }
-
-    /** The programme on now, from the guide data or now / next. */
-    fun current(channel: LiveChannel, now: Long = System.currentTimeMillis()): EpgProgram? =
-        schedules[channel.guideKey]?.firstOrNull { it.isAiring(now) } ?: nowNext[channel.guideKey]?.current?.takeIf { it.isAiring(now) }
-
-    // Guide schedules
-
-    /** Queues the guide chunks covering `[from, to)` for `channel`. */
-    fun needSchedule(channel: LiveChannel, from: Long, to: Long) {
-        if (epgEnabled != true) return
-        val key = channel.guideKey
-        // Negative chunks lie before [guideBase]: the past, paged into for catch-up.
-        val first = Math.floorDiv(from - guideBase, CHUNK).toInt()
-        val last = maxOf(first, Math.floorDiv(to - guideBase - 1, CHUNK).toInt())
-        var queued = false
-        for (index in first..last) {
-            if (chunksLoaded.add("$index|$key")) {
-                chunksPending.getOrPut(index) { mutableSetOf() } += key
-                queued = true
-            }
-        }
-        if (!queued || chunkJob != null) return
-        chunkJob = scope.launch {
-            delay(150)
-            val pending = chunksPending.toSortedMap()
-            chunksPending.clear()
-            chunkJob = null
-            for ((index, keys) in pending) fetchChunk(index, keys.toList())
-        }
-    }
-
-    private suspend fun fetchChunk(index: Int, keys: List<String>) {
-        for (batch in keys.chunked(40)) {
-            val result = chunkPrograms(index, batch)
-            if (result != null) {
-                val merged = schedules.toMutableMap()
-                for (key in batch) merged[key] = merge(merged[key].orEmpty(), result[key].orEmpty())
-                schedules = merged
-            } else {
-                batch.forEach { chunksLoaded.remove("$index|$it") }
-            }
-        }
-    }
-
-    /** One chunk's programmes for up to 40 keys; null when the request failed. */
-    private suspend fun chunkPrograms(index: Int, keys: List<String>): Map<String, List<EpgProgram>>? {
-        val start = guideBase + index * CHUNK
-        val offset = Math.floorDiv(start - System.currentTimeMillis(), 60_000L).toInt()
-        return try {
-            // An hour over the chunk, so a clock skew can't leave a gap between chunks.
-            ApiClient.epgSchedule(keys, offset, (CHUNK / 3_600_000).toInt() + 1)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            com.strmr.tv.app.AppLog.w("Live", "guide chunk $index failed: ${e.message}")
-            null
-        }
-    }
+    fun needNowNext(channel: LiveChannel) = guide.needNowNext(channel)
+    fun current(channel: LiveChannel, now: Long = System.currentTimeMillis()) = guide.current(channel, now)
+    fun needSchedule(channel: LiveChannel, from: Long, to: Long) = guide.needSchedule(channel, from, to)
 
     // Refresh Guide & Channels
 
@@ -369,9 +278,9 @@ class LiveStore(private val scope: CoroutineScope) {
     suspend fun refresh() {
         guideRefreshJob?.cancel()
         ApiClient.clearLiveCache()
-        val guide = epgEnabled == true
+        val epgOn = epgEnabled == true
         var before: EpgStatus? = null
-        if (guide) {
+        if (epgOn) {
             before = runCatching { ApiClient.epgStatus() }.getOrNull()
             showNotice("Refreshing the guide…", clears = false)
             if (!ApiClient.startEpgRefresh()) {
@@ -379,10 +288,9 @@ class LiveStore(private val scope: CoroutineScope) {
                 before = null
             }
         }
-        nowNext = emptyMap()
-        nowNextFetched.clear()
+        guide.clearNowNext()
         reload(force = true)
-        if (!guide) {
+        if (!epgOn) {
             showNotice("Channels refreshed.")
             return
         }
@@ -404,7 +312,7 @@ class LiveStore(private val scope: CoroutineScope) {
             // never started) counts as done after a few polls.
             if (sawRefreshing || current.lastRefresh != before.lastRefresh || System.currentTimeMillis() - started > 12_000) break
         }
-        refetchGuideData()
+        guide.refetch()
         val error = status?.lastError
         if (!error.isNullOrEmpty() && status?.lastRefresh == before.lastRefresh) {
             showNotice("Guide refresh failed: $error")
@@ -413,50 +321,7 @@ class LiveStore(private val scope: CoroutineScope) {
         }
     }
 
-    /** Fetches every loaded guide chunk and now / next again, replacing what was there. */
-    private suspend fun refetchGuideData() {
-        val keysByChunk = chunksLoaded.mapNotNull { entry ->
-            val bar = entry.indexOf('|')
-            entry.take(bar).toIntOrNull()?.let { it to entry.substring(bar + 1) }
-        }.groupBy({ it.first }, { it.second })
-        val fresh = mutableMapOf<String, List<EpgProgram>>()
-        val failed = mutableSetOf<String>()
-        for ((index, keys) in keysByChunk.toSortedMap()) {
-            for (batch in keys.chunked(40)) {
-                val result = chunkPrograms(index, batch)
-                if (result == null) { failed += batch; continue }
-                for (key in batch) fresh[key] = merge(fresh[key].orEmpty(), result[key].orEmpty())
-            }
-        }
-        // Keys with a failed chunk keep their old programmes rather than losing part of the day.
-        schedules = schedules + fresh.filterKeys { it !in failed }
-
-        val updated = nowNext.toMutableMap()
-        for (batch in nowNext.keys.toList().chunked(50)) {
-            val entries = runCatching { ApiClient.epgNow(batch) }.getOrNull() ?: continue
-            for (entry in entries) {
-                updated[entry.channelId] = entry
-                nowNextFetched[entry.channelId] = System.currentTimeMillis()
-            }
-        }
-        nowNext = updated
-    }
-
-    companion object {
-        private const val PAGE = 250
-        const val HALF_HOUR = 1_800_000L
-        const val CHUNK = 6 * 3_600_000L
-
-        fun halfHour(ms: Long) = ms - ms % HALF_HOUR
-
-        /** Sorted by start, one programme per start time, each cut off where the next begins. */
-        private fun merge(old: List<EpgProgram>, new: List<EpgProgram>): List<EpgProgram> {
-            val sorted = (old + new).filter { it.stopMs > it.startMs }.associateBy { it.startMs }.values.sortedBy { it.startMs }
-            sorted.forEachIndexed { i, p ->
-                p.endMs = p.stopMs
-                sorted.getOrNull(i + 1)?.let { next -> if (next.startMs < p.stopMs) p.endMs = next.startMs }
-            }
-            return sorted
-        }
+    private companion object {
+        const val PAGE = 250
     }
 }

@@ -89,7 +89,7 @@ data class EpgProgram(
     /** Epoch milliseconds; a programme that doesn't parse has no length. */
     @Transient val startMs: Long = parse(start)
     @Transient val stopMs: Long = parse(stop)
-    /** The stop as the guide shows it: cut where the next programme starts (see LiveStore.merge). */
+    /** The stop as the guide shows it: cut where the next programme starts (see LiveGuideData.merge). */
     @Transient var endMs: Long = stopMs
 
     fun isAiring(now: Long = System.currentTimeMillis()) = now in startMs until endMs

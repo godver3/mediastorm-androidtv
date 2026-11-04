@@ -7,7 +7,6 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.Cue
@@ -21,19 +20,16 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.StartPoint
 import com.strmr.tv.api.mediaHeaders
-import com.strmr.tv.api.reportProgress
 import com.strmr.tv.app.AppLog
 import com.strmr.tv.live.LiveCatchups
 import com.strmr.tv.player.dv7.Dv7Playback
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * One playback: ExoPlayer on the raw stream (platform decoders first, the FFmpeg extension
@@ -91,10 +87,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     private var audioRetried = false
     /** The playback's main-thread scope, cancelled shortly after [release]. */
     val scope = MainScope()
-    private var progressJob: Job? = null
-    /** The latest progress report in flight, which pages reloading after playback wait on. */
-    private var lastReport: Job? = null
-    private val progressLog = ProgressLog(request.title.name + (request.episode?.let { " · ${it.code}" } ?: ""))
+    private val progress: ProgressReporter
     /** A downloaded or translated subtitle, drawn in place of ExoPlayer's cues while selected. */
     val external = ExternalSubtitles(scope, { player.currentPosition }) { cues.value = it }
     val online = OnlineSubtitles(this, scope)
@@ -123,7 +116,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             isPlaying.value = playing
             if (playing) {
                 liveRetune?.playing()
-                startProgress()
+                progress.start()
             } else if (player.playbackState == Player.STATE_READY) report(paused = true)
         }
 
@@ -226,6 +219,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             .setSeekForwardIncrementMs(10_000)
             .build()
         player.addListener(listener)
+        progress = ProgressReporter(player, session, scope) { autoSwitch.trigger(it) }
         recordingHls = session.growingRestart?.let { RecordingHls(player, scope, session.liveSessionId, it) }
         liveRetune = session.retuneLive?.let {
             LiveRetune(player, scope, session.liveSessionId, session.liveChannel, it, ::liveGaveUp, session.liveStream) { next ->
@@ -313,89 +307,8 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         ended.value = true
     }
 
-    private fun startProgress() {
-        if (progressJob?.isActive == true) return
-        progressJob = scope.launch {
-            while (isActive) {
-                delay(10_000)
-                if (player.isPlaying) report()
-            }
-        }
-    }
-
-    /** Position and duration in seconds, or null before the duration is known. */
-    private fun times(): Pair<Double, Double>? {
-        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return null
-        return player.currentPosition / 1000.0 to duration / 1000.0
-    }
-
-    fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) {
-        if (!session.reportsProgress) return
-        val (position, duration) = times() ?: return
-        val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath, stream = streamHealth())
-        val kind = when {
-            ended -> ProgressLog.Kind.END
-            closing -> ProgressLog.Kind.CLOSE
-            paused -> ProgressLog.Kind.PAUSE
-            else -> ProgressLog.Kind.PERIODIC
-        }
-        lastReport = scope.launch {
-            withContext(NonCancellable) {
-                try {
-                    val reply = ApiClient.reportProgress(body)
-                    progressLog.saved(kind, position, duration, reply)
-                    if (reply.migrationRequested && !ended && !closing) {
-                        autoSwitch.trigger("server: ${reply.migrationReason ?: "migration requested"}")
-                    }
-                } catch (e: Exception) {
-                    progressLog.failed(kind, position, duration, e)
-                }
-            }
-        }
-    }
-
-    private fun streamHealth() = StreamHealth(
-        buffering = player.playbackState == Player.STATE_BUFFERING,
-        bufferAheadSeconds = player.totalBufferedDuration / 1000.0,
-        requiredMbps = player.videoFormat?.bitrate?.takeIf { it > 0 }?.let { it / 1_000_000.0 },
-    )
-
-    /** `byUser`: picked in a menu, which stops a running automatic subtitle search. */
-    fun select(track: PlayerTrack, byUser: Boolean = true) {
-        if (track.group.type == C.TRACK_TYPE_TEXT) {
-            if (byUser) online.userChose()
-            external.deselect()
-        }
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(track.group.type, false)
-            .setOverrideForType(TrackSelectionOverride(track.group.mediaTrackGroup, track.index))
-            .build()
-    }
-
-    fun subtitlesOff() {
-        online.userChose()
-        external.deselect()
-        disableEmbeddedSubtitles()
-    }
-
-    private fun disableEmbeddedSubtitles() {
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
-        cues.value = emptyList()
-    }
-
-    /** The loaded external track, picked in the Subtitles menu. */
-    fun selectExternal() {
-        online.userChose()
-        disableEmbeddedSubtitles()
-        external.select()
-    }
-
-    /** A new external track (downloaded or translated), shown in place of the stream's subtitles. */
-    fun showExternal(track: ExternalTrack) {
-        disableEmbeddedSubtitles()
-        external.show(track)
-    }
+    fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) =
+        progress.report(paused, ended, closing)
 
     /**
      * Switch Source: the position and the playing audio / subtitle languages go with the
@@ -417,7 +330,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         thumbnails?.cancel()
         upNext?.cancel()
         autoSwitch.cancel()
-        progressJob?.cancel()
+        progress.stop()
         // Each stops its server session.
         recordingHls?.release()
         catchup?.release()
@@ -426,7 +339,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         player.release()
         // Let the last report finish on its own.
         MainScope().launch { delay(5_000); scope.cancel() }
-        return lastReport
+        return progress.lastReport
     }
 }
 
