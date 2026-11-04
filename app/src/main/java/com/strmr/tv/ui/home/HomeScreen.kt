@@ -115,10 +115,10 @@ private fun HomePage(store: HomeStore, memory: HomeFocusMemory, tabsFocused: () 
     var menuError by remember { mutableStateOf<String?>(null) }
     /** Bumped after a title action reloads the rows: focus returns to the rows if the focused card left. */
     var refocus by remember { mutableIntStateOf(0) }
-    /** The row shown, which sizes the rows area under the full hero. */
+    /** The row shown, which sizes the rows area under hero text. */
     var shownRow by remember { mutableStateOf<String?>(null) }
-    /** Focused Title Info with the full hero shows one shelf to a screen; with Swap it fades from row to row. */
-    val oneShelf = layout.focusedInfo && layout.effectiveHeroSize == HeroSize.FULL &&
+    /** Focused Title Info with hero text shows one shelf to a screen; with Swap it fades from row to row. */
+    val oneShelf = layout.focusedInfo && layout.effectiveHeroSize.oneShelf &&
         layout.shelfTransition == ShelfTransition.SWAP
     val rowFade = remember { Animatable(1f) }
 
@@ -206,12 +206,12 @@ private fun HomePage(store: HomeStore, memory: HomeFocusMemory, tabsFocused: () 
 private fun ClassicHome(hero: HeroContent?, rowHeight: Dp, fade: Animatable<Float, AnimationVector1D>, rows: @Composable (Modifier) -> Unit) {
     val layout = HomeLayoutStore
     val size = layout.effectiveHeroSize
-    val full = size == HeroSize.FULL
+    val full = size.oneShelf
     Box(Modifier.fillMaxSize()) {
         HeroBackdrop(hero)
-        // As on tvOS: with the full hero, the rows area is exactly the shown row's height above
+        // As on tvOS: under hero text, the rows area is exactly the shown row's height above
         // the bottom safe area, so that shelf sits on the bottom edge and nothing peeks in under
-        // it; it changes size while the page is faded out between rows. A smaller hero sits under
+        // it; it changes size while the page is faded out between rows. Hero Size Off sits under
         // the tab bar and the rows run to the screen's bottom edge, so more of them show.
         Column(
             Modifier.fillMaxSize().padding(top = if (full) 0.dp else TAB_BAR_CLEARANCE, bottom = if (full) SAFE_BOTTOM else 0.dp)
@@ -243,8 +243,8 @@ private fun HomeStatus(store: HomeStore, modifier: Modifier): Boolean {
     return true
 }
 
-/** Room above a smaller hero for the tab bar (tvOS: the 60 pt safe area plus 90). */
+/** Room above the rows under Hero Size Off for the tab bar (tvOS: the 60 pt safe area plus 90). */
 internal val TAB_BAR_CLEARANCE = 75.dp
 
-/** The bottom safe area the full hero's row sits on (tvOS 60 pt). */
+/** The bottom safe area the row under hero text sits on (tvOS 60 pt). */
 internal val SAFE_BOTTOM = 30.dp

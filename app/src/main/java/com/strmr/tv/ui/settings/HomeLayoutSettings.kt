@@ -85,8 +85,8 @@ fun HomeLayoutSettings() {
                     s.chooseHeroSize(cycleNullable(s.heroSize, HeroSize.entries))
                 }
             }
-            // The full hero shows one shelf to a screen: Slide scrolls to the next, Swap fades to it.
-            if (options.showsHeroSize && s.effectiveHeroSize == HeroSize.FULL) item {
+            // Hero text shows one shelf to a screen: Slide scrolls to the next, Swap fades to it.
+            if (options.showsHeroSize && s.effectiveHeroSize.oneShelf) item {
                 Choice("Shelf Transition", s.shelfTransition.label) {
                     s.chooseShelfTransition(cycle(s.shelfTransition, ShelfTransition.entries))
                 }

@@ -13,9 +13,16 @@ const val CAROUSEL_LOG = "HomeCarousel"
 /** Where the focused card sits in a Home row once it has scrolled to it (`homeShelfFocusModel`). */
 enum class FocusedCardPosition(val label: String) { LEFT("Left"), CENTER("Center"), RIGHT("Right") }
 
-/** How much of Home the hero (logo, line, overview) takes above the rows. */
+/** How much the hero (logo, line, overview) says above the focused row. */
 enum class HeroSize(val label: String) {
     FULL("Full"), COMPACT("Compact"), MINIMAL("Minimal"), OFF("Off");
+
+    /**
+     * Focused Title Info is one shelf to a screen: the hero's text over the focused row alone, on
+     * the bottom safe area, the rows above and below it out of sight. Every size with text is;
+     * Off, with none, lists the rows under the menu.
+     */
+    val oneShelf: Boolean get() = this != OFF
 
     companion object {
         /** The size nearest the profile's `homeHeroScale` (0.5–1). */
@@ -26,7 +33,7 @@ enum class HeroSize(val label: String) {
 enum class HeroTextSize(val label: String, val scale: Float) { SMALL("Small", 0.85f), MEDIUM("Medium", 1f), LARGE("Large", 1.15f) }
 
 /**
- * How Focused Title Info's full hero, one shelf to a screen, moves between shelves (and from the
+ * How Focused Title Info, one shelf to a screen, moves between shelves (and from the
  * carousel's controls into the first one): the rows scroll, or the page fades out, the next shelf
  * takes the place and it fades back in.
  */
@@ -168,7 +175,7 @@ object HomeLayoutStore {
     /** "Focused Title Info": the Classic hero (backdrop, logo, line, synopsis) following the focused card. On by default. */
     var focusedInfo by mutableStateOf(prefs.getBoolean(FOCUSED_INFO, true))
         private set
-    /** "Shelf Transition" under the full hero (device only): Slide by default. */
+    /** "Shelf Transition" under hero text (device only): Slide by default. */
     var shelfTransition by mutableStateOf(enumOrNull<ShelfTransition>("shelfTransition") ?: ShelfTransition.SLIDE)
         private set
     /**

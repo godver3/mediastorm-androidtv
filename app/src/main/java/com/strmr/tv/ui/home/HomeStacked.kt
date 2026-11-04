@@ -41,8 +41,8 @@ class CarouselSetup(val shelf: HomeShelf?, val slides: List<HomeCard>, val focus
  * With the carousel the page is Classic's "hero + first shelf": the slide's art and its logo,
  * line and synopsis are fixed layers, and its buttons and dots are the rows' first item, at the
  * bottom safe area. Down scrolls that item away as a shelf scrolls and the first row lands
- * where Classic puts it (Focused Title Info on: on the bottom safe area under the Full hero,
- * else under a smaller one; off: under the menu), while the art crossfades to the focused card's
+ * where Classic puts it (Focused Title Info on: on the bottom safe area under the hero text,
+ * or under the menu with Hero Size Off; off: under the menu), while the art crossfades to the focused card's
  * backdrop (or the page background) and the slide info to the card's (or out). Up reverses it.
  * The crossfades are one alpha read in the draw phase: nothing recomposes per frame.
  */
@@ -74,14 +74,14 @@ internal fun StackedHome(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val size = layout.effectiveHeroSize
         val textScale = layout.heroTextSize.scale
-        val full = size == HeroSize.FULL
+        val full = size.oneShelf
         val gap = if (size == HeroSize.OFF) 0.dp else 18.dp
-        // Where Classic puts the focused row: on the bottom safe area under the full hero, else under a smaller one.
+        // Where Classic puts the focused row: on the bottom safe area under hero text, else under the menu.
         // The shown row's height (as Classic's), the tallest row's on the carousel: with Slide it
         // resizes with the scroll, with Swap while the page is faded out between places.
         val rowHeight by animateDpAsState(layout.fullHeroRowHeight(slots, shownRow), rowResize(layout.shelfTransition), label = "rowsArea")
         val infoRowTop = if (full) maxHeight - SAFE_BOTTOM - rowHeight else TAB_BAR_CLEARANCE + heroHeight(size, textScale) + gap
-        // The rows area, clipped as Classic's: one row tall over the safe area under the full hero, else to the bottom.
+        // The rows area, clipped as Classic's: one row tall over the safe area under hero text, else to the bottom.
         val areaTop = if (info) infoRowTop else menuTop
         val areaBottom = if (info && full) SAFE_BOTTOM else 0.dp
         val areaHeight = maxHeight - areaTop - areaBottom
@@ -100,7 +100,7 @@ internal fun StackedHome(
         )
         if (info) InfoText(hero, size, textScale, infoRowTop - gap - heroHeight(size, textScale), toRows, fade)
         // The controls' item runs FOCUS_ROOM past the rows area under the buttons, so a focused
-        // button isn't cut off at its foot (with the full hero that is the bottom safe area).
+        // button isn't cut off at its foot (under hero text that is the bottom safe area).
         // Peeking, the buttons sit inside the area and it is the plain clip.
         val header = RowsHeader(carousel.focus, active, tail = if (info) areaHeight else 0.dp, overflow = if (peeking) 0.dp else FOCUS_ROOM) { onDown ->
             if (peeking) {
