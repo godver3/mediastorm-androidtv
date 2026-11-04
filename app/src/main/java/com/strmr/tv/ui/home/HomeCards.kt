@@ -65,7 +65,11 @@ import com.strmr.tv.ui.captionGap
  * card is the same height, 135 dp at the Large size; posters are 2:3, landscape cards 16:9,
  * and an expanding poster opens to 16:9 at the same height.
  */
-data class CardMetrics(val style: ShelfStyle, val scale: Double, val text: CardText) {
+data class CardMetrics(
+    val style: ShelfStyle, val scale: Double, val text: CardText,
+    /** An opened poster draws the title's logo, line and overview (Show Info When Expanded). */
+    val expandedInfo: Boolean = false,
+) {
     /** The title and line go under the card. */
     val captions: Boolean get() = text == CardText.BELOW
     val height: Dp get() = Math.round(BASE_HEIGHT * scale).toFloat().dp
@@ -94,7 +98,7 @@ data class CardMetrics(val style: ShelfStyle, val scale: Double, val text: CardT
 /** A row's card geometry: its style, at that style's own card size (else Card Size). */
 fun HomeLayoutStore.metrics(shelf: String): CardMetrics {
     val style = style(shelf)
-    return CardMetrics(style, cardScale(style), cardText)
+    return CardMetrics(style, cardScale(style), cardText, expandedCardInfo && style == ShelfStyle.EXPANDING_POSTER)
 }
 
 /** The tallest row on the page. */
@@ -194,7 +198,10 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
         // Inset as tvOS places them: closer to the edge on the narrower poster.
         val inset = if (wide) 8.dp else 5.dp
         val progress = showsProgress(card.progress)
-        if (metrics.text.overlays(wide) && card.drawable == null && !card.logoTile) {
+        val info = metrics.expandedInfo && wide && card.target != null && card.drawable == null && !card.logoTile
+        if (info) {
+            ExpandedCardInfo(card, metrics.height, progress, Modifier.align(Alignment.BottomStart))
+        } else if (metrics.text.overlays(wide) && card.drawable == null && !card.logoTile) {
             CardOverlay(card.title, card.subtitle, inset, progress, Modifier.align(Alignment.BottomStart))
         }
         // A poster's "New" sits above its other badge; a 16:9 card's at the top right (as Expo).

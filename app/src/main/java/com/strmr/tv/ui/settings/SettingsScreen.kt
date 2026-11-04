@@ -95,8 +95,14 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
     var pickingLogoScale by remember { mutableStateOf(false) }
     if (pickingLogoScale) {
         val options = LogoSettings.Scale.entries
-        PickerDialog("Title Logo Size", options.map { it.label }, LogoSettings.scale.ordinal,
+        PickerDialog("Home Title Logo Size", options.map { it.label }, LogoSettings.scale.ordinal,
                      onPick = { LogoSettings.set(options[it]) }, onDismiss = { pickingLogoScale = false })
+    }
+    var pickingDetailsLogoScale by remember { mutableStateOf(false) }
+    if (pickingDetailsLogoScale) {
+        val options = LogoSettings.Scale.entries
+        PickerDialog("Details Title Logo Size", options.map { it.label }, LogoSettings.detailsScale.ordinal,
+                     onPick = { LogoSettings.setDetails(options[it]) }, onDismiss = { pickingDetailsLogoScale = false })
     }
     LazyColumn(
         // Clipped below the tab bar, so rows never scroll under it.
@@ -156,9 +162,17 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
         item {
             ListItem(
                 selected = false, onClick = { pickingLogoScale = true },
-                headlineContent = { Text("Title Logo Size") },
-                supportingContent = { Text("Titles' logos on Home and details pages") },
+                headlineContent = { Text("Home Title Logo Size") },
+                supportingContent = { Text("Titles' logos in Home's hero and carousel") },
                 trailingContent = { Text(LogoSettings.scale.label) },
+            )
+        }
+        item {
+            ListItem(
+                selected = false, onClick = { pickingDetailsLogoScale = true },
+                headlineContent = { Text("Details Title Logo Size") },
+                supportingContent = { Text("Titles' logos on details pages") },
+                trailingContent = { Text(LogoSettings.detailsScale.label) },
             )
         }
         item { Header("Appearance") }

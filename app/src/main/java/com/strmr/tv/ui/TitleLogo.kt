@@ -13,13 +13,16 @@ import coil.compose.SubcomposeAsyncImage
 import com.strmr.tv.ui.settings.LogoSettings
 
 /**
- * A title's logo fitted (bottom-start) in [width] x [height] at Title Logo Size
+ * A title's logo fitted (bottom-start) in [width] x [height] at [place]'s Title Logo Size
  * ([LogoSettings]); holds that slot while loading. If the logo fails, [fallback] (the name)
  * is drawn at its own size, not squeezed into a scaled-down slot.
  */
 @Composable
-fun TitleLogo(url: String, title: String, width: Dp, height: Dp, modifier: Modifier = Modifier, fallback: @Composable () -> Unit) {
-    val factor = LogoSettings.scale.factor
+fun TitleLogo(
+    url: String, title: String, width: Dp, height: Dp, modifier: Modifier = Modifier,
+    place: LogoSettings.Place = LogoSettings.Place.HOME, fallback: @Composable () -> Unit,
+) {
+    val factor = LogoSettings.scale(place).factor
     val slot = Modifier.size(width * factor, height * factor)
     SubcomposeAsyncImage(model = url, contentDescription = title, modifier = modifier) {
         when (painter.state) {

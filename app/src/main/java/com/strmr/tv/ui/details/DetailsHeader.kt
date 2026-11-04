@@ -51,6 +51,7 @@ import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ContentMargin
 import com.strmr.tv.ui.ExpandableText
 import com.strmr.tv.ui.TitleLogo
+import com.strmr.tv.ui.settings.LogoSettings
 import com.strmr.tv.ui.home.BadgeLabel
 import kotlinx.coroutines.launch
 
@@ -91,7 +92,7 @@ fun BoxScope.DetailsHeader(
     ) {
         val logo = Artwork.logo(model.title?.logo?.url ?: target.logoUrl)
         if (logo != null) {
-            TitleLogo(logo, target.name, width = 340.dp, height = 96.dp) { TitleText(target.name) }
+            TitleLogo(logo, target.name, width = 340.dp, height = 96.dp, place = LogoSettings.Place.DETAILS) { TitleText(target.name) }
         } else {
             TitleText(target.name)
         }

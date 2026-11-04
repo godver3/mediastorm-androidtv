@@ -122,6 +122,10 @@ fun HomeLayoutSettings() {
             if (s.usesExpandingPosters) item {
                 Choice("Animate Expansion", onOff(s.animateExpansion)) { s.chooseAnimateExpansion(!s.animateExpansion) }
             }
+            // The title's logo, line and overview on the opened card.
+            if (s.usesExpandingPosters) item {
+                Choice("Show Info When Expanded", onOff(s.expandedCardInfo)) { s.chooseExpandedCardInfo(!s.expandedCardInfo) }
+            }
             if (s.shelves.isNotEmpty()) item { Header("Rows") }
             items(s.shelves, key = { it.id }) { shelf ->
                 val hidden = s.isHidden(shelf.id)

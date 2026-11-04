@@ -164,6 +164,12 @@ object HomeLayoutStore {
      */
     var animateExpansion by mutableStateOf(prefs.getBoolean(ANIMATE_EXPANSION, true))
         private set
+    /**
+     * "Show Info When Expanded": an opened poster draws the title's logo, its year / rating /
+     * genre line and overview over its art (device only, off by default).
+     */
+    var expandedCardInfo by mutableStateOf(prefs.getBoolean(EXPANDED_CARD_INFO, false))
+        private set
     init { migrateHomeStyle() }
 
     /**
@@ -228,6 +234,7 @@ object HomeLayoutStore {
         prefs.edit().apply { if (v == null) remove("expandPosters") else putBoolean("expandPosters", v) }.apply()
     }
     fun chooseAnimateExpansion(v: Boolean) { animateExpansion = v; prefs.edit().putBoolean(ANIMATE_EXPANSION, v).apply() }
+    fun chooseExpandedCardInfo(v: Boolean) { expandedCardInfo = v; prefs.edit().putBoolean(EXPANDED_CARD_INFO, v).apply() }
     fun chooseHeroSize(v: HeroSize?) { heroSize = v; putEnum("heroSize", v) }
     fun chooseTopCarousel(v: Boolean) {
         topCarousel = v; prefs.edit().putBoolean(TOP_CAROUSEL, v).apply()
@@ -299,6 +306,7 @@ object HomeLayoutStore {
     private const val FOCUSED_INFO = "focusedInfo"
     private const val STYLE_CARD_SIZES = "styleCardSizes"
     private const val ANIMATE_EXPANSION = "animateExpansion"
+    private const val EXPANDED_CARD_INFO = "expandedCardInfo"
 
     private inline fun <reified E : Enum<E>> enumOrNull(key: String): E? =
         prefs.getString(key, null)?.let { name -> enumValues<E>().firstOrNull { it.name == name } }
