@@ -22,9 +22,25 @@ class CatchupRulesTest {
     }
 
     @Test
-    fun nearLiveGoesLive() {
-        assertEquals(CatchupRules.Seek.Live, CatchupRules.decide(now - 5_000, now, null, programs, week))
-        assertEquals(CatchupRules.Seek.Live, CatchupRules.decide(now - 40_000, now, null, programs, week))
+    fun nearLiveInTheWindowStaysLive() {
+        val window = CatchupRules.Span(startWallMs = now - 60_000, endWallMs = now)
+        assertEquals(CatchupRules.Seek.Live, CatchupRules.decide(now - 5_000, now, window, programs, week))
+    }
+
+    @Test
+    fun rewindFromAFreshTuneReachesAMinuteBack() {
+        // One 10 s press back with nothing held: a minute back, into the archive.
+        assertEquals(CatchupRules.Seek.Archive(game, 29 * 60_000), CatchupRules.decide(now - 10_000, now, null, programs, week))
+        assertEquals(CatchupRules.Seek.Archive(game, 29 * 60_000), CatchupRules.decide(now - 40_000, now, null, programs, week))
+        // Just before a short timeshift window: also a minute back.
+        val window = CatchupRules.Span(startWallMs = now - 20_000, endWallMs = now)
+        assertEquals(CatchupRules.Seek.Archive(game, 29 * 60_000), CatchupRules.decide(now - 30_000, now, window, programs, week))
+    }
+
+    @Test
+    fun forwardPastTheArchiveNearNowGoesLive() {
+        val archive = CatchupRules.Span(startWallMs = now - 20 * 60_000, endWallMs = now - 10 * 60_000)
+        assertEquals(CatchupRules.Seek.Live, CatchupRules.decide(now - 30_000, now, archive, programs, week))
     }
 
     @Test
