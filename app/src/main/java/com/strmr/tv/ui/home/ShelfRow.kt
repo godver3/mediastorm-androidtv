@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -30,7 +31,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -194,8 +195,8 @@ fun ShelfRow(
     }
     val list = memory.list
     val focus = memory.focus
-    // The card entering the row lands on, by focusRestorer's fallback: also when the row was
-    // out of composition, which forgets the restorer's own saved card.
+    // The card entering the row lands on: the one focus left it on (also after the row was out
+    // of composition), else its first.
     /** The card taking a removed focused card's place, which focus moves to. */
     var replacement by remember { mutableStateOf<Any?>(null) }
     val landing = replacement?.takeIf { it in keys } ?: memory.lastKey?.takeIf { it in keys } ?: keys.firstOrNull()
@@ -268,7 +269,12 @@ fun ShelfRow(
                 contentPadding = PaddingValues(start = ROW_INSET, end = ROW_INSET, top = metrics.liftRoom),
                 horizontalArrangement = Arrangement.spacedBy(CARD_SPACING),
                 modifier = Modifier
-                    .focusRestorer(target)
+                    // Entering lands on [target], not a focusRestorer: a restorer pins the card it
+                    // saved, which pins this row in Home's column, and a pinned row is laid out
+                    // straight under the shown one (one shelf to a screen), so Down went to the
+                    // last row visited instead of the next. Not yet composed: the nearest card.
+                    .focusProperties { onEnter = { runCatching { target.requestFocus() } } }
+                    .focusGroup()
                     .onSizeChanged { container = it.width.toFloat() }
                     .onFocusChanged {
                         memory.hasFocus = it.hasFocus
