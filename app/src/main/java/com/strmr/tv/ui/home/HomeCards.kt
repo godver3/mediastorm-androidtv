@@ -14,10 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
@@ -30,7 +27,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
@@ -41,13 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
-import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import kotlin.math.roundToInt
 import com.strmr.tv.ui.cardFocusBorder
 import com.strmr.tv.api.Artwork
-import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.CardText
 import com.strmr.tv.home.ExploreCard
 import com.strmr.tv.home.HomeSlot
@@ -55,7 +49,6 @@ import com.strmr.tv.home.HomeLayoutStore
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.ui.Accent
-import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.CardFocusScale
 import com.strmr.tv.ui.ContentMargin
 import com.strmr.tv.ui.captionGap
@@ -223,60 +216,6 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
 private fun CardImage(url: String?, size: String, description: String?, modifier: Modifier) {
     AsyncImage(model = Artwork.url(url, size), contentDescription = description, contentScale = ContentScale.Crop, modifier = modifier)
 }
-
-/**
- * A badge on artwork (tvOS ArtworkBadge). On a poster a status shows as its symbol in a small
- * glass disc; a 16:9 card ([wide]: landscape, or a poster opened on focus) has room for the text capsule.
- */
-@Composable
-fun Badge(badge: CardBadge, modifier: Modifier = Modifier, wide: Boolean = false) {
-    val icon = badge.symbol?.icon
-    if (icon == null || wide) {
-        BadgeLabel(badge.text, badge.symbol, modifier = modifier)
-        return
-    }
-    Box(
-        modifier.size(26.dp)
-            .background(Color.Black.copy(alpha = 0.65f), CircleShape)
-            .border(0.5.dp, Color.White.copy(alpha = 0.25f), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = badge.text, tint = Color.White, modifier = Modifier.size(13.dp))
-    }
-}
-
-/** A card's badges stacked in its top-left corner, as the Expo app stacks a release status with the watch state. */
-@Composable
-fun Badges(card: HomeCard, modifier: Modifier = Modifier, wide: Boolean = false) {
-    val badges = listOfNotNull(card.badge, card.watchBadge)
-    if (badges.isEmpty()) return
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) { badges.forEach { Badge(it, wide = wide) } }
-}
-
-/** Small capsule label on artwork or beside metadata, with an optional leading symbol. */
-@Composable
-fun BadgeLabel(text: String, symbol: CardBadge.Symbol? = null, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(50))
-            .border(0.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
-            .padding(horizontal = 7.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        symbol?.icon?.let { Icon(it, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp)) }
-        Text(text.uppercase(), fontSize = 11.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.25.sp)
-    }
-}
-
-private val CardBadge.Symbol.icon: ImageVector
-    get() = when (this) {
-        CardBadge.Symbol.COMING_SOON -> AppIcons.Event
-        CardBadge.Symbol.UNRELEASED -> AppIcons.Hourglass
-        CardBadge.Symbol.IN_THEATERS -> AppIcons.Theaters
-        CardBadge.Symbol.WATCHED -> Icons.Filled.Check
-        CardBadge.Symbol.IN_PROGRESS -> AppIcons.WatchedPartial
-    }
 
 /**
  * Whether a card shows its resume progress: any started progress under 90% watched. Whether

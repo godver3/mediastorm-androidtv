@@ -10,8 +10,9 @@ import java.util.Locale
 /**
  * A card badge: a release status, a rank or Watched. Statuses carry a symbol that artwork
  * shows instead of the text (the text stays as the content description and in the details header).
+ * [count] is a series' unwatched episodes, drawn as a number after the symbol.
  */
-data class CardBadge(val text: String, val symbol: Symbol? = null) {
+data class CardBadge(val text: String, val symbol: Symbol? = null, val count: Int? = null) {
     enum class Symbol { COMING_SOON, UNRELEASED, IN_THEATERS, WATCHED, IN_PROGRESS }
 
     companion object {

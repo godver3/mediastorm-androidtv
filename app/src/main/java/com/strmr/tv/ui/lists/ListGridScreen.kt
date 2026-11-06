@@ -36,7 +36,6 @@ import com.strmr.tv.home.BrowseList
 import com.strmr.tv.home.BrowsePage
 import com.strmr.tv.home.BrowseOptions
 import com.strmr.tv.home.BrowseSort
-import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
 import com.strmr.tv.home.browsePage
@@ -187,7 +186,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
     }
 
     val ranked = shown is BrowseList.TopTen
-    val cards = entries.mapIndexed { i, e -> HomeCard.from(e).let { if (ranked) it.copy(badge = CardBadge("#${i + 1}")) else it } }
+    val cards = entries.mapIndexed { i, e -> HomeCard.from(e).let { if (ranked) it.ranked(i + 1) else it } }
         // Titles hidden from this profile are left out, except in the Hidden list itself.
         .filter { list == BrowseList.Hidden || it.target?.let(HiddenItemsStore::isHidden) != true }
     // Nothing left to show (the last title removed, unhidden or hidden here): the status line

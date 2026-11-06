@@ -23,7 +23,7 @@ class WatchStateBadgeTest {
     @Test
     fun watchStateStacksUnderRankAndReleaseBadges() {
         val title = Title(id = "tmdb:movie:1", name = "Seen", mediaType = "movie", availability = "coming_soon", watchState = "partial")
-        assertEquals(CardBadge.ComingSoon, HomeCard.from(title).badge)
+        assertEquals(CardBadge.ComingSoon, HomeCard.from(title).releaseBadge)
         assertEquals(CardBadge.InProgress, HomeCard.from(title).watchBadge)
         assertEquals(CardBadge("#3"), HomeCard.from(title, rank = 3).badge)
         assertEquals(CardBadge.InProgress, HomeCard.from(title, rank = 3).watchBadge)

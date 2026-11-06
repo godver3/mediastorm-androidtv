@@ -29,6 +29,22 @@ sealed interface HomeLink {
 
 enum class HomeAction { SURPRISE, ASK_AI }
 
+/** Which optional card badges show (Settings › Card Badges over the server's `badgeVisibility`). */
+data class BadgeVisibility(
+    val watchState: Boolean = false,
+    val releaseStatus: Boolean = false,
+    val unwatchedCount: Boolean = false,
+) {
+    companion object {
+        /** The `badgeVisibility` the server sends when nothing is set: progress bars only. */
+        val DEFAULT_SERVER = listOf("watchProgress")
+
+        /** The device's choice, else whether the server's list (null: [DEFAULT_SERVER]) names [key]. */
+        fun shows(key: String, override: Boolean?, server: List<String>?): Boolean =
+            override ?: (server ?: DEFAULT_SERVER).any { it.trim().equals(key, ignoreCase = true) }
+    }
+}
+
 /** One Home card, from any shelf: what the card, the hero and details need. */
 data class HomeCard(
     val id: String,
@@ -45,10 +61,14 @@ data class HomeCard(
     val posterUrl: String? = null,
     /** 0–1; 0 hides the bar. */
     val progress: Float = 0f,
-    /** Rank, release status or air date: shown first. */
+    /** Rank or air date: shown first, whatever the badge settings say. */
     val badge: CardBadge? = null,
-    /** Watched or in progress, shown beside [badge] (a watched title can still be in theaters). */
+    /** Coming soon, unreleased or in theaters, when the Release Status badge is on. */
+    val releaseBadge: CardBadge? = null,
+    /** Watched or in progress, shown under the others (a watched title can still be in theaters). */
     val watchBadge: CardBadge? = null,
+    /** A series' unwatched episodes (the server's `unwatchedCount`); null for movies and unknown counts. */
+    val unwatchedCount: Int? = null,
     /** "New": Continue Watching's next episode came out in the last 72 hours. */
     val newEpisode: NewEpisodeBadge? = null,
     /** The card draws `logoUrl` on a plain tile instead of artwork (services, hubs, channels). */
@@ -63,6 +83,25 @@ data class HomeCard(
     val episode: CardEpisode? = null,
 ) {
     val target: DetailsTarget? get() = (link as? HomeLink.Details)?.target
+
+    /** A rank shown as the first badge, in place of the release status (Top 10 grids). */
+    fun ranked(rank: Int) = copy(badge = CardBadge("#$rank"), releaseBadge = null)
+
+    /**
+     * The badges the card draws, top to bottom, under [visibility]: the rank or air date always,
+     * then the release status and the watch state when on. A series' unwatched count rides in
+     * the watch-state badge (as the Expo card puts the number beside the icon), or stands alone.
+     */
+    fun visibleBadges(visibility: BadgeVisibility): List<CardBadge> {
+        val count = unwatchedCount?.takeIf { visibility.unwatchedCount && it > 0 }
+        val watch = watchBadge?.takeIf { visibility.watchState }
+        val watchOrCount = when {
+            count == null -> watch
+            watch != null -> watch.copy(text = "${watch.text}, $count unwatched", count = count)
+            else -> CardBadge("$count unwatched", count = count)
+        }
+        return listOfNotNull(badge, releaseBadge?.takeIf { visibility.releaseStatus }, watchOrCount)
+    }
 
     companion object {
         fun kindLine(year: Int?, isMovie: Boolean) =
@@ -91,7 +130,8 @@ data class HomeCard(
                 artworkUrl = ep?.image?.url ?: item.backdropUrl,
                 posterUrl = item.textPosterUrl ?: item.posterUrl,
                 progress = progress,
-                badge = airs?.let { CardBadge(it) } ?: ReleaseBadge.forStatus(item.status),
+                badge = airs?.let { CardBadge(it) },
+                releaseBadge = if (airs == null) ReleaseBadge.forStatus(item.status) else null,
                 newEpisode = if (!item.isMovie && ep != null) {
                     NewEpisodeBadge.from(ep.airDate, ep.airDateTimeUTC, item.prequeueStatus)
                 } else null,
@@ -116,8 +156,9 @@ data class HomeCard(
             logoUrl = item.logoUrl,
             artworkUrl = item.backdropUrl ?: item.posterUrl,
             posterUrl = item.textPosterUrl ?: item.posterUrl,
-            badge = ReleaseBadge.forTitle(item.availability, item.status, item.releaseDate),
+            releaseBadge = ReleaseBadge.forTitle(item.availability, item.status, item.releaseDate),
             watchBadge = CardBadge.forWatchState(item.watchState),
+            unwatchedCount = item.unwatchedCount.takeUnless { item.isMovie },
         )
 
         /** A list title; `rank` (Top 10) shows as the badge. */
@@ -131,9 +172,10 @@ data class HomeCard(
             logoUrl = title.logo?.url,
             artworkUrl = title.backdrop?.url ?: title.poster?.url,
             posterUrl = title.textPoster?.url ?: title.poster?.url,
-            badge = rank?.let { CardBadge("#$it") }
-                ?: ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate),
+            badge = rank?.let { CardBadge("#$it") },
+            releaseBadge = if (rank == null) ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate) else null,
             watchBadge = CardBadge.forWatchState(title.watchState),
+            unwatchedCount = title.unwatchedCount.takeUnless { title.isMovie },
             rank = rank,
             certification = title.certification?.takeIf { it.isNotBlank() },
             genre = title.genres?.firstOrNull(),

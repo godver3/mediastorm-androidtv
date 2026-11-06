@@ -17,6 +17,8 @@ data class HomeSettings(
     /** `exploreCardPosition`: the explore card leads the row unless set to "end". */
     val exploreFirst: Boolean = true,
     val hideWatched: Boolean = false,
+    /** The card badges the server asks for (`display.badgeVisibility`: the profile's, else the server's). */
+    val badgeVisibility: List<String>? = null,
     /** Continue Watching leaves out shows whose next episode hasn't aired (My Upcoming has them). */
     val excludeUpcomingFromContinue: Boolean = true,
     /** Card position, card style and sizes (device settings override them). */

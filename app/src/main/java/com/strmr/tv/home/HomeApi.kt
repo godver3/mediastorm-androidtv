@@ -15,13 +15,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-@Serializable private data class DisplayFields(val hideWatched: Boolean? = null)
+@Serializable private data class DisplayFields(val hideWatched: Boolean? = null, val badgeVisibility: List<String>? = null)
 
 @Serializable private data class UserHome(val homeShelves: HomeFields? = null, val display: DisplayFields? = null)
 
 @Serializable private data class MetadataFields(val aiApiKey: String? = null, val geminiApiKey: String? = null)
 
-@Serializable private data class ServerHome(val metadata: MetadataFields? = null, val homeShelves: HomeFields? = null)
+@Serializable private data class ServerHome(
+    val metadata: MetadataFields? = null,
+    val homeShelves: HomeFields? = null,
+    val display: DisplayFields? = null,
+)
 
 @Serializable private data class DeviceHome(val homeShelfFocusModel: String? = null)
 
@@ -68,6 +72,7 @@ suspend fun ApiClient.homeSettings(view: String = HomeViews.ALL): HomeSettings =
         itemCap = home.itemCap?.takeIf { it > 0 } ?: 20,
         exploreFirst = home.exploreCardPosition != "end",
         hideWatched = settings.display?.hideWatched ?: false,
+        badgeVisibility = settings.display?.badgeVisibility ?: serverHome?.display?.badgeVisibility,
         excludeUpcomingFromContinue = home.excludeUpcomingFromContinue ?: true,
         layout = ProfileHomeLayout.from(
             focusModel = device.await()?.homeShelfFocusModel ?: home.homeShelfFocusModel,
@@ -182,6 +187,8 @@ suspend fun ApiClient.browsePage(
     query["limit"] = limit.toString()
     query["offset"] = offset.toString()
     if (phase != null && list.loadsProgressively) query += phase.query
+    // Series counts the server hasn't cached yet are fetched in the background once asked for.
+    if (com.strmr.tv.ui.settings.BadgeSettings.visibility.unwatchedCount) query["includeUnwatchedCounts"] = "true"
     // An AI answer can take well over the usual 30 s the first time it is asked, and so can a
     // long list's complete pass on a cold server (it runs behind cards already showing).
     val timeout = when {

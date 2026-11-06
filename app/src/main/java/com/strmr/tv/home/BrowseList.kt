@@ -163,6 +163,8 @@ data class WatchlistItem(
     val externalIds: Map<String, String>? = null,
     /** none | partial | complete */
     val watchState: String? = null,
+    /** Series: released episodes not yet watched (when the server knows the episode total). */
+    val unwatchedCount: Int? = null,
     val status: String? = null,
     val releaseDate: String? = null,
     val availability: String? = null,

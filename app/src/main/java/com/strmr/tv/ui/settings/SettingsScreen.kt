@@ -55,6 +55,7 @@ fun SettingsScreen() {
     LaunchedEffect(Unit) { TrailerSettings.serverValue = ApiClient.playbackSettings().autoPlayTrailers }
     LaunchedEffect(Unit) { loadTrackDefaults() }
     LaunchedEffect(Unit) { SpoilerSettings.refresh() }
+    LaunchedEffect(Unit) { BadgeSettings.refresh() }
 
     var health by remember { mutableStateOf<String?>(null) }
     fun checkConnection() {
@@ -184,6 +185,8 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 trailingContent = { Text(AppearanceSettings.background.label) },
             )
         }
+        item { Header("Card Badges") }
+        badgeSettingRows()
         item { Header("Spoilers") }
         spoilerSettingRows()
         item { Header("Playback") }

@@ -45,7 +45,6 @@ import androidx.tv.material3.Text
 import com.strmr.tv.api.PersonRef
 import com.strmr.tv.api.Title
 import com.strmr.tv.app.AppSession
-import com.strmr.tv.home.CardBadge
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
 import com.strmr.tv.search.SearchRanking
@@ -87,7 +86,7 @@ fun SearchScreen() {
     // A list can name a title twice; the grid needs unique IDs.
     val titles = state.titles(normalized).distinctBy { it.id }
     // Top 10 Today carries its ranks, as its Home row does.
-    val cards = titles.mapIndexed { i, t -> searchCard(t).let { if (hasQuery) it else it.copy(badge = CardBadge("#${i + 1}")) } }
+    val cards = titles.mapIndexed { i, t -> searchCard(t).let { if (hasQuery) it else it.ranked(i + 1) } }
     val loading = if (hasQuery) state.loading else state.topTenLoading
     val notice = state.notice.takeIf { hasQuery && state.resultQuery == normalized && !state.loading }
 

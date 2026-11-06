@@ -110,6 +110,7 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
         revision = rev.await()
         if (gen != generation) return
         HomeViewStore.update(loaded.views)
+        com.strmr.tv.ui.settings.BadgeSettings.updateServer(loaded.badgeVisibility)
         // The view is gone: Home falls back to All, another store.
         if (loaded.view != view) return
         settings = loaded
