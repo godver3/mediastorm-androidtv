@@ -1,6 +1,7 @@
 package com.strmr.tv.live
 
 import java.time.OffsetDateTime
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -85,6 +86,10 @@ data class EpgProgram(
     val icon: String? = null,
     val categories: List<String>? = null,
     val episode: String? = null,
+    /** The guide flags a first airing (XMLTV <new/>, <premiere> or <live/>); most guides don't. */
+    @SerialName("new") val isNew: Boolean = false,
+    /** The guide flags a rerun (XMLTV <previously-shown>). */
+    @SerialName("previouslyShown") val isRerun: Boolean = false,
 ) {
     /** Epoch milliseconds; a programme that doesn't parse has no length. */
     @Transient val startMs: Long = parse(start)

@@ -243,6 +243,7 @@ private fun Cell(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 recording?.let { RecordingBadge(it) }
                 if (replayable) Icon(AppIcons.Restart, contentDescription = "Catch-up", modifier = Modifier.size(10.dp))
+                if (cell.program?.isNew == true) NewAiringTag()
                 Text(
                     (if (cell.program != null && cell.program.startMs < cell.start) "‹ " else "") + (cell.program?.title ?: "No Information"),
                     fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -282,6 +283,7 @@ private fun InfoPanel(channel: LiveChannel?, program: EpgProgram?, now: Long) {
                         Text("LIVE", fontSize = 9.sp, fontWeight = FontWeight.Black,
                              modifier = Modifier.background(Color(0xFFE5332A), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 1.dp))
                     }
+                    if (program.isNew) NewAiringTag(prominent = true)
                     if (channel != null && LiveCatchups.canReplay(channel, program, now)) {
                         Text(if (program.stopMs <= now) "CATCH-UP" else "START OVER", fontSize = 9.sp, fontWeight = FontWeight.Black,
                              modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 1.dp))
@@ -316,6 +318,7 @@ private fun details(p: EpgProgram, now: Long): String {
     else if (p.startMs > now) parts += "in ${(p.startMs - now) / 60_000} min"
     else parts += "${(now - p.startMs) / 3_600_000}h ago"
     p.episode?.takeIf { it.isNotEmpty() }?.let { parts += it }
+    if (p.isRerun && !p.isNew) parts += "Rerun"
     p.categories?.firstOrNull()?.let { parts += it }
     return parts.joinToString(" · ")
 }

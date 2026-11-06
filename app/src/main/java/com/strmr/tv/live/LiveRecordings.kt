@@ -44,8 +44,12 @@ class LiveRecordings(private val scope: CoroutineScope, private val notify: (Str
     fun record(program: EpgProgram, channel: LiveChannel) =
         perform("Recording scheduled for ${program.title}.") { ApiClient.recordProgram(program, channel) }
 
-    fun recordSeries(program: EpgProgram, channel: LiveChannel) =
-        perform("Series recording set for \"${program.title}\" on ${channel.name}.") { ApiClient.recordSeries(program.title, channel) }
+    /** [newOnly] skips airings the guide flags as reruns; re-recording with the other choice switches the rule. */
+    fun recordSeries(program: EpgProgram, channel: LiveChannel, newOnly: Boolean = false) =
+        perform(if (newOnly) "Recording new episodes of \"${program.title}\" on ${channel.name}."
+                else "Series recording set for \"${program.title}\" on ${channel.name}.") {
+            ApiClient.recordSeries(program.title, channel, newOnly)
+        }
 
     fun recordTwoHours(channel: LiveChannel) =
         perform("2 hour recording scheduled for ${channel.name}.") { ApiClient.recordTimeBlock(channel, 2 * 3_600_000L) }

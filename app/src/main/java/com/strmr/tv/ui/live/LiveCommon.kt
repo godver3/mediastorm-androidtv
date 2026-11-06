@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Icon
@@ -92,6 +94,7 @@ fun ChannelMenu(store: LiveStore, channel: LiveChannel, program: EpgProgram? = n
                 DialogChoice(if (!asProgram) "Record Current Program" else if (p.isAiring(now)) "Record" else "Record Once") { rec.record(p, channel) }
             },
             DialogChoice(if (asProgram) "Record Series" else "Record Every Airing") { rec.recordSeries(p, channel) },
+            DialogChoice("Record New Episodes Only") { rec.recordSeries(p, channel, newOnly = true) },
         )
     }.orEmpty()
     ChoiceDialog(
@@ -123,6 +126,20 @@ fun RecordingBadge(recording: Recording, modifier: Modifier = Modifier) {
         tint = if (running) Color(0xFFFF5A52) else com.strmr.tv.ui.Accent,
         modifier = modifier.size(10.dp),
     )
+}
+
+/**
+ * "NEW" on a programme the guide flags as a first airing: accent text in a guide cell, an accent
+ * pill in the info panel.
+ */
+@Composable
+fun NewAiringTag(prominent: Boolean = false) {
+    if (prominent) {
+        Text("NEW", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White,
+             modifier = Modifier.background(com.strmr.tv.ui.Accent, RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 1.dp))
+    } else {
+        Text("NEW", fontSize = 9.sp, fontWeight = FontWeight.Black, color = com.strmr.tv.ui.Accent)
+    }
 }
 
 /** "9:00–10:30 PM" in the device's clock format. */
