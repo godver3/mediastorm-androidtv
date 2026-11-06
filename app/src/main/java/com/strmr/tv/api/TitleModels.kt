@@ -233,6 +233,20 @@ data class ContinueWatchingItem(
 ) {
     val isMovie: Boolean get() = seriesId.contains(":movie:")
 
+    /**
+     * The series' watch state as the Expo Continue Watching card works it out: complete when every
+     * released episode is watched, partial once any episode is or [displayedProgress] is above 0.
+     */
+    fun seriesWatchState(displayedProgress: Float): String {
+        val total = totalEpisodeCount ?: 0
+        val watched = watchedEpisodeCount ?: 0
+        return when {
+            total > 0 && watched >= total -> "complete"
+            watched > 0 || displayedProgress > 0f -> "partial"
+            else -> "none"
+        }
+    }
+
     /** Episodes left, as the Expo Continue Watching card counts them; null when the total is unknown. */
     val unwatchedCount: Int?
         get() {

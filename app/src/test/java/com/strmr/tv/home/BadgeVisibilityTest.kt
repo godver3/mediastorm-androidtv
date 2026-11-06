@@ -75,7 +75,25 @@ class BadgeVisibilityTest {
         assertNull(HomeCard.from(continuing(id = "tmdb:movie:1", total = 10, watched = 3)).unwatchedCount)
         assertEquals(
             listOf(CardBadge("7 unwatched", count = 7)),
-            HomeCard.from(continuing(total = 10, watched = 3)).visibleBadges(all),
+            HomeCard.from(continuing(total = 10, watched = 3)).visibleBadges(all.copy(watchState = false)),
+        )
+    }
+
+    @Test
+    fun continueWatchingSeriesWatchState() {
+        assertEquals(CardBadge.Watched, HomeCard.from(continuing(total = 10, watched = 10)).watchBadge)
+        assertEquals(CardBadge.InProgress, HomeCard.from(continuing(total = 10, watched = 3)).watchBadge)
+        assertEquals(CardBadge.InProgress, HomeCard.from(continuing(total = null, watched = 2)).watchBadge)
+        assertNull(HomeCard.from(continuing(total = 10, watched = 0)).watchBadge)
+        val resumed = continuing(total = 10, watched = 0).copy(resumePercent = 40.0)
+        assertEquals(CardBadge.InProgress, HomeCard.from(resumed).watchBadge)
+        assertNull(HomeCard.from(continuing(id = "tmdb:movie:1", total = 10, watched = 10)).watchBadge)
+        // Gated when the card draws, as the other cards are.
+        val card = HomeCard.from(continuing(total = 10, watched = 3))
+        assertEquals(listOf(CardBadge("7 unwatched", count = 7)), card.visibleBadges(all.copy(watchState = false)))
+        assertEquals(
+            listOf(CardBadge("In Progress, 7 unwatched", CardBadge.Symbol.IN_PROGRESS, count = 7)),
+            card.visibleBadges(all),
         )
     }
 

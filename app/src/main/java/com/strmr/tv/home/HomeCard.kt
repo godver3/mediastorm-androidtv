@@ -136,6 +136,7 @@ data class HomeCard(
                     NewEpisodeBadge.from(ep.airDate, ep.airDateTimeUTC, item.prequeueStatus)
                 } else null,
                 episode = if (!item.isMovie && ep != null) CardEpisode.from(ep) else null,
+                watchBadge = if (item.isMovie) null else CardBadge.forWatchState(item.seriesWatchState(progress)),
                 unwatchedCount = item.unwatchedCount,
             )
         }
