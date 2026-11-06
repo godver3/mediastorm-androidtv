@@ -1,5 +1,6 @@
 package com.strmr.tv.home
 
+import com.strmr.tv.api.ContinueWatchingItem
 import com.strmr.tv.api.Title
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,12 +50,33 @@ class BadgeVisibilityTest {
     }
 
     @Test
-    fun countNeedsSeriesAPositiveCountAndTheSetting() {
-        assertEquals(listOf(CardBadge.InProgress), HomeCard.from(series(0)).visibleBadges(all))
+    fun countShowsForEverySeriesTheServerCountsIncludingZero() {
+        assertEquals(
+            listOf(CardBadge("Watched, 0 unwatched", CardBadge.Symbol.WATCHED, count = 0)),
+            HomeCard.from(series(0, state = "complete")).visibleBadges(all),
+        )
+        assertEquals(listOf(CardBadge("12 unwatched", count = 12)), HomeCard.from(series(12, state = "none")).visibleBadges(all))
         assertEquals(listOf(CardBadge.InProgress), HomeCard.from(series(null)).visibleBadges(all))
         assertEquals(listOf(CardBadge.InProgress), HomeCard.from(series(5)).visibleBadges(all.copy(unwatchedCount = false)))
         val movie = Title(id = "tmdb:movie:1", name = "Film", mediaType = "movie", watchState = "partial", unwatchedCount = 3)
         assertNull(HomeCard.from(movie).unwatchedCount)
+    }
+
+    private fun continuing(id: String = "tmdb:tv:1", total: Int?, watched: Int?) =
+        ContinueWatchingItem(seriesId = id, seriesTitle = "Show", totalEpisodeCount = total, watchedEpisodeCount = watched)
+
+    @Test
+    fun continueWatchingCountsFromEpisodeTotals() {
+        assertEquals(7, HomeCard.from(continuing(total = 10, watched = 3)).unwatchedCount)
+        assertEquals(0, HomeCard.from(continuing(total = 10, watched = 12)).unwatchedCount)
+        assertEquals(10, HomeCard.from(continuing(total = 10, watched = null)).unwatchedCount)
+        assertNull(HomeCard.from(continuing(total = null, watched = 3)).unwatchedCount)
+        assertNull(HomeCard.from(continuing(total = 0, watched = 0)).unwatchedCount)
+        assertNull(HomeCard.from(continuing(id = "tmdb:movie:1", total = 10, watched = 3)).unwatchedCount)
+        assertEquals(
+            listOf(CardBadge("7 unwatched", count = 7)),
+            HomeCard.from(continuing(total = 10, watched = 3)).visibleBadges(all),
+        )
     }
 
     @Test

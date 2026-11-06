@@ -227,8 +227,19 @@ data class ContinueWatchingItem(
     val status: String? = null,
     /** The prequeue / prewarm state of the item the row plays ("ready" once resolved). */
     val prequeueStatus: String? = null,
+    /** Released episodes in the series and how many of them were watched (series only). */
+    val totalEpisodeCount: Int? = null,
+    val watchedEpisodeCount: Int? = null,
 ) {
     val isMovie: Boolean get() = seriesId.contains(":movie:")
+
+    /** Episodes left, as the Expo Continue Watching card counts them; null when the total is unknown. */
+    val unwatchedCount: Int?
+        get() {
+            val total = totalEpisodeCount ?: 0
+            if (isMovie || total <= 0) return null
+            return (total - (watchedEpisodeCount ?: 0)).coerceAtLeast(0)
+        }
 }
 
 /** A discovery row entry (`display-list?source=trending` and the other title lists). */

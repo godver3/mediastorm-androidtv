@@ -93,7 +93,7 @@ data class HomeCard(
      * the watch-state badge (as the Expo card puts the number beside the icon), or stands alone.
      */
     fun visibleBadges(visibility: BadgeVisibility): List<CardBadge> {
-        val count = unwatchedCount?.takeIf { visibility.unwatchedCount && it > 0 }
+        val count = unwatchedCount?.takeIf { visibility.unwatchedCount }
         val watch = watchBadge?.takeIf { visibility.watchState }
         val watchOrCount = when {
             count == null -> watch
@@ -136,6 +136,7 @@ data class HomeCard(
                     NewEpisodeBadge.from(ep.airDate, ep.airDateTimeUTC, item.prequeueStatus)
                 } else null,
                 episode = if (!item.isMovie && ep != null) CardEpisode.from(ep) else null,
+                unwatchedCount = item.unwatchedCount,
             )
         }
 

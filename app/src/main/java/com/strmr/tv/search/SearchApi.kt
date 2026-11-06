@@ -3,6 +3,7 @@ package com.strmr.tv.search
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ListedTitle
 import com.strmr.tv.api.Title
+import com.strmr.tv.ui.settings.BadgeSettings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -14,9 +15,10 @@ import kotlinx.serialization.json.jsonObject
  * hit without a `mediaType` takes the request's type. The server drops people (and applies
  * rating limits) for kids profiles.
  */
-suspend fun ApiClient.search(query: String, type: String): List<SearchResult> =
+suspend fun ApiClient.search(query: String, type: String): List<SearchResult> {
+    val params = mutableMapOf("q" to query, "type" to type, "userId" to profileId).withUnwatchedCounts()
     // No hits may come back as null.
-    send<List<JsonObject>?>("GET", "/api/search", mapOf("q" to query, "type" to type, "userId" to profileId)).orEmpty().map { hit ->
+    return send<List<JsonObject>?>("GET", "/api/search", params).orEmpty().map { hit ->
         val title = hit["title"]?.jsonObject
         val typed = if (title != null && title["mediaType"] == null) {
             JsonObject(hit + ("title" to JsonObject(title + ("mediaType" to JsonPrimitive(type)))))
@@ -25,6 +27,12 @@ suspend fun ApiClient.search(query: String, type: String): List<SearchResult> =
         }
         ApiClient.json.decodeFromJsonElement<SearchResult>(typed)
     }
+}
+
+/** Asks the server to fetch missing episode totals while the unwatched-count badge is on. */
+private fun MutableMap<String, String>.withUnwatchedCounts() = apply {
+    if (BadgeSettings.visibility.unwatchedCount) this["includeUnwatchedCounts"] = "true"
+}
 
 @Serializable
 private data class TopTenPage(val items: List<ListedTitle> = emptyList())
@@ -32,4 +40,4 @@ private data class TopTenPage(val items: List<ListedTitle> = emptyList())
 /** Top 10 Today, what the Search page shows before anything is typed. */
 suspend fun ApiClient.searchTopTen(): List<Title> =
     // Can take a long time on a cold server cache.
-    send<TopTenPage>("GET", "/api/discover/top-ten", mapOf("userId" to profileId), timeoutMs = 60_000L).items.map { it.title }
+    send<TopTenPage>("GET", "/api/discover/top-ten", mutableMapOf("userId" to profileId).withUnwatchedCounts(), timeoutMs = 60_000L).items.map { it.title }
