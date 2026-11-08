@@ -21,6 +21,7 @@ import com.strmr.tv.sports.SportsRaceFormat
 import com.strmr.tv.sports.SportsRaceHub
 import com.strmr.tv.sports.SportsRaceListing
 import com.strmr.tv.sports.SportsStandings
+import com.strmr.tv.sports.SportsTeamFollows
 import com.strmr.tv.sports.isRacing
 import com.strmr.tv.sports.sportsCycling
 import com.strmr.tv.sports.sportsLeagues
@@ -65,7 +66,22 @@ class SportsHubState {
     /** Where each of the day's cards sits in its row, kept across refreshes. */
     private val ordering = SportsHubOrdering()
     var filter by mutableStateOf(SportsFilter.ALL)
-    var followingOnly by mutableStateOf(false)
+    private var following by mutableStateOf(false)
+    private var myTeams by mutableStateOf(false)
+    /** Following: followed competitions and teams and pinned sports only. Turns My Teams off. */
+    var followingOnly: Boolean
+        get() = following
+        set(value) {
+            following = value
+            if (value) myTeams = false
+        }
+    /** My Teams: only games a followed team plays in. Turns Following off. */
+    var myTeamsOnly: Boolean
+        get() = myTeams
+        set(value) {
+            myTeams = value
+            if (value) following = false
+        }
     /** The Sport filter: a [SportsHubFilters.sports] id, or [SportsHubFilters.ALL]. */
     var sport by mutableStateOf(SportsHubFilters.ALL); private set
     /** The League filter: a catalog league id, a cycling race's follow id, or [SportsHubFilters.ALL]. */
@@ -104,6 +120,7 @@ class SportsHubState {
 
     private val followed: List<String> get() = preferences?.preferences?.competitionIds.orEmpty()
     private val pinned: List<String> get() = preferences?.preferences?.pinnedSportIds.orEmpty()
+    val teamIds: List<String> get() = preferences?.preferences?.teamIds.orEmpty()
 
     private fun followId(league: String) = leagues[league]?.followId ?: SportsLeague.followAliases[league] ?: league
 
@@ -114,9 +131,8 @@ class SportsHubState {
     fun isFollowed(item: SportsHubItem): Boolean = when (item) {
         is SportsHubItem.Match -> {
             val game = item.game
-            val teams = preferences?.preferences?.teamIds.orEmpty()
             followId(game.league) in followed || family(game.league)?.let { it in pinned } == true ||
-                "${game.league}:${game.homeTeam.id}" in teams || "${game.league}:${game.awayTeam.id}" in teams
+                SportsTeamFollows.plays(teamIds, game)
         }
         is SportsHubItem.Race -> SportsRaceHub.isFollowed(item.league, followed, pinned)
         is SportsHubItem.Cycling -> SportsCycling.isFollowed(item.listing.race, followed, pinned)
@@ -203,7 +219,11 @@ class SportsHubState {
                 cyclingListings.map { SportsHubItem.Cycling(it) }
             val sport = sport.takeIf { s -> s == SportsHubFilters.ALL || sportOptions.any { it.id == s } } ?: SportsHubFilters.ALL
             val chosen = items.filter { SportsHubFilters.matches(subject(it), sport, league) }
-            val pool = if (followingOnly) chosen.filter(::isFollowed) else chosen
+            val pool = when {
+                followingOnly -> chosen.filter(::isFollowed)
+                myTeamsOnly -> SportsMyTeams.games(chosen, teamIds)
+                else -> chosen
+            }
             // Places are handed out on first sight, filters or not, so a filter never reorders a row.
             ordering.record(items)
             val all = SportsRow.entries.map { row ->

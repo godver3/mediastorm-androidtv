@@ -116,8 +116,12 @@ fun SportsScreen() {
             state.error != null && sections.isEmpty() -> item { Notice(state.error.orEmpty(), "Try Again") { state.retry() } }
             sections.isEmpty() -> item {
                 val filtered = state.sport != SportsHubFilters.ALL || state.league != SportsHubFilters.ALL
-                Notice(emptyText(state, filtered), if (filtered) "Clear Filters" else if (state.followingOnly) "Show All Events" else null) {
-                    if (filtered) state.clearFilters() else state.followingOnly = false
+                val narrowed = state.followingOnly || state.myTeamsOnly
+                Notice(emptyText(state, filtered), if (filtered) "Clear Filters" else if (narrowed) "Show All Events" else null) {
+                    if (filtered) state.clearFilters() else {
+                        state.followingOnly = false
+                        state.myTeamsOnly = false
+                    }
                 }
             }
             else -> {
@@ -238,6 +242,7 @@ private fun Notice(text: String, action: String?, onAction: () -> Unit) {
 }
 
 private fun emptyText(state: SportsHubState, filtered: Boolean): String {
+    if (state.myTeamsOnly && state.teamIds.isEmpty()) return SportsMyTeams.NO_TEAMS
     val day = state.day.label.lowercase()
     if (filtered) return "Nothing in this selection $day."
     if (state.followingOnly) return "Nothing from the competitions you follow $day."

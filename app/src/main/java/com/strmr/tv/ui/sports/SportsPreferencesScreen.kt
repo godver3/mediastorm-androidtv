@@ -34,9 +34,10 @@ import com.strmr.tv.ui.pageBackground
 import kotlinx.coroutines.launch
 
 /**
- * Follow competitions, grouped by sport. Followed competitions sort first on the hub and fill its
- * Following filter. Each change saves at once to the profile's sports preferences, shared with
- * the Expo app; ids this page doesn't know (teams, schools, cycling races) are kept as they are.
+ * Follow competitions, grouped by sport, then teams ([sportsTeamsSection]). Followed competitions
+ * sort first on the hub and fill its Following filter; followed teams fill My Teams. Each change
+ * saves at once to the profile's sports preferences, shared with the Expo app; ids this page
+ * doesn't know (schools, cycling races) are kept as they are.
  */
 @Composable
 fun SportsPreferencesScreen() {
@@ -47,10 +48,12 @@ fun SportsPreferencesScreen() {
     var saving by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val first = remember { FocusRequester() }
+    val teams = remember { SportsTeamsSectionState { envelope = it } }
     val bySport = hub.usableLeagues.groupBy { it.sport ?: "other" }.toSortedMap()
 
     suspend fun reload() {
         envelope = runCatching { ApiClient.sportsPreferences() }.getOrNull()
+        envelope?.let { hub.preferences = it }
         loading = false
     }
     LaunchedEffect(Unit) { reload() }
@@ -111,8 +114,10 @@ fun SportsPreferencesScreen() {
                     }
                 }
             }
+            if (current != null) sportsTeamsSection(teams, hub.teamIds, enabled = !saving)
         }
     }
+    if (envelope != null) SportsTeamsDialogs(teams, hub.teamIds)
 }
 
 /** "mma" → "MMA", "rugby-league" → "Rugby League". */

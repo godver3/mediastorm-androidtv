@@ -167,7 +167,7 @@ private fun Page(
         ) {
             SportsGameHeader(page, spoilers)
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Actions(page.game, spoilers, focus, onWatch)
+                Actions(page.game, page.kind, spoilers, focus, onWatch)
                 if (tabs.isNotEmpty()) Tabs(tabs, page.kind, shown, focus.tab, onPick)
             }
             if (spoilers) {
@@ -180,9 +180,9 @@ private fun Page(
     }
 }
 
-/** Watch Live / Find Streams while there is something to watch, and Hide / Show Scores. */
+/** Watch Live / Find Streams while there is something to watch, Follow each team, and Hide / Show Scores. */
 @Composable
-private fun Actions(game: SportsGame, spoilers: Boolean, focus: SportsGameFocus, onWatch: () -> Unit) {
+private fun Actions(game: SportsGame, kind: SportsKind, spoilers: Boolean, focus: SportsGameFocus, onWatch: () -> Unit) {
     SportsChipRow(null, centered = true) {
         if (canWatch(game)) {
             Button(onClick = onWatch, modifier = Modifier.focusRequester(focus.watch)) {
@@ -191,6 +191,7 @@ private fun Actions(game: SportsGame, spoilers: Boolean, focus: SportsGameFocus,
                 Text(if (game.lifecycle == SportsLifecycle.LIVE) "Watch Live" else "Find Streams")
             }
         }
+        SportsFollowButtons(game, kind)
         OutlinedButton(onClick = { SportsSpoilers.toggle() }, modifier = Modifier.focusRequester(focus.spoilers)) {
             Icon(if (spoilers) AppIcons.Visible else AppIcons.Hidden, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))

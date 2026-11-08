@@ -40,7 +40,7 @@ import com.strmr.tv.ui.sports.game.SportsChipRow
 /**
  * The hub's controls (Expo `SportsHubTV`'s TV rail and Filters panel, as native chips): All /
  * Live / Upcoming / Results, the day, the Sport and League pickers (followed and pinned first),
- * Following, Hide Scores and Customize. The row scrolls sideways when it outgrows the screen.
+ * Following, My Teams, Hide Scores and Customize. The row scrolls sideways when it outgrows the screen.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -62,6 +62,7 @@ fun SportsHubControls(state: SportsHubState, navigator: Navigator) {
             Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
         }
         FilterChip(selected = state.followingOnly, onClick = { state.followingOnly = !state.followingOnly }) { Text("Following") }
+        FilterChip(selected = state.myTeamsOnly, onClick = { state.myTeamsOnly = !state.myTeamsOnly }) { Text("My Teams") }
         FilterChip(selected = SportsSpoilers.hidden, onClick = { SportsSpoilers.toggle() }) { Text("Hide Scores") }
         FilterChip(selected = false, onClick = { navigator.open(Page.SportsPreferences) }) {
             Icon(Icons.Filled.Settings, contentDescription = "Customize Sports", modifier = Modifier.size(18.dp))
@@ -112,6 +113,7 @@ fun SportsFilterSummary(state: SportsHubState, navigator: Navigator) {
         SportsHubFilters.sportLabel(state.sport).takeIf { state.sport != SportsHubFilters.ALL },
         leagueLabel(state).takeIf { state.league != SportsHubFilters.ALL },
         "Following only".takeIf { state.followingOnly },
+        "My Teams only".takeIf { state.myTeamsOnly },
         "Scores hidden".takeIf { SportsSpoilers.hidden },
     ).joinToString(" · ")
     // Coming in from above or below, the remote lands on the row's first button, not the nearest.
