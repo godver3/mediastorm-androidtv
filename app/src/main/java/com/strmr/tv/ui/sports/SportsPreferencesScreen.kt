@@ -34,7 +34,7 @@ import com.strmr.tv.ui.pageBackground
 import kotlinx.coroutines.launch
 
 /**
- * Follow competitions, grouped by sport, then teams ([sportsTeamsSection]). Followed competitions
+ * Follow teams ([sportsTeamsSection]), then competitions grouped by sport. Followed competitions
  * sort first on the hub and fill its Following filter; followed teams fill My Teams. Each change
  * saves at once to the profile's sports preferences, shared with the Expo app; ids this page
  * doesn't know (schools, cycling races) are kept as they are.
@@ -90,31 +90,32 @@ fun SportsPreferencesScreen() {
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 36.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            item { Text("Follow Competitions", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold) }
+            item { Text("Follow Teams and Competitions", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold) }
             message?.let { item { Text(it, color = SportsMuted) } }
             val current = envelope
             when {
                 loading -> Unit
                 current == null -> item { Text("This server doesn't save sports preferences.", color = SportsMuted) }
-                else -> bySport.entries.forEachIndexed { groupIndex, (sport, leagues) ->
-                    item(key = "sport:$sport") {
-                        Text(sportName(sport), style = MaterialTheme.typography.titleSmall, color = SportsMuted,
-                             modifier = Modifier.padding(top = 14.dp, start = 4.dp))
-                    }
-                    items(leagues, key = { it.id }) { league ->
-                        val followed = league.followId in current.preferences.competitionIds
-                        ListItem(
-                            selected = false,
-                            enabled = !saving,
-                            onClick = { toggle(league) },
-                            headlineContent = { Text(league.label) },
-                            trailingContent = { Text(if (followed) "On" else "Off", color = SportsMuted) },
-                            modifier = if (groupIndex == 0 && league == leagues.first()) Modifier.focusRequester(first) else Modifier,
-                        )
+                else -> {
+                    sportsTeamsSection(teams, hub.teamIds, enabled = !saving, first = first)
+                    bySport.entries.forEach { (sport, leagues) ->
+                        item(key = "sport:$sport") {
+                            Text(sportName(sport), style = MaterialTheme.typography.titleSmall, color = SportsMuted,
+                                 modifier = Modifier.padding(top = 14.dp, start = 4.dp))
+                        }
+                        items(leagues, key = { it.id }) { league ->
+                            val followed = league.followId in current.preferences.competitionIds
+                            ListItem(
+                                selected = false,
+                                enabled = !saving,
+                                onClick = { toggle(league) },
+                                headlineContent = { Text(league.label) },
+                                trailingContent = { Text(if (followed) "On" else "Off", color = SportsMuted) },
+                            )
+                        }
                     }
                 }
             }
-            if (current != null) sportsTeamsSection(teams, hub.teamIds, enabled = !saving)
         }
     }
     if (envelope != null) SportsTeamsDialogs(teams, hub.teamIds)

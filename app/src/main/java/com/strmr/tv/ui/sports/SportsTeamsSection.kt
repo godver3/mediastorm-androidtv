@@ -80,7 +80,8 @@ class SportsTeamsSectionState(private val onSaved: (SportsPreferencesEnvelope) -
 }
 
 /** The section's rows, under Competitions. */
-fun LazyListScope.sportsTeamsSection(state: SportsTeamsSectionState, teamIds: List<String>, enabled: Boolean) {
+/** [first] takes the page's initial focus: the first followed team, else Add Team. */
+fun LazyListScope.sportsTeamsSection(state: SportsTeamsSectionState, teamIds: List<String>, enabled: Boolean, first: FocusRequester? = null) {
     item(key = "teams") {
         Text("Teams", style = MaterialTheme.typography.titleSmall, color = SportsMuted, modifier = Modifier.padding(top = 14.dp, start = 4.dp))
     }
@@ -99,6 +100,7 @@ fun LazyListScope.sportsTeamsSection(state: SportsTeamsSectionState, teamIds: Li
             headlineContent = { Text(name) },
             supportingContent = league?.let { { Text(SportsHub.state.leagueName(it), color = SportsMuted) } },
             trailingContent = { Text("Unfollow", color = SportsMuted) },
+            modifier = if (first != null && id == teamIds.first()) Modifier.focusRequester(first) else Modifier,
         )
     }
     item(key = "teams:add") {
@@ -108,7 +110,8 @@ fun LazyListScope.sportsTeamsSection(state: SportsTeamsSectionState, teamIds: Li
             enabled = enabled && loading == null,
             onClick = { state.choosingLeague = true },
             headlineContent = { Text("Add Team") },
-            modifier = Modifier.focusRequester(state.addTeam),
+            modifier = Modifier.focusRequester(state.addTeam)
+                .then(if (first != null && teamIds.isEmpty()) Modifier.focusRequester(first) else Modifier),
             trailingContent = loading?.let { { Text("Loading ${it.label}…", color = SportsMuted) } },
         )
     }
