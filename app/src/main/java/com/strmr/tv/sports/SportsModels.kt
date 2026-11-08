@@ -2,6 +2,7 @@ package com.strmr.tv.sports
 
 import com.strmr.tv.live.LiveChannel
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import java.time.Instant
 
 /** `GET /api/sports/status`: whether the hub is on and whether the server answers per-day scoreboards. */
@@ -198,14 +199,26 @@ data class SportsStreamMatch(
     val confidence: Double? = null,
     val confidenceTier: String? = null,
     val matchReason: String? = null,
+    /** One stream of a Stremio channel, picked in the picker (null: the server picks); tuned as `stremioStreamIndex`. */
+    @Transient val stremioStreamIndex: Int? = null,
+    /** That stream's label ("Feed 2" when the addon names none). */
+    @Transient val streamLabel: String? = null,
+    /** The channel's Stremio streams are still being looked up. */
+    @Transient val loadingStreams: Boolean = false,
+    /** The picker row's key, when not the channel's ([SportsStreamOptions.rows]). */
+    @Transient val rowKey: String? = null,
 ) {
-    val key: String get() = "$channelId|$channelUrl"
+    val key: String get() = rowKey ?: "$channelId|$channelUrl"
     val isStrong: Boolean get() = confidenceTier == "strong"
 
-    /** The channel as Live TV tunes it. */
+    /** "<channel> · <stream>" for a stream of a Stremio channel, else the channel's name. */
+    val title: String get() = streamLabel?.let { "$channelName · $it" } ?: channelName
+
+    /** The channel as Live TV tunes it, on the picked Stremio stream if any. */
     val channel: LiveChannel
         get() = LiveChannel(id = channelId, name = channelName, url = channelUrl, logo = channelLogo,
-                            tvgId = channelTvgId, sourceId = sourceId, sourceName = sourceName)
+                            tvgId = channelTvgId, sourceId = sourceId, sourceName = sourceName,
+                            stremioStreamIndex = stremioStreamIndex)
 }
 
 // Preferences
