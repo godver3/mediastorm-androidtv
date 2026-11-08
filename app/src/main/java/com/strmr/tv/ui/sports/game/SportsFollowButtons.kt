@@ -32,12 +32,12 @@ fun SportsFollowButtons(game: SportsGame, kind: SportsKind) {
     val teamIds = hub.teamIds
     listOf(game.awayTeam, game.homeTeam).let { if (kind.awayFirst) it else it.reversed() }.forEach { team ->
         val followed = SportsTeamFollows.isFollowed(teamIds, game.league, team.id)
-        OutlinedButton(onClick = { SportsTeamFollowing.toggle(game.league, team.id, team.shortName, !followed) }) {
+        OutlinedButton(onClick = { SportsTeamFollowing.toggle(game.league, team.id, team.followName, !followed) }) {
             if (followed) {
                 Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
             }
-            Text("${if (followed) "Following" else "Follow"} ${team.shortName}")
+            Text("${if (followed) "Following" else "Follow"} ${team.followName}")
         }
     }
 }

@@ -75,4 +75,10 @@ class SportsTeamFollowsTest {
         assertFalse(SportsTeamFollows.isTeamLeague(league("""{"id":"ufc","enabled":true,"sport":"mma"}""")))
         assertFalse(SportsTeamFollows.isTeamLeague(league("""{"id":"x","enabled":true,"sport":"soccer","supportsTeams":false}""")))
     }
+
+    @Test fun followButtonsNameATeamByItsNickname() {
+        assertEquals("Timberwolves", SportsTeam(name = "Minnesota Timberwolves", nickname = "Timberwolves", abbreviation = "MIN").followName)
+        assertEquals("Minnesota Timberwolves", SportsTeam(name = "Minnesota Timberwolves", nickname = " ", abbreviation = "MIN").followName)
+        assertEquals("MIN", SportsTeam(abbreviation = "MIN").followName)
+    }
 }

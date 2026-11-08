@@ -127,6 +127,8 @@ data class SportsTeam(
 ) {
     val logo: String? get() = logoUrl?.takeIf { it.startsWith("https://") }
     val shortName: String get() = abbreviation?.ifEmpty { null } ?: name
+    /** "Timberwolves": the follow buttons name a team by it (nickname, else name, else abbreviation). */
+    val followName: String get() = nickname?.ifBlank { null } ?: name.ifBlank { null } ?: abbreviation.orEmpty()
 
     /** A poll ranking worth showing (Expo keeps 1–25). */
     val displayRank: Int? get() = rank?.takeIf { it in 1..25 }
