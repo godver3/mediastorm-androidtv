@@ -9,8 +9,11 @@ import com.strmr.tv.app.AppLog
 import com.strmr.tv.live.Recording
 import com.strmr.tv.live.RecordingFilter
 import com.strmr.tv.live.RecordingRules
+import com.strmr.tv.live.SeriesRule
 import com.strmr.tv.live.cancelRecording
 import com.strmr.tv.live.deleteRecording
+import com.strmr.tv.live.deleteRecordingRule
+import com.strmr.tv.live.recordingRules
 import com.strmr.tv.live.recordings
 import com.strmr.tv.ui.AppToast
 import kotlinx.coroutines.CancellationException
@@ -24,6 +27,9 @@ import kotlinx.coroutines.launch
  */
 class RecordingsState(private val scope: CoroutineScope) {
     var recordings by mutableStateOf<List<Recording>>(emptyList())
+        private set
+    /** The profile's recording rules, so a rule's airing offers to cancel the whole series. */
+    var rules by mutableStateOf<List<SeriesRule>>(emptyList())
         private set
     var loading by mutableStateOf(true)
         private set
@@ -49,6 +55,7 @@ class RecordingsState(private val scope: CoroutineScope) {
         if (!quiet) refreshing = true
         try {
             recordings = ApiClient.recordings()
+            runCatching { ApiClient.recordingRules() }.getOrNull()?.let { rules = it }
             error = null
         } catch (e: CancellationException) {
             throw e
@@ -65,6 +72,16 @@ class RecordingsState(private val scope: CoroutineScope) {
 
     /** Cancels a scheduled recording or stops one in progress. */
     fun cancel(r: Recording) = act(r, "cancel", "Cancelled", "Failed to cancel recording.") { ApiClient.cancelRecording(r.id) }
+
+    /** The rule that scheduled a recording still to come or in progress (else null). */
+    fun ruleFor(r: Recording): SeriesRule? =
+        r.ruleId?.takeIf { RecordingRules.canCancel(r) }?.let { id -> rules.firstOrNull { it.id == id } }
+
+    /** Deletes the recording's rule; the server cancels the airings it scheduled. */
+    fun cancelSeries(r: Recording) {
+        val rule = ruleFor(r) ?: return
+        act(r, "cancel series", "Cancelled the series", "Failed to cancel the series recording.") { ApiClient.deleteRecordingRule(rule.id) }
+    }
 
     /** The deleted row's neighbour (the next, else the previous) becomes the selection, so its actions aren't a different recording's by surprise. */
     fun delete(r: Recording) = act(r, "delete", "Deleted", "Failed to delete recording.") {

@@ -75,7 +75,8 @@ fun ChannelLogo(channel: LiveChannel, width: Dp, height: Dp, fontSize: TextUnit,
 /**
  * Long-press actions shared by channel cards and guide cells (Expo's TV programme and channel
  * menus). A guide [program] that hasn't ended leads with its recording: Stop / Cancel the one
- * covering it, else Record (on now) or Record Once (later), then Record Series. Without one, the
+ * covering it, else Record (on now) or Record Once (later), then Record Series (or, when a rule
+ * already records it, switch that series or cancel it). Without one, the
  * channel's: Record Current Program (or Stop Recording) and Record Every Airing. Then Record 2 Hour
  * Block, Choose Source (Stremio channels), favorite and hide.
  */
@@ -93,9 +94,17 @@ fun ChannelMenu(store: LiveStore, channel: LiveChannel, program: EpgProgram? = n
             } else {
                 DialogChoice(if (!asProgram) "Record Current Program" else if (p.isAiring(now)) "Record" else "Record Once") { rec.record(p, channel) }
             },
+        ) + (rec.seriesRule(p, channel)?.let { rule ->
+            // Already a series: switch it, or cancel it (the rule and the airings it scheduled).
+            listOf(
+                if (rule.newOnly) DialogChoice("Record Every Airing Instead") { rec.setSeries(rule, newOnly = false) }
+                else DialogChoice("Record New Episodes Only Instead") { rec.setSeries(rule, newOnly = true) },
+                DialogChoice(if (rule.isRegex) "Delete Rule \"${rule.pattern}\"" else "Cancel Series Recording") { rec.cancelSeries(rule) },
+            )
+        } ?: listOf(
             DialogChoice(if (asProgram) "Record Series" else "Record Every Airing") { rec.recordSeries(p, channel) },
             DialogChoice("Record New Episodes Only") { rec.recordSeries(p, channel, newOnly = true) },
-        )
+        ))
     }.orEmpty()
     ChoiceDialog(
         title = program?.takeIf { it.stopMs > now }?.title ?: channel.name,

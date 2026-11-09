@@ -77,6 +77,7 @@ fun RecordingsScreen(asPage: Boolean = false) {
     val selectedRow = remember { FocusRequester() }
     var menuFor by remember { mutableStateOf<Recording?>(null) }
     var confirm by remember { mutableStateOf<Pair<Recording, Boolean>?>(null) }
+    var cancelSeriesFor by remember { mutableStateOf<Recording?>(null) }
     val sessionsEnded by PlaybackCoordinator.sessionsEnded.collectAsState()
 
     LaunchedEffect(sessionsEnded) {
@@ -147,9 +148,10 @@ fun RecordingsScreen(asPage: Boolean = false) {
                     }
                 }
                 RecordingDetail(
-                    selected, busy = state.busyId == selected.id, actionsFocus = actionsFocus,
+                    selected, rule = state.ruleFor(selected), busy = state.busyId == selected.id, actionsFocus = actionsFocus,
                     onPlay = { PlaybackCoordinator.playRecording(it) },
                     onCancel = { confirm = it to false },
+                    onCancelSeries = { cancelSeriesFor = it },
                     onDelete = { confirm = it to true },
                     modifier = Modifier.weight(0.58f).fillMaxHeight(),
                 )
@@ -158,11 +160,16 @@ fun RecordingsScreen(asPage: Boolean = false) {
     }
 
     menuFor?.let { r ->
-        RecordingMenu(r, onPlay = { PlaybackCoordinator.playRecording(r) }, onCancel = { confirm = r to false },
-                      onDelete = { confirm = r to true }, onDismiss = { menuFor = null })
+        RecordingMenu(r, state.ruleFor(r), onPlay = { PlaybackCoordinator.playRecording(r) }, onCancel = { confirm = r to false },
+                      onCancelSeries = { cancelSeriesFor = r }, onDelete = { confirm = r to true }, onDismiss = { menuFor = null })
     }
     confirm?.let { (r, delete) ->
         RecordingConfirmation(r, delete, onConfirm = { if (delete) state.delete(r) else state.cancel(r) }, onDismiss = { confirm = null })
+    }
+    cancelSeriesFor?.let { r ->
+        val rule = state.ruleFor(r)
+        if (rule == null) cancelSeriesFor = null
+        else SeriesCancelConfirmation(rule, onConfirm = { state.cancelSeries(r) }, onDismiss = { cancelSeriesFor = null })
     }
 }
 

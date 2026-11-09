@@ -18,6 +18,9 @@ import kotlinx.coroutines.launch
 class LiveRecordings(private val scope: CoroutineScope, private val notify: (String) -> Unit) {
     var active by mutableStateOf<List<Recording>>(emptyList())
         private set
+    /** The profile's series / regex rules, so a programme a rule covers offers to cancel or switch it. */
+    var rules by mutableStateOf<List<SeriesRule>>(emptyList())
+        private set
     private var job: Job? = null
 
     /** Refreshes [active] until the caller's coroutine is cancelled. */
@@ -30,9 +33,22 @@ class LiveRecordings(private val scope: CoroutineScope, private val notify: (Str
 
     /** Keeps what was last known through a transient failure. */
     suspend fun refresh() {
-        val fresh = runCatching { ApiClient.activeRecordings() }.getOrNull() ?: return
-        if (fresh != active) active = fresh
+        runCatching { ApiClient.activeRecordings() }.getOrNull()?.let { if (it != active) active = it }
+        runCatching { ApiClient.recordingRules() }.getOrNull()?.let { if (it != rules) rules = it }
     }
+
+    /** The rule that records [program] on the channel, if any. */
+    fun seriesRule(program: EpgProgram, channel: LiveChannel): SeriesRule? = SeriesRule.find(rules, program.title, channel)
+
+    /** Deletes the rule; the server cancels the airings it scheduled (one recording now keeps going). */
+    fun cancelSeries(rule: SeriesRule) =
+        perform("Series recording cancelled for ${rule.summary}.") { ApiClient.deleteRecordingRule(rule.id) }
+
+    /** Switches an existing rule between every airing and new episodes only. */
+    fun setSeries(rule: SeriesRule, newOnly: Boolean) =
+        perform(if (newOnly) "Now recording only new episodes of ${rule.summary}." else "Now recording every airing of ${rule.summary}.") {
+            ApiClient.setRecordingRuleNewOnly(rule.id, newOnly)
+        }
 
     /**
      * The active recording overlapping [program] on the channel, else (without one) the one
