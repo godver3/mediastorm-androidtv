@@ -91,9 +91,10 @@ data class HomeCard(
      * The badges the card draws, top to bottom, under [visibility]: the rank or air date always,
      * then the release status and the watch state when on. A series' unwatched count rides in
      * the watch-state badge (as the Expo card puts the number beside the icon), or stands alone.
+     * A zero count is dropped, so a fully watched series shows just the checkmark.
      */
     fun visibleBadges(visibility: BadgeVisibility): List<CardBadge> {
-        val count = unwatchedCount?.takeIf { visibility.unwatchedCount }
+        val count = unwatchedCount?.takeIf { visibility.unwatchedCount && it > 0 }
         val watch = watchBadge?.takeIf { visibility.watchState }
         val watchOrCount = when {
             count == null -> watch

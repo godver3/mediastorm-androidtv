@@ -50,11 +50,9 @@ class BadgeVisibilityTest {
     }
 
     @Test
-    fun countShowsForEverySeriesTheServerCountsIncludingZero() {
-        assertEquals(
-            listOf(CardBadge("Watched, 0 unwatched", CardBadge.Symbol.WATCHED, count = 0)),
-            HomeCard.from(series(0, state = "complete")).visibleBadges(all),
-        )
+    fun countShowsForEverySeriesTheServerCountsExceptZero() {
+        assertEquals(listOf(CardBadge.Watched), HomeCard.from(series(0, state = "complete")).visibleBadges(all))
+        assertEquals(emptyList<CardBadge>(), HomeCard.from(series(0, state = "none")).visibleBadges(all))
         assertEquals(listOf(CardBadge("12 unwatched", count = 12)), HomeCard.from(series(12, state = "none")).visibleBadges(all))
         assertEquals(listOf(CardBadge.InProgress), HomeCard.from(series(null)).visibleBadges(all))
         assertEquals(listOf(CardBadge.InProgress), HomeCard.from(series(5)).visibleBadges(all.copy(unwatchedCount = false)))
