@@ -82,15 +82,6 @@ fun DetailsMoreMenu(
     }
 }
 
-/** The Continue Watching entry for this title: its ID, or a shared provider ID. */
-private fun ContinueWatchingItem.isTitle(target: DetailsTarget): Boolean {
-    if (isMovie != target.isMovie) return false
-    if (seriesId == target.titleId) return true
-    val ids = externalIds ?: return false
-    return listOf("tmdb" to target.tmdbId, "imdb" to target.imdbId, "tvdb" to target.tvdbId)
-        .any { (key, value) -> !value.isNullOrEmpty() && ids[key] == value }
-}
-
 /**
  * The row's actions set to More, in row order, each labelled with its current state. The
  * callbacks are the page's, as the row's buttons use them.
