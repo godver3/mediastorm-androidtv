@@ -66,6 +66,8 @@ dependencies {
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     // Background playback: the media notification, lock screen and Bluetooth controls.
     implementation("androidx.media3:media3-session:1.10.1")
+    // Casting to Chromecasts (the Default Media Receiver); DLNA TVs are driven by hand (cast/Dlna*).
+    implementation("com.google.android.gms:play-services-cast-framework:22.3.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     // The FFmpeg audio decoders (TrueHD, DTS…): scripts/sync-vendor.sh copies them to core/libs.

@@ -21,6 +21,10 @@
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.MediaStorm">
+        <!-- Casting to Chromecasts: the Cast SDK's options (the Default Media Receiver). -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.strmr.mobile.cast.CastOptionsProvider" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
