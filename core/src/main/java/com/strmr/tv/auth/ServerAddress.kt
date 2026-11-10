@@ -33,16 +33,21 @@ object ServerAddress {
             .build()
     }
 
-    /** Private IPv4 ranges, localhost, `.local` and bare (dot-less) hostnames. */
+    /**
+     * Private IPv4 ranges, localhost, `.local` and bare (dot-less) hostnames, plus Tailscale
+     * (100.64.0.0/10 and MagicDNS `*.ts.net`): a VPN is how the server is reached away from
+     * home, and it serves plain HTTP on 7777 there too.
+     */
     fun isLocal(host: String): Boolean {
         val h = host.lowercase()
-        if (h == "localhost" || h.endsWith(".local") || !h.contains('.')) return true
+        if (h == "localhost" || h.endsWith(".local") || h.endsWith(".ts.net") || !h.contains('.')) return true
         val octets = h.split('.').mapNotNull { it.toIntOrNull() }
         if (octets.size != 4) return false
         return when {
             octets[0] == 10 || octets[0] == 127 -> true
             octets[0] == 192 && octets[1] == 168 -> true
             octets[0] == 172 && octets[1] in 16..31 -> true
+            octets[0] == 100 && octets[1] in 64..127 -> true
             else -> false
         }
     }
