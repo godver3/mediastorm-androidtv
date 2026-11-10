@@ -1,22 +1,31 @@
 package com.strmr.mobile.ui.settings
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import com.strmr.mobile.ui.shell.PageScaffold
 
+/** The settings sub pages' keys, for [com.strmr.mobile.ui.shell.Route.SettingsPage]. */
+object SettingsKeys {
+    const val PLAYBACK = "playback"
+    const val SUBTITLES = "subtitles"
+    const val HOME = "home"
+    const val CARDS = "cards"
+    const val MENU = "menu"
+    const val SERVER = "server"
+    const val UPDATES = "updates"
+    const val ABOUT = "about"
+}
 
-/** Placeholder until this screen is built. */
+/** A settings sub page, by its key. */
 @Composable
 fun SettingsPageScreen(key: String, title: String) {
-    PageScaffold("Settings", showBack = true) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-            Text("Settings", style = MaterialTheme.typography.titleMedium)
-        }
+    when (key) {
+        SettingsKeys.PLAYBACK -> PlaybackSettingsPage()
+        SettingsKeys.SUBTITLES -> SubtitleSettingsPage()
+        SettingsKeys.HOME -> HomeSettingsPage()
+        SettingsKeys.CARDS -> CardSettingsPage()
+        SettingsKeys.MENU -> MenuSettingsPage()
+        SettingsKeys.SERVER -> ServerSettingsPage()
+        SettingsKeys.UPDATES -> UpdateSettingsPage()
+        SettingsKeys.ABOUT -> AboutSettingsPage()
+        else -> SettingsPage(title) {}
     }
 }
