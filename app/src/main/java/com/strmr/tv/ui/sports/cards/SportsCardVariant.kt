@@ -62,20 +62,6 @@ fun SportsCardDelayed() {
 }
 
 /**
- * A logo-less side's mark: a team's short abbreviation ("RCB"), else a player's initials
- * ("Chris Rodesch" → "CR", "J.J. Spaun" → "JS").
- */
-val SportsTeam.monogram: String
-    get() {
-        val short = abbreviation
-        if (!short.isNullOrEmpty() && short.length <= 4 && ' ' !in short && '.' !in short) return short
-        val words = name.split(' ', '/').filter { it.firstOrNull()?.isLetter() == true }
-        val first = words.firstOrNull()?.first() ?: return shortName.take(3)
-        val last = if (words.size > 1) words.last().first() else null
-        return listOfNotNull(first, last).joinToString("").uppercase()
-    }
-
-/**
  * A field event on the hub (Expo `FieldEventCard` for individual golf and schedule-only boxing,
  * tvOS `SportsFieldCard`): the event's title, how it stands, then the top two on the leaderboard
  * with their score and round ("-19 · R4"). Hide Scores keeps the title and drops the standings.

@@ -20,6 +20,9 @@ data class SeriesRule(
     val allChannels: Boolean = false,
     val enabled: Boolean = true,
     val newOnly: Boolean = false,
+    /** Padding the rule adds before and after each airing it records. */
+    val paddingBeforeSeconds: Int = 0,
+    val paddingAfterSeconds: Int = 0,
 ) {
     val isRegex get() = matchType == "regex"
 

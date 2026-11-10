@@ -18,10 +18,10 @@ import com.strmr.mobile.ui.search.SearchScreen
 import com.strmr.mobile.ui.settings.SettingsPageScreen
 import com.strmr.mobile.ui.settings.SettingsScreen
 import com.strmr.mobile.ui.sports.SportsCompetitionScreen
-import com.strmr.mobile.ui.sports.SportsCyclingScreen
-import com.strmr.mobile.ui.sports.SportsGameScreen
+import com.strmr.mobile.ui.sports.cycling.SportsCyclingScreen
+import com.strmr.mobile.ui.sports.game.SportsGameScreen
 import com.strmr.mobile.ui.sports.SportsPreferencesScreen
-import com.strmr.mobile.ui.sports.SportsRaceScreen
+import com.strmr.mobile.ui.sports.race.SportsRaceScreen
 import com.strmr.mobile.ui.sports.SportsScreen
 import com.strmr.mobile.ui.watchlist.WatchlistScreen
 
