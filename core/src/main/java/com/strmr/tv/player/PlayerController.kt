@@ -184,6 +184,12 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 player.prepare()
                 return
             }
+            // A platform audio decoder that rejects the stream (Atmos on some phones): FFmpeg takes over.
+            AudioDecoderFallback.exclude(e)?.let { decoder ->
+                AppLog.w("Player", "audio decoder $decoder failed (${e.message}); retrying with FFmpeg")
+                player.prepare()
+                return
+            }
             if (catchup?.failed(e.message ?: e.errorCodeName) == true) return
             // A live stream that fell behind its window rejoins at the live edge.
             if (session.isLive && e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -208,6 +214,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             // Platform decoders first; the FFmpeg extension (TrueHD, DTS…) when none can.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
+            .setMediaCodecSelector(AudioDecoderFallback.selector)
         val http = OkHttpDataSource.Factory(ApiClient.http).setDefaultRequestProperties(ApiClient.mediaHeaders)
         // HTTP(S) through OkHttp as before; `file://` (a phone's downloaded copy) from disk.
         val dataSource = DefaultDataSource.Factory(context, http)
