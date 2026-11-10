@@ -44,21 +44,6 @@ import com.strmr.tv.player.ManualTracks
 import com.strmr.tv.ui.Accent
 import com.strmr.tv.ui.ignoreHeldSelect
 
-/** A result's track probe for the panel: null while it runs. */
-data class ProbeState(val probe: TrackProbe?)
-
-/** What the panel preselects before the user changes anything: the profile's languages and mode. */
-data class TrackDefaults(
-    val audioLanguage: String?,
-    val subtitleLanguage: String?,
-    val subtitleMode: String?,
-    val allowed: List<String>,
-    val losslessAudio: Boolean = false,
-)
-
-/** Tracks the server already chose (container stream numbers; a null subtitle is off), preselected instead. */
-data class PreselectedTracks(val audio: Int?, val subtitle: Int?)
-
 /**
  * The Expo TV long-press track panel for one manual-selection result: its probed audio and
  * subtitle tracks (limited to the profile's allowed languages), the default ones preselected,
@@ -114,7 +99,7 @@ fun SourceTracksDialog(
                         }
                         state.probe is TrackProbe.Failed -> Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Couldn't load tracks", style = MaterialTheme.typography.titleMedium)
-                            Text(state.probe.reason, color = Color.White.copy(alpha = 0.6f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                            Text((state.probe as TrackProbe.Failed).reason, color = Color.White.copy(alpha = 0.6f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                             Text("Play uses the default tracks.", color = Color.White.copy(alpha = 0.6f))
                         }
                         !loaded -> Text("No track information available. Play uses the default tracks.",

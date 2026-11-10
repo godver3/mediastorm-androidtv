@@ -27,39 +27,6 @@ import com.strmr.tv.ui.LocalNavigator
 import com.strmr.tv.ui.Page
 import kotlinx.coroutines.launch
 
-/**
- * An unmatched library file ready to play: its stream path, and where it was left. Its progress is
- * keyed by that path (the Expo app's rule), since no catalog id names it.
- */
-data class LibraryFileStart(
-    val group: LibraryGroup,
-    val versions: LibraryVersions,
-    val version: LibraryVersion,
-    val episode: PlaybackRequest.EpisodeInfo?,
-    val following: List<PlaybackRequest.EpisodeInfo>,
-    val playback: LibraryPlaybackInfo,
-    val resumeAt: StartPoint?,
-) {
-    fun play(from: StartPoint?) {
-        val request = PlaybackRequest(
-            DetailsTarget.unmatched(group), episode, from, backdrops = listOfNotNull(episode?.imageUrl, group.backdropUrl),
-            following = following, library = versions,
-        )
-        PlaybackCoordinator.playLibrary(request, version, playback)
-    }
-
-    companion object {
-        suspend fun prepare(
-            version: LibraryVersion, versions: LibraryVersions, group: LibraryGroup,
-            episode: PlaybackRequest.EpisodeInfo? = null, following: List<PlaybackRequest.EpisodeInfo> = emptyList(),
-        ): LibraryFileStart {
-            val playback = ApiClient.libraryPlayback(version.id)
-            val resume = ApiClient.resumeState(if (episode == null) "movie" else "episode", playback.streamPath)
-            return LibraryFileStart(group, versions, version, episode, following, playback, resume?.startPoint)
-        }
-    }
-}
-
 /** Resume / Start Over for a library file left partway. */
 @Composable
 fun LibraryResumeDialog(start: LibraryFileStart, onDismiss: () -> Unit) {
