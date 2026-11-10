@@ -73,6 +73,7 @@ fun MainScaffold() {
     }
 
     CompositionLocalProvider(LocalNavigator provides navigator) {
+        com.strmr.mobile.ui.components.TitleMenuHost()
         if (compact) {
             Scaffold(
                 bottomBar = {
