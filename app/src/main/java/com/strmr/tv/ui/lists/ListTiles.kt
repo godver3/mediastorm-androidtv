@@ -55,24 +55,6 @@ import com.strmr.tv.ui.MinimalScroll
 private val TILE_WIDTH = 240.dp
 private val TILE_HEIGHT = 135.dp
 
-/** Artwork of a list's first titles. */
-data class TileArt(val posters: List<String> = emptyList(), val backdrops: List<String> = emptyList())
-
-/**
- * A tile to show: its list, its size when known up front, and artwork when the tab already
- * has it (otherwise the tile fetches the list's first titles). `title` overrides the list's
- * name (collection hub cards); `logo` draws on a plain panel instead (services, hub cards).
- */
-data class TileSpec(
-    val list: BrowseList,
-    val title: String? = null,
-    val count: Int? = null,
-    val art: TileArt? = null,
-    val logo: String? = null,
-    /** Under the name when there is no count (a library's source and kind). */
-    val subtitle: String? = null,
-)
-
 /** A titled row of list tiles; focus returns to the tile last focused in it, as on Home. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -173,38 +155,5 @@ private fun NewListTile(onClick: () -> Unit) {
             Text("New List", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.6f),
                  modifier = Modifier.padding(top = 8.dp).height(22.dp))
         }
-    }
-}
-
-/**
- * The first few titles of each list, for its tile, kept per profile for the app's lifetime
- * so scrolling back and forth or switching Movies / Shows doesn't refetch.
- */
-private object BrowsePreviews {
-    private val cache = mutableMapOf<String, TileArt>()
-
-    suspend fun art(list: BrowseList, version: Int?): TileArt {
-        if (list is BrowseList.Similar) return TileArt() // the seed's own backdrop
-        val key = "${ApiClient.profileId}|$list|${version ?: ""}"
-        cache[key]?.let { return it }
-        // Four posters: the quick pass, not a whole remote list read and filled in first.
-        val page = runCatching { ApiClient.browsePage(list, limit = 4, phase = ShelfPhase.CARDS) }.getOrNull() ?: return TileArt()
-        val art = TileArt(page.entries.mapNotNull(::posterOf), page.entries.mapNotNull(::backdropOf))
-        cache[key] = art
-        return art
-    }
-
-    private fun posterOf(e: BrowseEntry): String? = when (e) {
-        is BrowseEntry.TitleEntry -> (e.title.textPoster ?: e.title.poster)?.url
-        is BrowseEntry.ItemEntry -> e.item.textPosterUrl ?: e.item.posterUrl
-        is BrowseEntry.WatchingEntry -> e.item.textPosterUrl ?: e.item.posterUrl
-        is BrowseEntry.LibraryItemEntry -> e.entry.group.posterUrl
-    }
-
-    private fun backdropOf(e: BrowseEntry): String? = when (e) {
-        is BrowseEntry.TitleEntry -> e.title.backdrop?.url
-        is BrowseEntry.ItemEntry -> e.item.backdropUrl
-        is BrowseEntry.WatchingEntry -> e.item.backdropUrl
-        is BrowseEntry.LibraryItemEntry -> e.entry.group.backdropUrl
     }
 }

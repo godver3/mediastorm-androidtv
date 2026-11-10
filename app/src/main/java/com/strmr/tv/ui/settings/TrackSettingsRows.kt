@@ -8,22 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
-import com.strmr.tv.api.ApiClient
-import com.strmr.tv.api.playbackSettings
-import com.strmr.tv.api.subtitleServerSettings
-import com.strmr.tv.player.RegionalAudio
-import com.strmr.tv.player.SubtitleLanguages
 import com.strmr.tv.player.TrackOverrides
 import com.strmr.tv.ui.PickerDialog
-
-/** Reads the server's values the track rows show as "Default (…)". */
-suspend fun loadTrackDefaults() {
-    val playback = runCatching { ApiClient.playbackSettings() }.getOrNull()
-    TrackOverrides.serverSubtitleMode = playback?.preferredSubtitleMode
-    TrackOverrides.serverSubtitleLanguage = playback?.preferredSubtitleLanguage
-    TrackOverrides.serverAudioLanguage = playback?.preferredAudioLanguage
-    TrackOverrides.serverTranslation = ApiClient.subtitleServerSettings().translationEnabled
-}
 
 /**
  * Settings › Playback: Subtitles, Subtitle Translation, Subtitle Language and Audio
@@ -83,17 +69,8 @@ fun LazyListScope.trackSettingRows() {
 /** With `regional`, each regional dub ("French (Canada)") follows its language. */
 @Composable
 private fun LanguageRow(title: String, value: String?, server: String?, set: (String?) -> Unit, regional: Boolean = false) {
-    val options = SubtitleLanguages.options.flatMap { option ->
-        val variants = if (!regional) emptyList() else RegionalAudio.options
-            .filter { SubtitleLanguages.canonical(it.first) == option.settingCode }
-            .map { (code, name) -> SubtitleLanguages.Option(option.code, code, name) }
-        listOf(option) + variants
-    }
-    val selected = value?.let { v ->
-        options.indexOfFirst {
-            SubtitleLanguages.canonical(it.settingCode) == SubtitleLanguages.canonical(v) && RegionalAudio.sameVariant(it.settingCode, v)
-        }
-    }
+    val options = LanguageChoices.options(regional)
+    val selected = LanguageChoices.indexOf(options, value)
     ChoiceRow(
         title, null,
         choices = options.map { it.name },
