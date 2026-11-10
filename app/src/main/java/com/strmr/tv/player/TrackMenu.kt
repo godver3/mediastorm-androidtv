@@ -25,21 +25,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.media3.common.C
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-
-/** One row of a player menu; a new `section` starts a headed group. */
-data class MenuChoice(
-    val title: String,
-    val detail: String? = null,
-    val selected: Boolean,
-    val section: String? = null,
-    val onClick: () -> Unit,
-)
 
 /**
  * A player popover (the tvOS transport bar's menus): a titled, rounded glass list rising
@@ -67,8 +57,9 @@ fun ChoiceMenu(title: String, choices: List<MenuChoice>, empty: String, modifier
                  color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp))
         }
         itemsIndexed(choices) { index, choice ->
-            if (choice.section != null && choice.section != choices.getOrNull(index - 1)?.section) {
-                Text(choice.section, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.5f),
+            val section = choice.section
+            if (section != null && section != choices.getOrNull(index - 1)?.section) {
+                Text(section, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.5f),
                      modifier = Modifier.padding(start = 12.dp, top = if (index == 0) 0.dp else 10.dp, bottom = 2.dp))
             }
             ListItem(
@@ -115,32 +106,7 @@ fun TrackMenu(
     val external by controller.external.track.collectAsState()
     val externalOn by controller.external.selected.collectAsState()
     val translation by controller.online.serverTranslation.collectAsState()
-    val list = tracks.ofType(if (audio) C.TRACK_TYPE_AUDIO else C.TRACK_TYPE_TEXT)
-        .filter { it.supported && (controller.session.isLive || !TrackPreferences.isClosedCaption(it.format)) }
-    val ext = external.takeIf { !audio }
-    val choices = buildList {
-        if (!audio && (list.isNotEmpty() || ext != null)) {
-            add(MenuChoice("Off", selected = list.none { it.selected } && !(ext != null && externalOn)) { controller.subtitlesOff(); onDone() })
-        }
-        ext?.let { t ->
-            add(MenuChoice(t.title, t.detail, selected = externalOn) { controller.selectExternal(); onDone() })
-        }
-        list.forEach { track ->
-            val f = track.format
-            add(MenuChoice(f.menuTitle("Track ${track.typeIndex + 1}"), if (audio) f.audioDetail() else f.subtitleDetail(),
-                           track.selected) { controller.select(track); onDone() })
-        }
-        if (!audio && onSearch != null && controller.online.available) {
-            add(MenuChoice("Search Online…", selected = false, onClick = onSearch))
-        }
-        // Only while the server allows translation (its switch is a kill switch).
-        if (!audio && onTranslate != null && controller.online.available && translation == true) {
-            add(MenuChoice("Translate…", selected = false, onClick = onTranslate))
-        }
-        if (!audio && onStyle != null && (list.isNotEmpty() || ext != null)) {
-            add(MenuChoice("Style", SubtitleStyle.sizeName(SubtitleStyleStore.style.size), selected = false, onClick = onStyle))
-        }
-    }
+    val choices = trackMenuChoices(controller, audio, tracks, external, externalOn, translation, onDone, onStyle, onSearch, onTranslate)
     ChoiceMenu(if (audio) "Audio" else "Subtitles", choices, if (audio) "No audio tracks" else "No subtitles", modifier)
 }
 
@@ -150,18 +116,7 @@ fun TrackMenu(
  */
 @Composable
 fun SubtitleStyleMenu(modifier: Modifier = Modifier) {
-    val style = SubtitleStyleStore.style
-    val choices = SubtitleStyle.sizes.map { v ->
-        MenuChoice(SubtitleStyle.sizeName(v), selected = v == style.size, section = "Size") { SubtitleStyleStore.update { it.copy(size = v) } }
-    } + SubtitleStyle.backgroundOpacities.map { v ->
-        MenuChoice(SubtitleStyle.percent(v), selected = v == style.backgroundOpacity, section = "Background") {
-            SubtitleStyleStore.update { it.copy(backgroundOpacity = v) }
-        }
-    } + SubtitleStyle.margins.map { v ->
-        MenuChoice(SubtitleStyle.marginName(v), selected = v == style.bottomMargin, section = "Position") {
-            SubtitleStyleStore.update { it.copy(bottomMargin = v) }
-        }
-    }
+    val choices = subtitleStyleChoices()
     ChoiceMenu("Subtitle Style", choices, "", modifier)
 }
 
@@ -169,11 +124,8 @@ fun SubtitleStyleMenu(modifier: Modifier = Modifier) {
 @Composable
 fun SpeedMenu(controller: PlayerController, onDone: () -> Unit, modifier: Modifier = Modifier) {
     val speed by controller.speed.collectAsState()
-    val choices = SPEEDS.map { s ->
-        MenuChoice(if (s == 1f) "Normal" else "${s}×", selected = s == speed) { controller.setSpeed(s); onDone() }
-    }
+    val choices = speedChoices(controller, speed, onDone)
     ChoiceMenu("Playback Speed", choices, "", modifier)
 }
 
-private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 private val MenuShape = RoundedCornerShape(20.dp)
