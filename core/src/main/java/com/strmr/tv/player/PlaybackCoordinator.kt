@@ -49,6 +49,12 @@ object PlaybackCoordinator {
     /** The player is on screen (log uploads hold off). */
     @Volatile var playerOpen = false
 
+    /**
+     * Offered every resolved title stream before the player opens; true takes it (the phone's
+     * Cast to Device… plays the resolve on a TV instead, without opening the player).
+     */
+    @Volatile var streamClaim: ((PlaybackRequest, ResolvedStream) -> Boolean)? = null
+
     /** The session the player picks up when it starts. */
     @Volatile var pending: PlayerSession? = null
         private set
@@ -229,6 +235,12 @@ object PlaybackCoordinator {
                 } else {
                     val settings = async { runCatching { ApiClient.playbackSettings() }.getOrNull() }
                     val r = resolve()
+                    if (streamClaim?.invoke(request, r) == true) {
+                        settings.cancel()
+                        AppLog.i("Playback", "resolved stream claimed (cast)")
+                        playerStarted()
+                        return@launch
+                    }
                     PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path) + StreamInfo.trackerQuery(r.path, r.source)), r.tracks, streamPath = r.path,
                                   releaseName = r.releaseName?.ifEmpty { null } ?: releaseFileName(r.path), subtitleStreams = r.subtitleStreams,
                                   playback = settings.await(), manualTracks = r.manualTracks, carried = carried,

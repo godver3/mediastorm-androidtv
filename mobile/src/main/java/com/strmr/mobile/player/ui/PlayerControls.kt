@@ -25,6 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.strmr.mobile.cast.castable
+import com.strmr.mobile.ui.cast.PlayerCastPicker
 import com.strmr.tv.player.PlayerController
 import com.strmr.tv.player.ProgrammeTimeline
 import com.strmr.tv.player.SkipAction
@@ -64,6 +66,7 @@ fun PlayerControls(
     val timer = remember { ChromeTimer() }
     var visible by remember { mutableStateOf(true) }
     var scrubbing by remember { mutableStateOf(false) }
+    var castPicker by remember { mutableStateOf(false) }
     val busy by rememberUpdatedState(ui.sheet != null || scrubbing)
     val isPlaying by rememberUpdatedState(playing)
     val live = controller.session.isLive
@@ -120,6 +123,7 @@ fun PlayerControls(
                         controller, onExit, onPictureInPicture,
                         onAudio = { open(PlayerSheet.AUDIO) }, onSubtitles = { open(PlayerSheet.SUBTITLES) },
                         onSettings = { open(PlayerSheet.SETTINGS) }, modifier = Modifier.align(Alignment.TopCenter),
+                        onCast = { castPicker = true }.takeIf { controller.session.castable() },
                     )
                     CenterButtons(
                         seekable = controller.seekable, playing = playing || (buffering && controller.player.playWhenReady),
@@ -157,6 +161,7 @@ fun PlayerControls(
         SubtitleStatus(controller, Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(top = 64.dp, end = 16.dp))
         error?.let { PlaybackErrorDialog(it, onExit) }
         PlayerSheetHost(controller, ui, tablet, aspectMode, onAspectMode)
+        if (castPicker) PlayerCastPicker(controller, onExit, onDismiss = { castPicker = false })
     }
 }
 

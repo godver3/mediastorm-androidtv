@@ -131,16 +131,18 @@ suspend fun ApiClient.clearLiveCache() {
  * query as on every header-less media URL. [forceHls]: an HLS session even when the source is
  * configured direct (multiscreen tiles, which each own and stop their session). [timeshift]: an
  * HLS session that keeps the server's timeshift window (`timeshift=1`), so the channel can be
- * paused and rewound; with timeshift off on the server it tunes as usual.
+ * paused and rewound; with timeshift off on the server it tunes as usual. [target] `cast` asks
+ * for a session a Chromecast or DLNA TV can read (H.264 / AAC, segments kept for a late join).
  */
 suspend fun ApiClient.startLive(
     channel: LiveChannel, programTitle: String?, forceHls: Boolean = false, timeshift: Boolean = false,
+    target: String = "native",
 ): LiveStream {
     val q = buildMap {
         if (forceHls) put("format", "hls")
         if (timeshift) put("timeshift", "1")
         put("url", channel.url)
-        put("target", "native")
+        put("target", target)
         put("profileId", profileId)
         put("mediaType", "channel")
         put("title", programTitle ?: channel.name)
