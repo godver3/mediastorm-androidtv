@@ -56,7 +56,7 @@ fun DetailsMoreSheet(state: DetailsPageState, warm: WarmPrequeue?, scope: Corout
         if (model.libraryVersions(state.activeEpisode).isNotEmpty()) {
             add(SheetAction("Versions", Icons.Outlined.Storage) { state.versionsFor = EpisodeTarget(state.activeEpisode) })
         }
-        addAll(DetailsExtras.provider?.moreActions(extras).orEmpty())
+        DetailsExtras.providers.forEach { addAll(it.moreActions(extras)) }
         add(SheetAction("Add to List…", Icons.AutoMirrored.Outlined.PlaylistAdd) { CustomListsStore.picking = target })
         if (!target.isMovie && model.seasons.isNotEmpty()) add(SheetAction("Watch State…", Icons.Outlined.Checklist) { state.watchState = true })
         if (inContinueWatching) {
@@ -96,7 +96,7 @@ fun EpisodeMenuSheet(state: DetailsPageState, episode: Episode, scope: Coroutine
         if (resumeAt != null) add(SheetAction("Start Over", Icons.Outlined.Replay) { state.play(episode, null) })
         if (model.libraryVersions(episode).isNotEmpty()) add(SheetAction("Choose Version", Icons.Outlined.Storage) { state.versionsFor = EpisodeTarget(episode) })
         add(SheetAction("Choose Source", Icons.Outlined.Search) { state.sourcesFor = EpisodeTarget(episode) })
-        addAll(DetailsExtras.provider?.episodeActions(extras, episode).orEmpty())
+        DetailsExtras.providers.forEach { addAll(it.episodeActions(extras, episode)) }
         add(SheetAction(if (watched) "Mark as Unwatched" else "Mark as Watched", Icons.Outlined.CheckCircle) {
             scope.launch { model.toggleWatched(episode) }
         })

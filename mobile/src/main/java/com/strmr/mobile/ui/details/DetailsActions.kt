@@ -131,7 +131,7 @@ fun SecondaryActions(state: DetailsPageState, trailer: TrailerController, extras
             }
             DetailsActionItem("Watched", icon) { state.watchState = true }
         }
-        DetailsExtras.provider?.run { Actions(extras) }
+        DetailsExtras.providers.forEach { it.run { Actions(extras) } }
     }
 }
 

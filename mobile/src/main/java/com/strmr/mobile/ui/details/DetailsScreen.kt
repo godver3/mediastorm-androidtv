@@ -139,7 +139,7 @@ private fun DetailsTopBar(title: String, scrolled: Boolean, extras: DetailsActio
         title = { if (scrolled) Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = { IconButton(onClick = { navigator.pop() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
         actions = {
-            DetailsExtras.provider?.run { TopBar(extras) }
+            DetailsExtras.providers.forEach { it.run { TopBar(extras) } }
             IconButton(onClick = onMore) { Icon(Icons.Filled.MoreVert, contentDescription = "More Options") }
         },
         colors = TopAppBarDefaults.topAppBarColors(

@@ -20,7 +20,7 @@ class DetailsActionContext(
 /**
  * Actions other features add to the details page without the page knowing them, Downloads
  * and Cast (as the iPhone page's Download and Cast to Device…). Each slot is optional; the
- * page draws whatever [DetailsExtras.provider] gives, in these places:
+ * page draws whatever the [DetailsExtras.providers] give, in registration order, in these places:
  */
 interface DetailsExtraActions {
     /** Round actions at the end of the action row (a Download button), as [DetailsActionItem]s. */
@@ -38,8 +38,13 @@ interface DetailsExtraActions {
     fun episodeActions(context: DetailsActionContext, episode: Episode): List<SheetAction> = emptyList()
 }
 
-/** Where the app registers its [DetailsExtraActions] (once, at start-up); null adds nothing. */
+/** Where features register their [DetailsExtraActions], once each at start-up (Downloads, Cast). */
 object DetailsExtras {
     @Volatile
-    var provider: DetailsExtraActions? = null
+    var providers: List<DetailsExtraActions> = emptyList()
+        private set
+
+    fun register(provider: DetailsExtraActions) {
+        if (provider !in providers) providers = providers + provider
+    }
 }
