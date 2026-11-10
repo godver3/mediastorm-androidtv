@@ -1,5 +1,7 @@
 package com.strmr.mobile.ui.sports.game
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import com.strmr.mobile.ui.sports.*
 import com.strmr.mobile.ui.sports.SportsChip
 import com.strmr.tv.sports.*
@@ -119,9 +121,13 @@ private fun Players(
 
 @Composable
 private fun Table(table: SportsBoxScoreTable, widths: List<Dp>, team: SportsTeam, marked: Marked?) {
+    // A phone scrolls a wide table sideways with the player column at a fixed width.
+    val compact = LocalSportsCompact.current
+    val nameWidth = if (compact) Modifier.width(150.dp) else Modifier
     SportsPanel(table.category.ifEmpty { "Players" }) {
+      Column(if (compact) Modifier.horizontalScroll(rememberScrollState()) else Modifier) {
         Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Player", fontSize = 11.sp, color = SportsMuted, modifier = Modifier.weight(1f))
+            Text("Player", fontSize = 11.sp, color = SportsMuted, modifier = if (compact) nameWidth else Modifier.weight(1f))
             table.columns.forEachIndexed { index, label ->
                 Text(SportsBoxScoreTable.heading(label), fontSize = 11.sp, color = SportsMuted, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.width(widths[index]))
             }
@@ -129,9 +135,9 @@ private fun Table(table: SportsBoxScoreTable, widths: List<Dp>, team: SportsTeam
         table.rows.forEach { row ->
             val focus = marked?.takeIf { it.first == SportsPlayerTarget(team.id, row.id, table.category) }?.second
             val selected = focus != null
-            SportsReadout(if (focus != null) Modifier.focusRequester(focus) else Modifier) {
+            SportsReadout {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(if (compact) nameWidth else Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         SportsPlayerPortrait(row.name, row.headshotUrl, team, 22.dp)
                         Text(row.name, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                         row.jersey?.let { Text("#$it", fontSize = 11.sp, color = SportsMuted) }
@@ -143,6 +149,7 @@ private fun Table(table: SportsBoxScoreTable, widths: List<Dp>, team: SportsTeam
                 }
             }
         }
+      }
     }
 }
 
