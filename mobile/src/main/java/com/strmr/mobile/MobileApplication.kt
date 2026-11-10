@@ -7,7 +7,11 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.strmr.mobile.cast.CastController
 import com.strmr.mobile.cast.install
+import com.strmr.mobile.connection.ConnectionManager
+import com.strmr.mobile.downloads.Downloads
 import com.strmr.mobile.player.MobilePlayerActivity
+import com.strmr.mobile.ui.details.DetailsExtras
+import com.strmr.mobile.ui.downloads.DownloadDetailsExtras
 import com.strmr.tv.api.ServerArtwork
 import com.strmr.tv.app.App
 import com.strmr.tv.app.Platform
@@ -34,11 +38,19 @@ class MobileApplication : Application(), ImageLoaderFactory {
         com.strmr.tv.diagnostics.CrashReporter.install()
         AppForeground.register(this)
         com.strmr.tv.diagnostics.MainThreadWatchdog.start()
-        AppForeground.onEntered = { com.strmr.tv.adaptive.AdaptiveThroughput.scheduleIdle("foreground-idle") }
+        AppForeground.onEntered = {
+            com.strmr.tv.adaptive.AdaptiveThroughput.scheduleIdle("foreground-idle")
+            ConnectionManager.foregrounded()
+        }
+        AppForeground.onLeft = { ConnectionManager.backgrounded() }
         AppUpdater.start()
         // Cast: on the details page, and offered every resolved stream (Cast to Device…).
         com.strmr.mobile.ui.details.DetailsExtras.register(com.strmr.mobile.ui.cast.DetailsCastActions)
         CastController.install()
+        // Home / away switching and reconnecting, then the download queue that follows them.
+        ConnectionManager.start()
+        Downloads.start()
+        DetailsExtras.register(DownloadDetailsExtras)
     }
 
     /**

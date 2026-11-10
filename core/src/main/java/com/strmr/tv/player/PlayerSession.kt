@@ -57,6 +57,13 @@ data class PlayerSession(
     val sourceDolbyVision: String? = null,
     /** The server's probe saw HDR10 (PQ) video in the file. */
     val sourceHdr10: Boolean = false,
+    /**
+     * A file on this device (a phone's download): no seek previews or Auto Switch, which need
+     * the server; [streamPath] stays the server path it was downloaded from.
+     */
+    val localFile: Boolean = false,
+    /** Also told about every progress report ([ProgressSink]): a download's local resume point and offline queue. */
+    val progressSink: ProgressSink? = null,
 )
 
 /** A resolved stream: its path, the server's track choice and what online subtitles match against. */

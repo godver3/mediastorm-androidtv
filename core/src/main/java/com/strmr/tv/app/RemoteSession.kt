@@ -52,11 +52,13 @@ internal object RemoteSession {
     fun leave() {
         RemoteAccess.forget()
         isRemote.value = false
+        NetworkRoutes.isHomeDirect.value = false
         ApiClient.remoteCredential = null
     }
 
     private fun enter() {
         isRemote.value = true
+        NetworkRoutes.isHomeDirect.value = false
         ApiClient.remoteCredential = RemoteAccess.pairing?.credential
     }
 }

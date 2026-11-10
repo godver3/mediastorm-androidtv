@@ -74,9 +74,10 @@ fun SettingsSheet(controller: PlayerController, ui: PlayerUiState, tablet: Boole
     }
 }
 
-/** Switch Source: a resolved title only (not live TV, trailers or recordings). */
+/** Switch Source: a resolved title only (not live TV, trailers, recordings or a downloaded file). */
 fun switchable(controller: PlayerController): Boolean =
-    !controller.session.isLive && controller.session.reportsProgress && controller.session.streamPath != null
+    !controller.session.isLive && controller.session.reportsProgress && controller.session.streamPath != null &&
+        !controller.session.localFile
 
 @Composable
 private fun SettingRow(icon: ImageVector, title: String, value: String?, onClick: () -> Unit) {

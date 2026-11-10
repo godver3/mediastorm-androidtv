@@ -159,7 +159,11 @@ object AppSession {
      * session's scope, since leaving the error screen would cancel the screen's own.
      */
     fun retryStartup() {
-        scope.launch { if (isRemote.value && RemoteSession.paired) RemoteSession.start() else resumeSession() }
+        scope.launch {
+            // A phone routed straight to its home server is still a paired launch.
+            val paired = (isRemote.value || NetworkRoutes.isHomeDirect.value) && RemoteSession.paired
+            if (paired) RemoteSession.start() else resumeSession()
+        }
     }
 
     fun changeServer() {

@@ -11,6 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import com.strmr.mobile.ui.connection.ConnectionBanner
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.app.AppSession
 import com.strmr.tv.app.MenuTabs
@@ -81,6 +83,7 @@ fun MainScaffold() {
                 bottomBar = {
                     androidx.compose.foundation.layout.Column {
                         com.strmr.mobile.ui.cast.CastNowPlayingBar()
+                        ConnectionBanner()
                         NavigationBar {
                             split.tabs.forEach { s -> SectionBarItem(s, navigator) }
                             if (split.more.isNotEmpty()) SectionBarItem(Section.MORE, navigator)
@@ -108,6 +111,7 @@ fun MainScaffold() {
                 androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxSize()) {
                     Box(Modifier.weight(1f).fillMaxSize()) { SectionContent(navigator, emptyList()) }
                     com.strmr.mobile.ui.cast.CastNowPlayingBar()
+                    ConnectionBanner(modifier = Modifier.navigationBarsPadding())
                 }
             }
         }
