@@ -30,21 +30,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import com.strmr.tv.api.ApiClient
-import com.strmr.tv.home.BrowseEntry
 import com.strmr.tv.home.BrowseList
-import com.strmr.tv.home.BrowsePage
 import com.strmr.tv.home.BrowseOptions
 import com.strmr.tv.home.BrowseSort
-import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
-import com.strmr.tv.home.browsePage
 import com.strmr.tv.home.filters
 import com.strmr.tv.home.indexesLetters
 import com.strmr.tv.home.offersRandom
 import com.strmr.tv.home.sorts
 import com.strmr.tv.library.CustomListsStore
-import com.strmr.tv.library.HiddenItemsStore
 import com.strmr.tv.library.TitleActions
 import com.strmr.tv.ui.ChoiceDialog
 import com.strmr.tv.ui.DialogChoice
@@ -57,126 +51,41 @@ import com.strmr.tv.ui.PosterGrid
 import com.strmr.tv.ui.fullWidth
 import kotlinx.coroutines.launch
 
-private const val PAGE = 60
-
 /**
  * A whole list as a poster grid, paged from `display-list` as focus nears the end: what a
  * Lists tile, an explore card, a streaming service, a collection hub card or Ask AI opens.
- * The server sorts and filters ([BrowseOptions]); any change reloads from the first page.
- * The profile's own lists can be renamed or deleted here, and long press removes a title.
+ * The server sorts and filters ([BrowseOptions]); any change reloads from the first page
+ * ([ListGridModel]). The profile's own lists can be renamed or deleted here, and long press
+ * removes a title.
  */
 @Composable
 fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
-    var options by remember { mutableStateOf(BrowseOptions()) }
-    var part by remember { mutableIntStateOf((list as? BrowseList.Service)?.part ?: 0) }
-    var entries by remember { mutableStateOf<List<BrowseEntry>>(emptyList()) }
-    /** Items read so far (duplicates dropped from `entries` included). */
-    var fetched by remember { mutableIntStateOf(0) }
-    var total by remember { mutableStateOf<Int?>(null) }
-    var genres by remember { mutableStateOf<List<String>>(emptyList()) }
-    var letters by remember { mutableStateOf<List<String>>(emptyList()) }
-    var loadError by remember { mutableStateOf<String?>(null) }
-    var actionError by remember { mutableStateOf<String?>(null) }
-    var loadingFor by remember { mutableStateOf<Any?>(null) }
-    var picking by remember { mutableStateOf(false) }
+    val model = remember { ListGridModel(list, query, scope) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
-    /** Bumped when a title is added to this list elsewhere (Add to List…), so it re-reads. */
-    var added by remember { mutableIntStateOf(0) }
     val first = remember { FocusRequester() }
     val status = remember { FocusRequester() }
 
-    val shown = if (list is BrowseList.Service) list.copy(part = part) else list
-    val customId = (list as? BrowseList.Custom)?.id
-    val current = customId?.let { id -> CustomListsStore.lists?.firstOrNull { it.id == id } }
-    // A custom list shows its current name (it may have been renamed here or elsewhere).
-    val title = current?.name ?: shown.title
-    val manageable = current != null && !current.isSetAside
-    val reloadKey = listOf(options, part, added)
-
-    suspend fun loadPage() {
-        val requested = reloadKey
-        if (loadingFor == requested || total?.let { fetched >= it } == true) return
-        loadingFor = requested
-        try {
-            val offset = fetched
-            val quick = shown.quickPageQuery
-            val page = ApiClient.browsePage(shown, limit = PAGE, offset = offset, extra = query + quick.orEmpty(), options = options)
-            // The sort or a filter changed while this page was loading; that reload wins.
-            if (requested != reloadKey) return
-            // Then the full page's cards (same titles, with their text posters) replace the quick ones in place.
-            if (quick != null) scope.launch {
-                val full = runCatching { ApiClient.browsePage(shown, limit = PAGE, offset = offset, extra = query, options = options) }.getOrNull()
-                if (full == null || requested != reloadKey) return@launch
-                val byId = full.entries.associateBy { HomeCard.from(it).id }
-                entries = entries.map { byId[HomeCard.from(it).id] ?: it }
-            }
-            if (fetched == 0) {
-                genres = page.genres
-                letters = page.letters
-            }
-            fetched += page.entries.size
-            val seen = entries.map { HomeCard.from(it).id }.toMutableSet()
-            entries = entries + page.entries.filter { seen.add(HomeCard.from(it).id) }
-            total = page.listSize(fetched)
-            loadError = null
-        } catch (e: Exception) {
-            if (entries.isEmpty() && requested == reloadKey) loadError = e.message
-        } finally {
-            if (loadingFor == requested) loadingFor = null
-        }
-    }
+    val customId = model.customId
+    val title = model.title
+    val manageable = model.manageable
+    val options = model.options
+    val entries = model.entries
+    val total = model.total
+    val loadError = model.loadError
 
     // Only this list's own changes: an add re-reads it, a removal drops the title in place so focus stays near it.
-    LaunchedEffect(customId) {
-        if (customId == null) return@LaunchedEffect
-        CustomListsStore.itemChanges.collect { change ->
-            if (change.listId != customId) return@collect
-            val removed = change.removed ?: return@collect run { added++ }
-            val gone = entries.filter { (it as? BrowseEntry.ItemEntry)?.item?.let { i -> i.mediaType == removed.mediaType && i.id == removed.id } == true }
-            if (gone.isEmpty()) return@collect
-            entries = entries - gone.toSet()
-            fetched = maxOf(0, fetched - gone.size)
-            total = total?.let { maxOf(0, it - gone.size) }
-        }
-    }
-
-    LaunchedEffect(reloadKey) {
-        entries = emptyList()
-        fetched = 0
-        total = null
-        loadError = null
-        loadPage()
-    }
+    LaunchedEffect(customId) { model.followItemChanges() }
+    LaunchedEffect(model.reloadKey) { model.reload() }
     // A title action (Set Aside, hide / unhide, watched) re-reads the loaded part in place, so its
     // state and badges show while focus stays on the card instead of jumping to the controls.
     var seenChanges by remember { mutableIntStateOf(TitleActions.changes) }
     LaunchedEffect(TitleActions.changes) {
         if (TitleActions.changes == seenChanges) return@LaunchedEffect
         seenChanges = TitleActions.changes
-        if (loadingFor != null || total == null) return@LaunchedEffect
-        val requested = reloadKey
-        // Pages as loadPage does (the server may cap a page below what is asked for), up to what
-        // was loaded, so the cards below the first page stay.
-        val wanted = fetched
-        val read = mutableListOf<BrowseEntry>()
-        var firstPage: BrowsePage? = null
-        var size: Int
-        do {
-            val page = runCatching { ApiClient.browsePage(shown, limit = PAGE, offset = read.size, extra = query, options = options) }.getOrNull()
-            if (page == null || requested != reloadKey) return@LaunchedEffect
-            if (firstPage == null) firstPage = page
-            read += page.entries
-            size = page.listSize(read.size)
-        } while (page.entries.isNotEmpty() && read.size < wanted && read.size < size)
-        val seen = mutableSetOf<String>()
-        entries = read.filter { seen.add(HomeCard.from(it).id) }
-        fetched = read.size
-        total = size
-        genres = firstPage?.genres.orEmpty()
-        letters = firstPage?.letters.orEmpty()
+        model.rereadLoaded()
     }
     // Once the first cards are laid out (a frame after they arrive), focus the first.
     LaunchedEffect(entries.isNotEmpty()) {
@@ -185,10 +94,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
         runCatching { first.requestFocus() }
     }
 
-    val ranked = shown is BrowseList.TopTen
-    val cards = entries.mapIndexed { i, e -> HomeCard.from(e).let { if (ranked) it.ranked(i + 1) else it } }
-        // Titles hidden from this profile are left out, except in the Hidden list itself.
-        .filter { list == BrowseList.Hidden || it.target?.let(HiddenItemsStore::isHidden) != true }
+    val cards = model.cards
     // Nothing left to show (the last title removed, unhidden or hidden here): the status line
     // takes focus, so the page keeps it and Back still closes just this page.
     val settled = cards.isEmpty() && (loadError != null || total != null)
@@ -198,49 +104,11 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
         runCatching { status.requestFocus() }
     }
 
-    /** Drops the title here at once so focus keeps its place, then tells the server. */
-    fun remove(card: HomeCard) {
-        val id = customId ?: return
-        val entry = entries.firstOrNull { HomeCard.from(it).id == card.id } as? BrowseEntry.ItemEntry ?: return
-        val previous = Triple(entries, fetched, total)
-        entries = entries - entry
-        fetched = maxOf(0, fetched - 1)
-        total = total?.let { maxOf(0, it - 1) }
-        scope.launch {
-            try {
-                CustomListsStore.remove(entry.item, id, reloadGrids = false)
-                actionError = null
-            } catch (e: Exception) {
-                entries = previous.first
-                fetched = previous.second
-                total = previous.third
-                actionError = e.message
-            }
-        }
-    }
-
-    /** One title at a random position of the whole (filtered) list, not just the pages loaded so far. */
-    fun pickRandom() {
-        val count = total ?: fetched
-        if (picking || count <= 0) return
-        picking = true
-        scope.launch {
-            try {
-                // A library's unmatched files have no page to open: try a few other picks.
-                repeat(6) {
-                    val offset = (0 until count).random()
-                    val entry = if (offset < entries.size && fetched == entries.size) entries[offset]
-                    else runCatching { ApiClient.browsePage(shown, limit = 1, offset = offset, extra = query, options = options).entries.firstOrNull() }.getOrNull()
-                        ?: return@launch
-                    val link = HomeCard.from(entry).link
-                    when {
-                        link is HomeLink.Details -> return@launch navigator.openDetails(link.target)
-                        link is HomeLink.Library && link.entry.group.isShow -> return@launch navigator.open(Page.LibraryShow(link.entry))
-                    }
-                }
-            } finally {
-                picking = false
-            }
+    fun pickRandom() = model.pickRandom { link ->
+        when (link) {
+            is HomeLink.Details -> navigator.openDetails(link.target)
+            is HomeLink.Library -> navigator.open(Page.LibraryShow(link.entry))
+            else -> Unit
         }
     }
 
@@ -249,12 +117,12 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
             cards,
             first = first,
             contentPadding = PaddingValues(horizontal = PageMargin, vertical = 32.dp),
-            onNearEnd = { scope.launch { loadPage() } },
+            onNearEnd = { scope.launch { model.loadPage() } },
             // About half a page ahead, so a cold page (seconds) is usually in before the end.
-            nearEndCards = PAGE / 2,
+            nearEndCards = ListGridModel.PAGE / 2,
             continueWatching = list == BrowseList.ContinueWatching,
             // Set Aside titles leave through the menu's Remove from Set Aside.
-            extraActions = { card -> if (manageable) listOf(DialogChoice("Remove from List") { remove(card) }) else emptyList() },
+            extraActions = { card -> if (manageable) listOf(DialogChoice("Remove from List") { model.remove(card) }) else emptyList() },
             header = {
                 fullWidth("header") {
                     Column(Modifier.padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -267,7 +135,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (list.sorts.isNotEmpty() || list.filters || list.offersRandom || parts.size > 1) {
                                 BrowseControls(
-                                    list, options, { options = it }, genres, parts, part, { part = it }, picking,
+                                    list, options, { model.options = it }, model.genres, parts, model.part, { model.part = it }, model.picking,
                                     onRandom = if (list.offersRandom) ::pickRandom else null,
                                     onRename = if (manageable) { { renaming = true } } else null,
                                     onDelete = if (manageable) { { deleting = true } } else null,
@@ -275,16 +143,16 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                             }
                             GridCardSizeButton()
                         }
-                        actionError?.let { Text(it, color = Color(0xFFFF6B6B)) }
-                        if (list.indexesLetters && options.sort == BrowseSort.NAME && letters.isNotEmpty()) {
-                            LetterIndex(letters, options.letter) { options = options.copy(letter = it) }
+                        model.actionError?.let { Text(it, color = Color(0xFFFF6B6B)) }
+                        if (list.indexesLetters && options.sort == BrowseSort.NAME && model.letters.isNotEmpty()) {
+                            LetterIndex(model.letters, options.letter) { model.options = options.copy(letter = it) }
                         }
                     }
                 }
             },
             footer = {
                 // The next page is on its way: the grid hasn't ended.
-                if (cards.isNotEmpty() && loadingFor == reloadKey) fullWidth("more") {
+                if (cards.isNotEmpty() && model.loadingMore) fullWidth("more") {
                     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                     }
@@ -321,7 +189,7 @@ fun ListGridScreen(list: BrowseList, query: Map<String, String> = emptyMap()) {
                             CustomListsStore.delete(customId)
                             navigator.close()
                         } catch (e: Exception) {
-                            actionError = e.message
+                            model.actionError = e.message
                         }
                     }
                 },
