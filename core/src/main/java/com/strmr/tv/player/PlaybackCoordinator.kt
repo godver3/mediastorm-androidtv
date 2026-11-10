@@ -190,6 +190,16 @@ object PlaybackCoordinator {
         }
     }
 
+    /**
+     * A ready session that needs no resolve (a phone's downloaded file): straight to the player,
+     * unless another playback is resolving.
+     */
+    fun playSession(session: PlayerSession) {
+        if (_resolving.value != null) return
+        pending = session
+        launchPlayer()
+    }
+
     private fun launchPlayer() {
         AdaptiveThroughput.playbackStarting()
         App.context.startActivity(Intent(App.context, App.platform.playerActivity).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

@@ -13,6 +13,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -94,9 +95,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val online = OnlineSubtitles(this, scope)
     private val autoSwitch = AutoSwitch(this)
 
-    /** Seek previews, for a resolved stream (not trailers or live). */
+    /** Seek previews, for a resolved stream (not trailers, live or a downloaded file). */
     val thumbnails: PlaybackThumbnails? =
-        session.streamPath?.takeIf { !session.isLive && session.reportsProgress }?.let { PlaybackThumbnails(it, request) }
+        session.streamPath?.takeIf { !session.isLive && session.reportsProgress && !session.localFile }?.let { PlaybackThumbnails(it, request) }
     /** A recording still recording, over its growing HLS session (set as the player is built). */
     private var recordingHls: RecordingHls? = null
     /** A live channel: its server session, and tuning it again when the source drops (set as the player is built). */
@@ -207,7 +208,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             // Platform decoders first; the FFmpeg extension (TrueHD, DTS…) when none can.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
-        val dataSource = OkHttpDataSource.Factory(ApiClient.http).setDefaultRequestProperties(ApiClient.mediaHeaders)
+        val http = OkHttpDataSource.Factory(ApiClient.http).setDefaultRequestProperties(ApiClient.mediaHeaders)
+        // HTTP(S) through OkHttp as before; `file://` (a phone's downloaded copy) from disk.
+        val dataSource = DefaultDataSource.Factory(context, http)
         player = ExoPlayer.Builder(context, renderers)
             // Dolby Vision Profile 7 rewritten for this box's decoders (player/dv7).
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource, Dv7Playback.extractorsFactory()))

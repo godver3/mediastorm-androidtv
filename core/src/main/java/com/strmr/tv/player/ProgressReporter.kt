@@ -61,6 +61,7 @@ class ProgressReporter(
             paused -> ProgressLog.Kind.PAUSE
             else -> ProgressLog.Kind.PERIODIC
         }
+        session.progressSink?.saved(position, duration, ended)
         lastReport = scope.launch {
             withContext(NonCancellable) {
                 try {
@@ -71,6 +72,7 @@ class ProgressReporter(
                     }
                 } catch (e: Exception) {
                     log.failed(kind, position, duration, e)
+                    session.progressSink?.undelivered(body)
                 }
             }
         }

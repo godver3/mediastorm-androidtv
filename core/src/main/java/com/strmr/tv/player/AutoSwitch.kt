@@ -31,7 +31,7 @@ class AutoSwitch(private val controller: PlayerController) {
     private val request get() = controller.request
 
     private val applies: Boolean
-        get() = session.reportsProgress && !session.isLive && session.streamPath != null && request.libraryVersion == null
+        get() = session.reportsProgress && !session.isLive && session.streamPath != null && request.libraryVersion == null && !session.localFile
 
     /** From the start of loading, so a source that never starts is caught too. */
     fun start() {

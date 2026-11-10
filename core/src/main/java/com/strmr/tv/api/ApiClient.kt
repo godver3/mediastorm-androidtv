@@ -57,6 +57,11 @@ object ApiClient {
      * base URL (the proxy's port can change). Set by AppSession.
      */
     @Volatile var recoverTransport: (suspend () -> HttpUrl?)? = null
+    /**
+     * Told (on an I/O thread) about every request that failed in transport (no answer at all),
+     * so the phone app can check whether the server is still there. The TV app leaves it unset.
+     */
+    @Volatile var onTransportFailure: ((IOException) -> Unit)? = null
     /** Persisted to [com.strmr.tv.auth.SecureStore] whenever it changes (login, refresh). */
     @Volatile var session: AuthSession? = null
         set(value) {
@@ -269,6 +274,7 @@ object ApiClient {
         val response = try {
             http.newCall(request).apply { timeout().timeout(req.timeoutMs, TimeUnit.MILLISECONDS) }.await()
         } catch (e: IOException) {
+            if (retried || remoteCredential == null || !isTransportFailure(e)) onTransportFailure?.invoke(e)
             // Through the iroh proxy, the first request after a sleep or a path change can fail
             // while the connection is re-established: reconnect, then retry once.
             if (retried || remoteCredential == null || !isTransportFailure(e)) throw e
