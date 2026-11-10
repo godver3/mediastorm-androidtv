@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.DownloadForOffline
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayCircle
@@ -82,6 +84,8 @@ fun SettingsScreen(asPage: Boolean) {
         }
         SettingsSection("App") {
             PageRow("Server", SettingsKeys.SERVER, if (remote) "Remote access (iroh)" else server?.let { ServerAddress.display(it) }, Icons.Filled.Dns)
+            PageRow("Connection", SettingsKeys.CONNECTION, "Home and away networks", Icons.Filled.Wifi)
+            PageRow("Downloads", SettingsKeys.DOWNLOADS, "Wi-Fi only, storage", Icons.Filled.DownloadForOffline)
             val update = AppUpdater.state
             PageRow(
                 "App Updates", SettingsKeys.UPDATES,

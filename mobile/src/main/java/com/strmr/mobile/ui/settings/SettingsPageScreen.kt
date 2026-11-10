@@ -12,6 +12,8 @@ object SettingsKeys {
     const val SERVER = "server"
     const val UPDATES = "updates"
     const val ABOUT = "about"
+    const val CONNECTION = "connection"
+    const val DOWNLOADS = "downloads"
 }
 
 /** A settings sub page, by its key. */
@@ -26,6 +28,8 @@ fun SettingsPageScreen(key: String, title: String) {
         SettingsKeys.SERVER -> ServerSettingsPage()
         SettingsKeys.UPDATES -> UpdateSettingsPage()
         SettingsKeys.ABOUT -> AboutSettingsPage()
+        SettingsKeys.CONNECTION -> com.strmr.mobile.ui.connection.ConnectionSettingsPage()
+        SettingsKeys.DOWNLOADS -> com.strmr.mobile.ui.downloads.DownloadSettingsPage()
         else -> SettingsPage(title) {}
     }
 }
