@@ -39,6 +39,18 @@ object ConnectionSelector {
     private var running: Deferred<Unit>? = null
     private val prefs by lazy { App.context.getSharedPreferences("strmr.connection", Context.MODE_PRIVATE) }
 
+    /**
+     * Debug builds: a paired phone stays on the tunnel even on the home Wi-Fi, so remote access
+     * (playback over iroh included) can be tried at home, as the iPhone's debug network fault.
+     */
+    var stayRemote: Boolean
+        get() = com.strmr.mobile.BuildConfig.DEBUG && stayRemoteState.value
+        set(value) {
+            stayRemoteState.value = value
+            prefs.edit().putBoolean("debug.stayRemote", value).apply()
+        }
+    private val stayRemoteState by lazy { androidx.compose.runtime.mutableStateOf(prefs.getBoolean("debug.stayRemote", false)) }
+
     /** A home network that can take over from the tunnel: paired, with a home Wi-Fi and address. */
     val automaticHome: AutomaticHome?
         get() {
@@ -92,7 +104,7 @@ object ConnectionSelector {
     private val onCellular get() = NetworkMonitor.path.value.iface == NetworkMonitor.Interface.CELLULAR
 
     private suspend fun selectPaired(reason: String, mayMove: Boolean) {
-        val home = automaticHome
+        val home = automaticHome.takeUnless { stayRemote }
         var useHome = false
         if (home != null) {
             val ssid = if (onCellular) null else WifiSsid.current()

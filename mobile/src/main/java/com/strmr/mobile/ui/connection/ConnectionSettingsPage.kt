@@ -128,6 +128,20 @@ fun ConnectionSettingsPage(onBack: (() -> Unit)? = null) {
                 item { Row2("Remote Access", if (homeDirect) "Standing by (on home network)" else if (status == ConnectionManager.Status.Online) "Connected" else "Reconnecting…") }
                 RemoteAccess.pairing?.connectionCode?.let { code -> item { Row2("Paired With", code.take(13) + "…") } }
                 item { Footer("Remote access stays in use away from home and never falls back to an unverified local address.") }
+                if (com.strmr.mobile.BuildConfig.DEBUG) {
+                    item {
+                        ListItem(
+                            headlineContent = { Text("Stay on Remote Access") },
+                            supportingContent = { Text("Debug builds: use the tunnel even on the home Wi-Fi") },
+                            trailingContent = {
+                                androidx.compose.material3.Switch(checked = ConnectionSelector.stayRemote, onCheckedChange = {
+                                    ConnectionSelector.stayRemote = it
+                                    scope.launch { ConnectionSelector.select("settings changed") }
+                                })
+                            },
+                        )
+                    }
+                }
             }
 
             item { SectionHeader("Actions") }
