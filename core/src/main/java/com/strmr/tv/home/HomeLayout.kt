@@ -174,9 +174,10 @@ object HomeLayoutStore {
 
     /**
      * "Top Carousel": an independent carousel fed by one row above the rows.
-     * Device only (the server has no such field); off by default.
+     * Device only (the server has no such field); off by default on a TV, on by default on a
+     * phone or tablet (as the iPhone app), where it is Home's only hero.
      */
-    var topCarousel by mutableStateOf(prefs.getBoolean(TOP_CAROUSEL, false))
+    var topCarousel by mutableStateOf(prefs.getBoolean(TOP_CAROUSEL, !App.platform.isTv))
         private set
     /** "Focused Title Info": the Classic hero (backdrop, logo, line, synopsis) following the focused card. On by default. */
     var focusedInfo by mutableStateOf(prefs.getBoolean(FOCUSED_INFO, true))
