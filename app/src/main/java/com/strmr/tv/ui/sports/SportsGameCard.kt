@@ -60,11 +60,6 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Text
-import coil.compose.SubcomposeAsyncImage
-import coil.imageLoader
-import coil.request.ImageRequest
-import android.content.Context
-import androidx.compose.ui.platform.LocalContext
 import com.strmr.tv.sports.SportsGame
 import com.strmr.tv.sports.SportsLifecycle
 import com.strmr.tv.sports.SportsTeam
@@ -256,38 +251,6 @@ fun SportsTeamLine(
 }
 
 @Composable
-fun SportsTeamLogo(team: SportsTeam, size: Dp) {
-    val fallback = @Composable {
-        Box(Modifier.size(size).clip(CircleShape).background(teamColor(team.color) ?: Color.White.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center) {
-            Text(team.monogram, fontSize = (size.value * 0.3f).sp, fontWeight = FontWeight.Bold)
-        }
-    }
-    val logo = team.logo
-    if (logo == null) fallback()
-    else SubcomposeAsyncImage(model = sportsLogoRequest(LocalContext.current, logo), contentDescription = team.name,
-                              contentScale = ContentScale.Fit, error = { fallback() }, modifier = Modifier.size(size))
-}
-
-/**
- * Team logos decode at one fixed size, the largest any page draws them (the game header's 55 dp),
- * so the request is resolved before layout and a logo already in the memory cache paints in the
- * card's first frame; the hub warms a row's logos with the same request ([prefetchSportsLogos]) so
- * a card scrolling in doesn't pop its logos in after it.
- */
-private const val SPORTS_LOGO_PX = 160
-
-fun sportsLogoRequest(context: Context, url: String): ImageRequest =
-    ImageRequest.Builder(context).data(url).size(SPORTS_LOGO_PX).build()
-
-/** Starts loading [games]' team logos into Coil's caches. */
-fun prefetchSportsLogos(context: Context, games: List<SportsGame>) {
-    val loader = context.imageLoader
-    games.flatMap { listOf(it.awayTeam.logo, it.homeTeam.logo) }.filterNotNull().distinct()
-        .forEach { loader.enqueue(sportsLogoRequest(context, it)) }
-}
-
-@Composable
 fun SportsStatusPill(lifecycle: SportsLifecycle) =
     SportsStatusPill(lifecycle.pill, live = lifecycle == SportsLifecycle.LIVE, amber = lifecycle.isScheduleChange)
 
@@ -302,9 +265,4 @@ fun SportsStatusPill(text: String, live: Boolean = false, amber: Boolean = false
         if (live) Box(Modifier.size(6.dp).clip(CircleShape).background(SportsLive))
         Text(text, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (amber) SportsAmber else Color.White)
     }
-}
-
-private fun teamColor(hex: String?): Color? {
-    val s = hex?.removePrefix("#")?.takeIf { it.length == 6 } ?: return null
-    return s.toLongOrNull(16)?.let { Color(0xFF000000 or it) }
 }

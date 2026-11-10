@@ -22,7 +22,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.strmr.tv.ui.sports.SportsMuted
 import java.util.Locale
 
 /** A chart's plot area and scales: elapsed seconds across, [low]…[high] up. */
@@ -69,14 +68,15 @@ fun SportsChart(
 
 private val Grid = Color.White.copy(alpha = 0.15f)
 private val PeriodLine = Color.White.copy(alpha = 0.2f)
-internal val AxisLabel = TextStyle(color = SportsMuted, fontSize = 11.sp)
+/** Axis labels: muted white over the dark page (both apps draw charts on dark surfaces). */
+val AxisLabel = TextStyle(color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
 
 /** A chart line, 3 dp with round ends. */
-internal fun DrawScope.chartLine(path: Path, color: Color) =
+fun DrawScope.chartLine(path: Path, color: Color) =
     drawPath(path, color, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
 /** A straight line through [points]. */
-internal fun linearPath(points: List<Offset>): Path = Path().apply {
+fun linearPath(points: List<Offset>): Path = Path().apply {
     points.forEachIndexed { index, point -> if (index == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y) }
 }
 
@@ -84,7 +84,7 @@ internal fun linearPath(points: List<Offset>): Path = Path().apply {
  * A monotone cubic through [points] (Fritsch–Carlson, Swift Charts' `.monotone`): it never
  * overshoots between two samples, so a probability stays within its range.
  */
-internal fun monotonePath(points: List<Offset>): Path {
+fun monotonePath(points: List<Offset>): Path {
     if (points.size < 3) return linearPath(points)
     val n = points.size
     val slopes = FloatArray(n - 1) { i ->
