@@ -37,10 +37,7 @@ fun TranslateMenu(controller: PlayerController, onDone: () -> Unit, modifier: Mo
     val picked = source
     key(picked == null, languages.isEmpty()) {
         if (picked == null) {
-            val choices = online.translatableTracks(tracks).map { track ->
-                val f = track.format
-                MenuChoice(f.menuTitle("Track ${track.typeIndex + 1}"), f.subtitleDetail(), selected = false) { source = track }
-            }
+            val choices = translateSourceChoices(controller, tracks) { source = it }
             ChoiceMenu("Translate From", choices, "No text subtitles to translate", modifier)
         } else {
             val choices = languages.map { option ->
