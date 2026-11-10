@@ -28,6 +28,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.ScrollState
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.dp
 import com.strmr.tv.live.GuideCell
 import com.strmr.tv.live.GuideLayout
@@ -44,7 +47,7 @@ import com.strmr.tv.live.Recording
 @Composable
 fun GuideRowCells(
     store: LiveStore, channel: LiveChannel, from: Long, to: Long, start: Long, dpPerMs: Float, totalWidth: Dp, now: Long,
-    onProgram: (LiveSheetTarget) -> Unit,
+    scroll: ScrollState, onProgram: (LiveSheetTarget) -> Unit,
 ) {
     val cells = GuideLayout.cells(store.schedules[channel.guideKey].orEmpty(), from, to)
     val recordings = store.recordings.active.filter { it.channelId == channel.id }
@@ -53,7 +56,7 @@ fun GuideRowCells(
             val x = ((cell.start - start) * dpPerMs).dp
             val w = maxOf(((cell.end - cell.start) * dpPerMs).dp - 2.dp, 4.dp)
             GuideProgramCell(
-                cell, now,
+                cell, now, cellX = x + 1.dp, scroll = scroll,
                 recording = cell.program?.let { LiveRecordings.matching(recordings, it, now) },
                 replayable = LiveCatchups.replaysOnSelect(channel, cell.program, now),
                 onOpen = { onProgram(LiveSheetTarget(channel, cell.program)) },
@@ -70,7 +73,7 @@ fun GuideRowCells(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GuideProgramCell(
-    cell: GuideCell, now: Long, recording: Recording?, replayable: Boolean, onOpen: () -> Unit, modifier: Modifier,
+    cell: GuideCell, now: Long, cellX: Dp, scroll: ScrollState, recording: Recording?, replayable: Boolean, onOpen: () -> Unit, modifier: Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     val p = cell.program
@@ -94,7 +97,18 @@ private fun GuideProgramCell(
                 onOpen()
             }),
     ) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalArrangement = Arrangement.Center) {
+        // A programme that began left of the visible guide keeps its title in view: the text
+        // slides right with the scroll (read at layout, so scrolling doesn't recompose), until
+        // only a short end of the cell is left.
+        Column(
+            Modifier.fillMaxSize().layout { measurable, constraints ->
+                val room = (constraints.maxWidth - 72.dp.toPx()).coerceAtLeast(0f)
+                val shift = (scroll.value - cellX.toPx()).coerceIn(0f, room).roundToInt()
+                val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = constraints.maxWidth - shift))
+                layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(shift, 0) }
+            }.padding(horizontal = 8.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 recording?.let { RecordingBadge(it, 10.dp) }
                 if (replayable) Icon(Icons.Filled.Replay, contentDescription = "Catch-up", tint = content, modifier = Modifier.size(10.dp))

@@ -104,7 +104,7 @@ fun LiveGuideGrid(store: LiveStore, now: Long, onProgram: (LiveSheetTarget) -> U
                                          onTune = { PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title) },
                                          onMenu = { onProgram(LiveSheetTarget(channel, null)) })
                         Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(scroll)) {
-                            GuideRowCells(store, channel, from, to, start, dpPerMs, totalWidth, now, onProgram)
+                            GuideRowCells(store, channel, from, to, start, dpPerMs, totalWidth, now, scroll, onProgram)
                         }
                     }
                     HorizontalDivider()
