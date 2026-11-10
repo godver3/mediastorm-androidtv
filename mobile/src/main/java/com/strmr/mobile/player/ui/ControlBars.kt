@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
@@ -56,6 +57,7 @@ fun TopBar(
     onSubtitles: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onCast: (() -> Unit)? = null,
 ) {
     val request = controller.request
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -70,6 +72,7 @@ fun TopBar(
         }
         // A recording still recording: its playlist grows as it plays.
         if (controller.session.growingRestart != null) LiveBadge("REC", Modifier.padding(horizontal = 8.dp))
+        onCast?.let { IconButton(onClick = it, colors = OnVideo) { Icon(Icons.Filled.Cast, "Cast") } }
         onPictureInPicture?.let { IconButton(onClick = it, colors = OnVideo) { Icon(Icons.Filled.PictureInPictureAlt, "Picture in picture") } }
         IconButton(onClick = onAudio, colors = OnVideo) { Icon(Icons.Filled.Audiotrack, "Audio") }
         IconButton(onClick = onSubtitles, colors = OnVideo) { Icon(Icons.Filled.ClosedCaption, "Subtitles") }

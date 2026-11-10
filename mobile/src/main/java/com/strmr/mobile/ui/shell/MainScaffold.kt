@@ -75,12 +75,16 @@ fun MainScaffold() {
     CompositionLocalProvider(LocalNavigator provides navigator) {
         com.strmr.mobile.ui.components.TitleMenuHost()
         com.strmr.mobile.ui.settings.UpdatePrompt()
+        com.strmr.mobile.ui.cast.CastHost()
         if (compact) {
             Scaffold(
                 bottomBar = {
-                    NavigationBar {
-                        split.tabs.forEach { s -> SectionBarItem(s, navigator) }
-                        if (split.more.isNotEmpty()) SectionBarItem(Section.MORE, navigator)
+                    androidx.compose.foundation.layout.Column {
+                        com.strmr.mobile.ui.cast.CastNowPlayingBar()
+                        NavigationBar {
+                            split.tabs.forEach { s -> SectionBarItem(s, navigator) }
+                            if (split.more.isNotEmpty()) SectionBarItem(Section.MORE, navigator)
+                        }
                     }
                 },
                 contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
@@ -101,7 +105,10 @@ fun MainScaffold() {
                         )
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxSize()) { SectionContent(navigator, emptyList()) }
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxSize()) { SectionContent(navigator, emptyList()) }
+                    com.strmr.mobile.ui.cast.CastNowPlayingBar()
+                }
             }
         }
     }

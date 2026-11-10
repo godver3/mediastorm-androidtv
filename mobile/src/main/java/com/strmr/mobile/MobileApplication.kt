@@ -5,6 +5,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.strmr.mobile.cast.CastController
+import com.strmr.mobile.cast.install
 import com.strmr.mobile.player.MobilePlayerActivity
 import com.strmr.tv.api.ServerArtwork
 import com.strmr.tv.app.App
@@ -34,6 +36,9 @@ class MobileApplication : Application(), ImageLoaderFactory {
         com.strmr.tv.diagnostics.MainThreadWatchdog.start()
         AppForeground.onEntered = { com.strmr.tv.adaptive.AdaptiveThroughput.scheduleIdle("foreground-idle") }
         AppUpdater.start()
+        // Cast: on the details page, and offered every resolved stream (Cast to Device…).
+        com.strmr.mobile.ui.details.DetailsExtras.register(com.strmr.mobile.ui.cast.DetailsCastActions)
+        CastController.install()
     }
 
     /**
