@@ -55,7 +55,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.SubcomposeAsyncImage
-import com.strmr.tv.R
+import com.strmr.core.R
 import com.strmr.tv.app.AppSession
 import com.strmr.tv.ui.Accent
 

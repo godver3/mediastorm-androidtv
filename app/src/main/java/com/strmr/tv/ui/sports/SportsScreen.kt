@@ -227,11 +227,6 @@ private class RowFocusMemory {
     }
 }
 
-/** The hub's state, kept across tab switches and game pages for the app's life. */
-object SportsHub {
-    val state = SportsHubState()
-}
-
 @Composable
 private fun Notice(text: String, action: String?, onAction: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 60.dp), horizontalAlignment = Alignment.CenterHorizontally,

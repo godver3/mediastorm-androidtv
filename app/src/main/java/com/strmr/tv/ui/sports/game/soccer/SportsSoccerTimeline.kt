@@ -113,7 +113,7 @@ private fun Event(page: SportsGamePage, play: SportsPlay) {
                 )
                 Text(play.title.ifEmpty { "Reported event" }, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 when {
-                    play.description != null -> Text(play.description, fontSize = 12.sp, color = SportsMuted, maxLines = 3)
+                    play.description != null -> Text(play.description!!, fontSize = 12.sp, color = SportsMuted, maxLines = 3)
                     play.participants.isNotEmpty() -> Text(play.participants.joinToString(" · ") { it.name }, fontSize = 12.sp, color = SportsMuted)
                 }
             }

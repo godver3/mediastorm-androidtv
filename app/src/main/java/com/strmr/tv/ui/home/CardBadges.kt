@@ -37,8 +37,9 @@ import com.strmr.tv.ui.settings.BadgeSettings
 @Composable
 fun Badge(badge: CardBadge, modifier: Modifier = Modifier, wide: Boolean = false) {
     val icon = badge.symbol?.icon
-    if (badge.count != null) {
-        CountBadge(badge.count, icon, badge.text, modifier)
+    val count = badge.count
+    if (count != null) {
+        CountBadge(count, icon, badge.text, modifier)
         return
     }
     if (icon == null || wide) {

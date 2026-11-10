@@ -168,7 +168,7 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
     val wide = metrics.showsArtwork16x9 || openPast(open) { it > 0.5f }
     Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1E)), contentAlignment = Alignment.Center) {
         when {
-            card.drawable != null -> Image(painterResource(card.drawable), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             card.logoTile -> AsyncImage(
                 model = card.logoUrl, contentDescription = card.title, contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize().padding(18.dp),

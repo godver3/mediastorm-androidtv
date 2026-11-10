@@ -142,5 +142,5 @@ fun PageStack(content: @Composable () -> Unit) {
 private fun PickingHost() {
     CustomListsStore.picking?.let { AddToListDialog(it) }
     UpdatePrompt()
-    AppToast.Host()
+    AppToastHost()
 }

@@ -218,8 +218,8 @@ private fun StatusLine(game: SportsGame, spoilers: Boolean, stale: Boolean) {
 fun SportsCardFooterLine(footer: SportsCardFooter) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         when {
-            footer.bases != null -> SportsBasesGlyph(footer.bases, 9.dp)
-            footer.glyph != null -> SportsGlyphMark(footer.glyph)
+            footer.bases != null -> SportsBasesGlyph(footer.bases!!, 9.dp)
+            footer.glyph != null -> SportsGlyphMark(footer.glyph!!)
         }
         if (footer.text.isNotEmpty()) {
             Text(footer.text, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -307,30 +307,4 @@ fun SportsStatusPill(text: String, live: Boolean = false, amber: Boolean = false
 private fun teamColor(hex: String?): Color? {
     val s = hex?.removePrefix("#")?.takeIf { it.length == 6 } ?: return null
     return s.toLongOrNull(16)?.let { Color(0xFF000000 or it) }
-}
-
-object SportsFormat {
-    private val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-    private val day = DateTimeFormatter.ofPattern("EEE, MMM d")
-    private val fullDay = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)
-
-    /** "7:05 PM · Starts in 2h 5m" (Expo's countdown), the live clock, or the final line. */
-    fun statusLine(game: SportsGame, spoilers: Boolean, now: Instant = Instant.now()): String = when (game.lifecycle) {
-        SportsLifecycle.SCHEDULED -> {
-            val countdown = countdown(game.start, now)
-            if (game.start == Instant.EPOCH) countdown else "${time.format(game.start.atZone(ZoneId.systemDefault()))} · $countdown"
-        }
-        SportsLifecycle.LIVE -> if (spoilers) "In progress · scores hidden"
-            else game.statusDetail ?: listOfNotNull(game.period, game.clock).joinToString(" · ")
-        SportsLifecycle.FINAL -> if (spoilers) "Result hidden" else game.statusDetail ?: "Final"
-        else -> game.statusDetail ?: startTime(game)
-    }
-
-    fun startTime(game: SportsGame): String {
-        val local = game.start.atZone(ZoneId.systemDefault())
-        val today = java.time.LocalDate.now()
-        return if (local.toLocalDate() == today) time.format(local) else "${day.format(local)} · ${time.format(local)}"
-    }
-
-    fun date(game: SportsGame): String = fullDay.format(game.start.atZone(ZoneId.systemDefault()))
 }

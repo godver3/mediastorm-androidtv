@@ -5,10 +5,11 @@ secrets.properties
 .idea/
 *.iml
 .DS_Store
-app/libs/
-app/src/main/jniLibs/
-app/libdovi/
-app/.cxx/
+core/libs/
+core/src/main/jniLibs/
+core/libdovi/
+*/.cxx/
+*/build/
 scripts/
 docs/
 .kotlin/
