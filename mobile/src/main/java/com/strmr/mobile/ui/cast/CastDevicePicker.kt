@@ -42,6 +42,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -189,5 +194,9 @@ private fun AddByAddress(onPick: (CastDevice) -> Unit) {
         style = MaterialTheme.typography.bodySmall,
         color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 24.dp),
+    )
+    // Clear of the gesture bar, and of the keyboard while typing an address.
+    androidx.compose.foundation.layout.Spacer(
+        Modifier.windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
     )
 }

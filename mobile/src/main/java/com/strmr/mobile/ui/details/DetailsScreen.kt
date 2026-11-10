@@ -122,7 +122,12 @@ fun DetailsScreen(target: DetailsTarget, autoplay: Boolean) {
             }
             relatedRows(model)
         }
-        val scrolled by remember { derivedStateOf { list.firstVisibleItemIndex > 0 } }
+        // The first item is the whole header (art, text, buttons): the bar turns solid once the
+        // art has mostly scrolled under it, not when the header has gone.
+        val solidAfter = with(androidx.compose.ui.platform.LocalDensity.current) { 220.dp.roundToPx() }
+        val scrolled by remember(solidAfter) {
+            derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > solidAfter }
+        }
         DetailsTopBar(target.name, scrolled, extras) { state.more = true }
     }
 
