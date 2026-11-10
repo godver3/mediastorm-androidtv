@@ -6,7 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.strmr.mobile.player.MobilePlayerPrefs
+import com.strmr.mobile.player.PlayerPrefs
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.playbackSettings
 import com.strmr.tv.live.LiveHlsPreference
@@ -56,11 +56,14 @@ fun PlaybackSettingsPage() {
                 o.chooseLosslessAudio(it == 1)
             }
         }
-        SettingsSection("Player", "Follow Device Rotation starts the player the way the phone is held and turns with it; off, it plays in landscape.") {
-            SwitchRow("Follow Device Rotation", MobilePlayerPrefs.followRotation) { MobilePlayerPrefs.followRotation = it }
+        SettingsSection("Player", "Follow Device Rotation starts the player the way the phone is held and turns with it. Tablets always turn freely.") {
+            val orientations = PlayerPrefs.Orientation.entries
+            PickerRow("Player Orientation", orientations.map { it.title }, orientations.indexOf(PlayerPrefs.orientation)) {
+                PlayerPrefs.orientation = orientations[it]
+            }
             SwitchRow(
-                "Background Playback", MobilePlayerPrefs.backgroundAudio, "Keep the sound playing when you leave the app",
-            ) { MobilePlayerPrefs.backgroundAudio = it }
+                "Background Playback", PlayerPrefs.backgroundAudio, "Keep the sound playing when you leave the app",
+            ) { PlayerPrefs.backgroundAudio = it }
         }
         SettingsSection("Sources") {
             SwitchRow(
