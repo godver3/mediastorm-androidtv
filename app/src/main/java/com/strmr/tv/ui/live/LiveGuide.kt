@@ -50,6 +50,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.strmr.tv.live.EpgProgram
+import com.strmr.tv.live.GuideCell
+import com.strmr.tv.live.GuideLayout
 import com.strmr.tv.live.LiveCatchups
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveGuideData
@@ -66,34 +68,6 @@ private val CHANNEL_WIDTH = 150.dp
 private val ROW_HEIGHT = 40.dp
 private val INSET = PageMargin
 private val CELL_GAP = 4.dp
-
-/** One focusable slot in a guide row: a programme, or a stretch without guide data. */
-private data class GuideCell(val id: Long, val program: EpgProgram?, val start: Long, val end: Long)
-
-/**
- * The window's programmes with gaps filled; gaps under five minutes fold into the next
- * programme so no sliver of a cell is left to focus. `id` is the programme's own start
- * (stable while the window pages), or a gap's start.
- */
-private fun layout(programs: List<EpgProgram>, from: Long, to: Long): List<GuideCell> {
-    val cells = mutableListOf<GuideCell>()
-    var cursor = from
-    for (p in programs) {
-        if (p.endMs <= cursor || p.startMs >= to) continue
-        var start = maxOf(p.startMs, cursor)
-        if (start - cursor >= 300_000) cells += GuideCell(cursor, null, cursor, start) else start = cursor
-        val end = minOf(p.endMs, to)
-        cells += GuideCell(p.startMs, p, start, end)
-        cursor = end
-    }
-    if (to - cursor >= 60_000 || cells.isEmpty()) {
-        cells += GuideCell(cursor, null, cursor, to)
-    } else {
-        val last = cells.removeAt(cells.lastIndex)
-        cells += last.copy(end = to)
-    }
-    return cells
-}
 
 /** Where focus should land after the window pages: this channel, at this time. */
 private data class PendingFocus(val channel: String, val at: Long)
@@ -130,7 +104,7 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                     itemsIndexed(channels, key = { _, c -> c.id }) { index, channel ->
                         LaunchedEffect(channel.id, windowStart) { store.needSchedule(channel, windowStart, windowStart + SPAN) }
                         if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
-                        val cells = layout(store.schedules[channel.guideKey].orEmpty(), windowStart, windowStart + SPAN)
+                        val cells = GuideLayout.cells(store.schedules[channel.guideKey].orEmpty(), windowStart, windowStart + SPAN)
                         val recordings = store.recordings.active.filter { it.channelId == channel.id }
                         Row(Modifier.height(ROW_HEIGHT), verticalAlignment = Alignment.CenterVertically) {
                             ChannelColumn(channel, channel.id in store.favorites,
@@ -245,7 +219,7 @@ private fun Cell(
                 if (replayable) Icon(AppIcons.Restart, contentDescription = "Catch-up", modifier = Modifier.size(10.dp))
                 if (cell.program?.isNew == true) NewAiringTag()
                 Text(
-                    (if (cell.program != null && cell.program.startMs < cell.start) "‹ " else "") + (cell.program?.title ?: "No Information"),
+                    (if (cell.program?.let { it.startMs < cell.start } == true) "‹ " else "") + (cell.program?.title ?: "No Information"),
                     fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
