@@ -14,6 +14,7 @@ import com.strmr.tv.player.TrackOverrides
 import com.strmr.tv.ui.settings.AutoSwitchSettings
 import com.strmr.tv.ui.settings.DolbyVisionSettings
 import com.strmr.tv.ui.settings.LanguageChoices
+import com.strmr.tv.ui.settings.CreditsDetectionSettings
 import com.strmr.tv.ui.settings.TrailerSettings
 import com.strmr.tv.ui.settings.loadTrackDefaults
 
@@ -26,7 +27,13 @@ import com.strmr.tv.ui.settings.loadTrackDefaults
 fun PlaybackSettingsPage() {
     val o = TrackOverrides
     LaunchedEffect(Unit) { runCatching { loadTrackDefaults() } }
-    LaunchedEffect(Unit) { runCatching { TrailerSettings.serverValue = ApiClient.playbackSettings().autoPlayTrailers } }
+    LaunchedEffect(Unit) {
+        runCatching {
+            val settings = ApiClient.playbackSettings()
+            TrailerSettings.serverValue = settings.autoPlayTrailers
+            CreditsDetectionSettings.serverValue = settings.creditsDetection
+        }
+    }
 
     SettingsPage("Playback") {
         SettingsSection(
@@ -64,6 +71,10 @@ fun PlaybackSettingsPage() {
             SwitchRow(
                 "Background Playback", PlayerPrefs.backgroundAudio, "Keep the sound playing when you leave the app",
             ) { PlayerPrefs.backgroundAudio = it }
+            OverrideRow(
+                "Credits Detection", listOf("Off", "On"), CreditsDetectionSettings.override?.let { if (it) 1 else 0 },
+                CreditsDetectionSettings.serverValue?.let(::onOff), "Find an episode's end credits on screen when they aren't known, for Next Episode",
+            ) { i -> CreditsDetectionSettings.set(i?.let { it == 1 }) }
         }
         SettingsSection("Sources") {
             SwitchRow(

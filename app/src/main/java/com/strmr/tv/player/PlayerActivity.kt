@@ -87,6 +87,8 @@ class PlayerActivity : ComponentActivity() {
                                 setShutterBackgroundColor(android.graphics.Color.BLACK)
                                 // Subtitles are drawn by SubtitleOverlay, as the tvOS overlay draws them.
                                 subtitleView?.visibility = android.view.View.GONE
+                                // Credits detection copies frames from it.
+                                c.videoSurface = videoSurfaceView as? android.view.SurfaceView
                             }
                         },
                         modifier = Modifier.fillMaxSize().focusProperties { canFocus = false },

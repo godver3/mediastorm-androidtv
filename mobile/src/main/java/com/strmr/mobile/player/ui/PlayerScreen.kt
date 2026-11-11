@@ -57,6 +57,8 @@ fun PlayerScreen(
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     // Subtitles are drawn by PhoneSubtitleOverlay, as on the TV.
                     subtitleView?.visibility = android.view.View.GONE
+                    // Credits detection copies frames from it.
+                    controller.videoSurface = videoSurfaceView as? android.view.SurfaceView
                 }
             },
             update = { it.resizeMode = aspectMode.resizeMode },

@@ -88,6 +88,9 @@ dependencies {
     api("androidx.media3:media3-datasource-okhttp:$media3")
     api("androidx.media3:media3-ui:$media3")
     api("androidx.media3:media3-ui-compose:$media3")
+    // On-device credits detection (player/CreditsDetector): the bundled Latin text model, so it
+    // works without Google Play services (Fire TV).
+    api("com.google.mlkit:text-recognition:16.0.1")
     // The nullness annotations in the vendored Matroska extractor (player/dv7/mkv).
     compileOnly("org.checkerframework:checker-qual:3.43.0")
     testImplementation("junit:junit:4.13.2")

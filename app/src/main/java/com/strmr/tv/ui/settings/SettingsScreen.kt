@@ -52,7 +52,11 @@ fun SettingsScreen() {
     val remote by session.isRemote.collectAsState()
     val profile by session.profile.collectAsState()
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { TrailerSettings.serverValue = ApiClient.playbackSettings().autoPlayTrailers }
+    LaunchedEffect(Unit) {
+        val settings = ApiClient.playbackSettings()
+        TrailerSettings.serverValue = settings.autoPlayTrailers
+        CreditsDetectionSettings.serverValue = settings.creditsDetection
+    }
     LaunchedEffect(Unit) { loadTrackDefaults() }
     LaunchedEffect(Unit) { SpoilerSettings.refresh() }
     LaunchedEffect(Unit) { BadgeSettings.refresh() }
@@ -221,6 +225,23 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                         true -> "On"
                         false -> "Off"
                     })
+                },
+            )
+        }
+        item {
+            val override = CreditsDetectionSettings.override
+            val server = CreditsDetectionSettings.serverValue
+            ListItem(
+                selected = false,
+                // Default (follows the server) → On → Off → Default.
+                onClick = { CreditsDetectionSettings.set(when (override) { null -> true; true -> false; false -> null }) },
+                headlineContent = { Text("Credits Detection") },
+                supportingContent = {
+                    Text(when (override) {
+                        null -> "Default" + (server?.let { if (it) " (On)" else " (Off)" } ?: "")
+                        true -> "On"
+                        false -> "Off"
+                    } + " · finds unknown end credits on screen for Next Episode")
                 },
             )
         }

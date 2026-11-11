@@ -4,6 +4,7 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.SkipSegment
 import com.strmr.tv.api.playbackSettings
 import com.strmr.tv.app.AppLog
+import com.strmr.tv.ui.settings.CreditsDetectionSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,10 +16,21 @@ import kotlinx.coroutines.launch
  * Next Episode replaces Skip Credits, and with the profile's credits auto-skip on it counts
  * down and plays by itself. Pausing holds the countdown; seeking out of the credits cancels it.
  * Back over the pill dismisses it for that segment. Driven by [PlayerController]'s clock.
+ * With Credits Detection on and no credits from the server, the credits come from
+ * [CreditsDetector] reading the video [surface].
  */
-class UpNext(request: PlaybackRequest, private val scope: CoroutineScope, private val onAdvance: (PlaybackRequest) -> Unit) {
+class UpNext(
+    request: PlaybackRequest,
+    streamPath: String?,
+    private val scope: CoroutineScope,
+    private val surface: () -> android.view.SurfaceView?,
+    private val onAdvance: (PlaybackRequest) -> Unit,
+) {
     val nextEpisode: PlaybackRequest? = request.nextEpisode
-    private val segments = SkipSegments(request)
+    private val segments = SkipSegments(request, streamPath)
+    private var detector: CreditsDetector? = null
+    private var durationSec = 0.0
+    private var cancelled = false
     private val _action = MutableStateFlow<SkipAction?>(null)
     val action: StateFlow<SkipAction?> = _action
 
@@ -31,13 +43,21 @@ class UpNext(request: PlaybackRequest, private val scope: CoroutineScope, privat
     private var advanced = false
 
     init {
-        if (nextEpisode != null) scope.launch { autoSkip = ApiClient.playbackSettings().creditsAutoSkip }
+        if (nextEpisode != null) scope.launch {
+            val settings = ApiClient.playbackSettings()
+            autoSkip = settings.creditsAutoSkip
+            if (request.isEpisode && CreditsDetectionSettings.enabled(settings.creditsDetection) && !advanced && !cancelled) {
+                detector = CreditsDetector { start -> segments.detectedCredits(start, durationSec) }
+            }
+        }
     }
 
     /** Called about twice a second with the player's state. */
     fun tick(positionMs: Long, durationMs: Long, playing: Boolean) {
         if (advanced) return
         segments.refresh(scope, durationMs)
+        durationSec = durationMs / 1000.0
+        if (!segments.hasOutro) detector?.tick(positionMs / 1000.0, durationSec, surface())
         val found = segments.active(positionMs).takeIf { it != dismissed }
         if (found != active) {
             active = found
@@ -86,7 +106,11 @@ class UpNext(request: PlaybackRequest, private val scope: CoroutineScope, privat
         onAdvance(next)
     }
 
-    fun cancel() = segments.cancel()
+    fun cancel() {
+        cancelled = true
+        segments.cancel()
+        detector?.close()
+    }
 
     private fun prefetchIfNear(positionMs: Long, durationMs: Long) {
         val next = nextEpisode ?: return

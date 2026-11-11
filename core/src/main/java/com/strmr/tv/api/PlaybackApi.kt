@@ -68,6 +68,8 @@ data class PlaybackSettings(
     val autoPlayTrailers: Boolean = false,
     /** Next Episode counts down over the credits and plays by itself (`playback.creditsAutoSkip`). */
     val creditsAutoSkip: Boolean = false,
+    /** Episodes with no known credits are read on screen for them (`playback.creditsDetectionEnabled`). */
+    val creditsDetection: Boolean = false,
     /** The Expo app's subtitle style (`playback.subtitle*`) under this device's; null from servers that send none. */
     val subtitleStyle: SubtitleStyle.Server? = null,
     /** Subtitle language (`playback.preferredSubtitleLanguage`), for when the server sent no track choice. */
@@ -87,6 +89,7 @@ private data class PlaybackFields(
     val creditsAutoSkip: Boolean? = null,
     /** The older name of `creditsAutoSkip`. */
     val creditsDetection: Boolean? = null,
+    val creditsDetectionEnabled: Boolean? = null,
     val subtitleSize: Double? = null,
     val subtitleColor: String? = null,
     val subtitleOpacity: Double? = null,
@@ -130,6 +133,7 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
         prequeueOnOpen = !(d?.disablePrequeue ?: u?.disablePrequeue ?: false),
         autoPlayTrailers = d?.autoPlayTrailersTV ?: u?.autoPlayTrailersTV ?: false,
         creditsAutoSkip = d?.autoSkip ?: u?.autoSkip ?: false,
+        creditsDetection = d?.creditsDetectionEnabled ?: u?.creditsDetectionEnabled ?: false,
         subtitleStyle = d?.style?.mergedOver(u?.style) ?: u?.style,
         preferredSubtitleLanguage = (d?.preferredSubtitleLanguage?.ifEmpty { null } ?: u?.preferredSubtitleLanguage)?.ifEmpty { null },
         preferredSubtitleMode = when (val mode = d?.preferredSubtitleMode?.ifEmpty { null } ?: u?.preferredSubtitleMode) {

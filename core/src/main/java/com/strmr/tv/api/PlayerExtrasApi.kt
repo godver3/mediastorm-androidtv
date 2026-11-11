@@ -88,3 +88,18 @@ private data class SkipSegmentsResponse(val segments: List<SkipSegment>? = null)
 
 suspend fun ApiClient.skipSegments(body: JsonObject): List<SkipSegment> =
     send<SkipSegmentsResponse>("POST", "/api/video/segments", body = body, promptOnLock = false).segments.orEmpty()
+
+/** A container chapter of the playing file, as the server's ffprobe read it (`/api/video/metadata`). */
+@Serializable
+data class VideoChapter(val title: String = "", val start: Double, val end: Double = 0.0)
+
+@Serializable
+private data class VideoChaptersResponse(val chapters: List<VideoChapter>? = null)
+
+/**
+ * The file's chapters (ExoPlayer surfaces none), for `/api/video/segments` to read credits
+ * from chapter names as the Expo player's do. The server caches the probe per path.
+ */
+suspend fun ApiClient.videoChapters(path: String): List<VideoChapter> =
+    send<VideoChaptersResponse>("GET", "/api/video/metadata", mapOf("path" to path),
+                                promptOnLock = false, timeoutMs = 20_000).chapters.orEmpty()

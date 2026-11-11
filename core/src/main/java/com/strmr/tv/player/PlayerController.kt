@@ -98,6 +98,8 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** Seek previews, for a resolved stream (not trailers, live or a downloaded file). */
     val thumbnails: PlaybackThumbnails? =
         session.streamPath?.takeIf { !session.isLive && session.reportsProgress && !session.localFile }?.let { PlaybackThumbnails(it, request) }
+    /** The video surface, set by the player screen's PlayerView: credits detection reads frames from it. */
+    var videoSurface: android.view.SurfaceView? = null
     /** A recording still recording, over its growing HLS session (set as the player is built). */
     private var recordingHls: RecordingHls? = null
     /** A live channel: its server session, and tuning it again when the source drops (set as the player is built). */
@@ -107,7 +109,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     var catchup: CatchupJoin? = null
         private set
     val upNext: UpNext? = if (session.reportsProgress && !session.isLive) {
-        UpNext(request, scope) { next ->
+        UpNext(request, session.streamPath?.takeIf { !session.localFile }, scope, { videoSurface }) { next ->
             report(ended = true)
             advanceTo.value = next.copy(speed = speed.value)
         }
