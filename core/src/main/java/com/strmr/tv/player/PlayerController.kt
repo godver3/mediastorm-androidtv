@@ -109,7 +109,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val upNext: UpNext? = if (session.reportsProgress && !session.isLive) {
         UpNext(request, scope) { next ->
             report(ended = true)
-            advanceTo.value = next
+            advanceTo.value = next.copy(speed = speed.value)
         }
     } else null
 
@@ -244,6 +244,8 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         recordingHls?.let { player.setMediaItem(it.mediaItem(session.url), 0) }
             ?: player.setMediaItem(Timeshift.mediaItem(session.url, timeshift.value))
         request.startPosition?.let { player.seekTo((it * 1000).toLong()) }
+        // Up Next / Switch Source: the previous playback's speed (live always plays at 1x).
+        if (request.speed != 1f && !session.isLive) setSpeed(request.speed)
         player.playWhenReady = true
         player.prepare()
         autoSwitch.start()
@@ -329,7 +331,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         val position = player.currentPosition
         val carried = CarriedTracks.capture(player.currentTracks, player.trackSelectionParameters, external.selected.value)
         AppLog.i("SourceSwitch", "switch from \"${session.releaseName}\" to \"${source.title}\" at ${position / 1000}s carried=$carried")
-        switchTo.value = SourceSwitchRequest(SourceSwitchRules.resumeAt(request, position), source, carried)
+        switchTo.value = SourceSwitchRequest(SourceSwitchRules.resumeAt(request, position).copy(speed = speed.value), source, carried)
     }
 
     /** Saves the position and lets go of the player; returns the last report, still finishing. */

@@ -104,7 +104,7 @@ class AutoSwitch(private val controller: PlayerController) {
         val carried = CarriedTracks.capture(player.currentTracks, player.trackSelectionParameters, controller.external.selected.value)
         AppLog.i(TAG, "-> \"${source.title}\" (${source.serviceType}) at ${player.currentPosition / 1000}s carried=$carried")
         val next = SourceSwitchRules.resumeAt(request, player.currentPosition)
-            .copy(autoSwitchTried = tried, autoSwitchCount = request.autoSwitchCount + 1)
+            .copy(autoSwitchTried = tried, autoSwitchCount = request.autoSwitchCount + 1, speed = controller.speed.value)
         controller.online.setStatus(null)
         controller.switchTo.value = SourceSwitchRequest(next, source, carried, resolved)
     }
