@@ -172,7 +172,13 @@ object ConnectionManager {
             return
         }
         if (check()) {
-            if (_status.value != Status.Online) recovered()
+            if (_status.value != Status.Online) {
+                recovered()
+            } else if (reason == "network change") {
+                // A new network that reaches the server (e.g. home Wi-Fi): save the home and away
+                // addresses now, so leaving it later can switch without asking the server.
+                selector.refreshSettings()
+            }
         } else if (_status.value !is Status.Reconnecting) {
             ReconnectJournal.record("server-unreachable", mapOf("reason" to reason))
             scheduleRetry(0)
@@ -242,6 +248,8 @@ object ConnectionManager {
         val at = System.currentTimeMillis()
         recoveredAt.value = at
         AppSession.wakes.value += 1 // pages that failed while the server was away load again
+        // A sign-in-time fetch may have failed: read the home and away addresses while reachable.
+        scope.launch { selector.refreshSettings() }
         scope.launch {
             OfflineProgress.flush()
             delay(3_000)
