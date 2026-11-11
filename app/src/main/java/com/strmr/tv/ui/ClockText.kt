@@ -26,13 +26,13 @@ import com.strmr.tv.ui.settings.ClockSettings
 import java.util.Date
 
 /**
- * The current time on the tab bar's glass pill (Home's top right, the player's chrome), in the
- * device's 12 / 24-hour format. Not focusable. It changes on the system's minute tick (also
+ * The current time on its own glass pill (the player's chrome, the side-menu style's Home), or
+ * bare (`pill = false`) at the end of the top tab bar's pill, in the device's 12 / 24-hour format. Not focusable. It changes on the system's minute tick (also
  * delivered on waking from sleep) and on a time, zone, locale or 12 / 24-hour change, never more often.
  * Hidden by Settings › Appearance › Show Clock.
  */
 @Composable
-internal fun ClockText(modifier: Modifier = Modifier) {
+internal fun ClockText(modifier: Modifier = Modifier, pill: Boolean = true) {
     if (!ClockSettings.enabled) return
     val context = LocalContext.current
     var time by remember { mutableStateOf(formatNow(context)) }
@@ -56,8 +56,12 @@ internal fun ClockText(modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
         color = Color.White.copy(alpha = 0.85f),
-        modifier = modifier.background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
-            .padding(horizontal = 18.dp, vertical = 7.dp),
+        modifier = if (pill) {
+            modifier.background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
+                .padding(horizontal = 18.dp, vertical = 7.dp)
+        } else {
+            modifier
+        },
     )
 }
 

@@ -2,6 +2,7 @@ package com.strmr.tv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,7 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabDefaults
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
+import com.strmr.tv.ui.settings.ClockSettings
 
 /**
  * The top menu style: Google TV's tab row on a glass pill over the page. Focusing a tab
@@ -56,40 +58,51 @@ internal fun TopMenuBar(
     val keys = tabs.map { it.key }
     val compact = compactFor == keys
     Column(Modifier.fillMaxWidth().padding(top = 20.dp).onSizeChanged { width = it.width }) {
-        // On a glass pill, so it reads over any backdrop (the tvOS tab bar's look).
-        TabRow(
-            selectedTabIndex = selected,
-            modifier = Modifier.align(Alignment.CenterHorizontally).wrapContentWidth()
+        // On a glass pill, so it reads over any backdrop (the tvOS tab bar's look). The clock
+        // ends the pill after Settings on every tab (so the row never shifts between tabs), and
+        // counts toward the width check, so a long row goes compact instead of running into it.
+        Row(
+            Modifier.align(Alignment.CenterHorizontally).wrapContentWidth()
                 // Held to the screen's width means it overflowed (it scrolls): go compact.
                 .onSizeChanged { if (!compact && width > 0 && it.width >= width) compactFor = keys }
                 .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
-                .padding(horizontal = 6.dp, vertical = 4.dp)
-                // Up from anywhere in the page lands on the current tab, not the one nearest the focused card.
-                .focusProperties { onEnter = { menuFocus.requestFocus() } }
-                .onFocusChanged { onMenuFocused(it.hasFocus) },
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            tabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = index == selected,
-                    onFocus = { onFocusTab(tab) },
-                    // Labels stay readable while focus is in the page, as on tvOS.
-                    colors = TabDefaults.pillIndicatorTabColors(
-                        contentColor = Color.White.copy(alpha = 0.8f),
-                        inactiveContentColor = Color.White.copy(alpha = 0.8f),
-                    ),
-                    // Down enters the page (the view switcher first, on Home): the search alone doesn't leave the row for it.
-                    modifier = Modifier.focusProperties { down = if (switcher != null) switcherFocus else pageFocus }
-                        .then(if (index == selected) Modifier.focusRequester(menuFocus) else Modifier),
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = if (compact) 10.dp else 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            TabRow(
+                selectedTabIndex = selected,
+                modifier = Modifier.weight(1f, fill = false)
+                    // Up from anywhere in the page lands on the current tab, not the one nearest the focused card.
+                    .focusProperties { onEnter = { menuFocus.requestFocus() } }
+                    .onFocusChanged { onMenuFocused(it.hasFocus) },
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = index == selected,
+                        onFocus = { onFocusTab(tab) },
+                        // Labels stay readable while focus is in the page, as on tvOS.
+                        colors = TabDefaults.pillIndicatorTabColors(
+                            contentColor = Color.White.copy(alpha = 0.8f),
+                            inactiveContentColor = Color.White.copy(alpha = 0.8f),
+                        ),
+                        // Down enters the page (the view switcher first, on Home): the search alone doesn't leave the row for it.
+                        modifier = Modifier.focusProperties { down = if (switcher != null) switcherFocus else pageFocus }
+                            .then(if (index == selected) Modifier.focusRequester(menuFocus) else Modifier),
                     ) {
-                        if (!compact) Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(tab.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            Modifier.padding(horizontal = if (compact) 10.dp else 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (!compact) Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(tab.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
+            }
+            if (ClockSettings.enabled) {
+                Box(Modifier.padding(horizontal = 8.dp).size(width = 1.dp, height = 20.dp).background(Color.White.copy(alpha = 0.25f)))
+                ClockText(Modifier.padding(start = 6.dp, end = 12.dp), pill = false)
             }
         }
         switcher?.invoke(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).focusProperties { up = menuFocus })

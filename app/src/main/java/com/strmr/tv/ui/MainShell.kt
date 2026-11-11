@@ -202,8 +202,6 @@ fun MainShell() {
                 menuFocus = menuFocus, pageFocus = pageFocus, onMenuFocused = { menuFocused = it },
                 switcher = switcher, switcherFocus = switcherFocus,
             )
-            // Level with the tab bar's pill (centred on it), at the screen's right edge.
-            if (onHome) ClockText(Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = CLOCK_END))
         }
     }
     if (picking) {
@@ -218,5 +216,5 @@ fun MainShell() {
     }
 }
 
-/** The Home clock's inset from the screen's right edge. */
+/** The side-menu style's Home clock: its inset from the screen's right edge. */
 private val CLOCK_END = 48.dp
