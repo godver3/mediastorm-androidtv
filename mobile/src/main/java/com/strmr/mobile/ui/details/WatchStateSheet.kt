@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,6 +18,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.strmr.mobile.ui.components.SheetHeader
 import com.strmr.tv.api.ApiClient
+import com.strmr.tv.api.BulkWatchConfirmation
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.api.Episode
 import com.strmr.tv.api.Season
@@ -53,13 +56,17 @@ fun WatchStateLoader(target: DetailsTarget, onDismiss: () -> Unit) {
  * targets and the whole-show choices (all, or all but the most recent season) close it; each
  * season toggles in place with the sheet left up (checked once every aired episode is
  * watched). Whole-show and whole-season changes carry their scope so Trakt-style providers
- * record them with their own bulk calls. Only aired episodes are marked watched.
+ * record them with their own bulk calls. Only aired episodes are marked watched. Whole-show
+ * choices, and seasons of [BulkWatchConfirmation.SEASON_THRESHOLD] episodes or more, confirm
+ * first.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WatchStateSheet(model: DetailsModel, episode: Episode?, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
+    var pending by remember { mutableStateOf<Pair<BulkWatchConfirmation.Prompt, () -> Unit>?>(null) }
+    val show = model.target.name
     val ordered = remember(model.seasons) { model.seasons.sortedBy { it.number } }
     val aired = remember(model.seasons) { ordered.associate { s -> s.number to s.episodes.filter(DetailsModel::hasAired) } }
     val regular = ordered.map { it.number }.filter { it > 0 }
@@ -83,6 +90,12 @@ fun WatchStateSheet(model: DetailsModel, episode: Episode?, onDismiss: () -> Uni
         }
     }
 
+    fun confirmAll(watched: Boolean, episodes: List<Episode>, watchedScope: WatchedScope?, exceptSeason: Int? = null) {
+        if (episodes.isEmpty()) return
+        pending = BulkWatchConfirmation.allEpisodes(watched, episodes.size, show, exceptSeason) to
+            { apply(watched, episodes, watchedScope, close = true) }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         LazyColumn(Modifier.fillMaxWidth().navigationBarsPadding()) {
             item { SheetHeader("Watch State", model.target.name, null) }
@@ -99,26 +112,39 @@ fun WatchStateSheet(model: DetailsModel, episode: Episode?, onDismiss: () -> Uni
             val allAired = ordered.flatMap { aired[it.number].orEmpty() }
             val all = ordered.flatMap { it.episodes }
             section("All Episodes")
-            item { Choice("Mark All ${allAired.size} as Watched", enabled = allAired.isNotEmpty()) { apply(true, allAired, WatchedScope.SHOW, close = true) } }
+            item { Choice("Mark All ${allAired.size} as Watched", enabled = allAired.isNotEmpty()) { confirmAll(true, allAired, WatchedScope.SHOW) } }
             if (latest != null) {
                 val restAired = rest.flatMap { aired[it.number].orEmpty() }
-                item { Choice("All Except Season $latest as Watched", enabled = restAired.isNotEmpty()) { apply(true, restAired, null, close = true) } }
+                item { Choice("All Except Season $latest as Watched", enabled = restAired.isNotEmpty()) { confirmAll(true, restAired, null, exceptSeason = latest) } }
             }
-            item { Choice("Mark All ${all.size} as Unwatched", enabled = all.isNotEmpty()) { apply(false, all, WatchedScope.SHOW, close = true) } }
+            item { Choice("Mark All ${all.size} as Unwatched", enabled = all.isNotEmpty()) { confirmAll(false, all, WatchedScope.SHOW) } }
             if (latest != null) {
                 val restAll = rest.flatMap { it.episodes }
-                item { Choice("All Except Season $latest as Unwatched", enabled = restAll.isNotEmpty()) { apply(false, restAll, null, close = true) } }
+                item { Choice("All Except Season $latest as Unwatched", enabled = restAll.isNotEmpty()) { confirmAll(false, restAll, null, exceptSeason = latest) } }
             }
             section("Seasons")
             // Keyed by number: a season's ID can be empty, and a repeated key crashes the list.
             ordered.forEach { season ->
                 item(key = "season-${season.number}") {
                     SeasonToggle(season, aired[season.number].orEmpty(), model::isWatched) { w, eps ->
-                        apply(w, eps, if (season.number > 0) WatchedScope.SEASON else null, close = false)
+                        val seasonScope = if (season.number > 0) WatchedScope.SEASON else null
+                        val prompt = BulkWatchConfirmation.season(w, eps.size, show, seasonName(season.number))
+                        if (prompt == null) apply(w, eps, seasonScope, close = false)
+                        else pending = prompt to { apply(w, eps, seasonScope, close = false) }
                     }
                 }
             }
         }
+    }
+
+    pending?.let { (prompt, run) ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text(prompt.title) },
+            text = { Text(prompt.message) },
+            confirmButton = { TextButton(onClick = { pending = null; run() }) { Text(prompt.confirm) } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text("Cancel") } },
+        )
     }
 }
 

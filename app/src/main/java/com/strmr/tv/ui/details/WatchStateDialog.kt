@@ -19,10 +19,13 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
 import com.strmr.tv.api.ApiClient
+import com.strmr.tv.api.BulkWatchConfirmation
 import com.strmr.tv.api.Episode
 import com.strmr.tv.api.Season
 import com.strmr.tv.api.WatchedScope
 import com.strmr.tv.api.setWatched
+import com.strmr.tv.ui.ChoiceDialog
+import com.strmr.tv.ui.DialogChoice
 import com.strmr.tv.ui.PanelSection
 import com.strmr.tv.ui.SidePanelDialog
 import kotlinx.coroutines.launch
@@ -34,7 +37,9 @@ import kotlinx.coroutines.launch
  * (checked once every aired episode is watched), so several can be marked in one visit.
  * Whole-show and whole-season changes carry their scope so Trakt-style providers record them
  * with their own bulk calls. Only aired episodes are marked watched; unwatched applies to
- * everything. Episodes flip at once; [onChanged] runs after each change.
+ * everything. Episodes flip at once; [onChanged] runs after each change. Whole-show choices,
+ * and seasons of [BulkWatchConfirmation.SEASON_THRESHOLD] episodes or more, confirm first, with
+ * Cancel focused.
  */
 @Composable
 fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismiss: () -> Unit) {
@@ -44,7 +49,9 @@ fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismi
     val latest = if (regular.size > 1) regular.max() else null
     val rest = ordered.filter { it.number != latest }
     var error by remember { mutableStateOf<String?>(null) }
+    var pending by remember { mutableStateOf<Pair<BulkWatchConfirmation.Prompt, () -> Unit>?>(null) }
     val scope = rememberCoroutineScope()
+    val show = model.target.name
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 
@@ -66,6 +73,12 @@ fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismi
         }
     }
 
+    fun confirmAll(watched: Boolean, episodes: List<Episode>, watchedScope: WatchedScope?, exceptSeason: Int? = null) {
+        if (episodes.isEmpty()) return
+        pending = BulkWatchConfirmation.allEpisodes(watched, episodes.size, show, exceptSeason) to
+            { apply(watched, episodes, watchedScope, close = true) }
+    }
+
     SidePanelDialog("Watch State", model.target.name, onDismiss) {
         error?.let { item { Text(it, fontSize = 14.sp, color = Color(0xFFFF6B6B)) } }
         model.primaryEpisode?.let { ep ->
@@ -83,31 +96,48 @@ fun WatchStateDialog(model: DetailsModel, onChanged: suspend () -> Unit, onDismi
             val focus = if (model.primaryEpisode == null) Modifier.focusRequester(first) else Modifier
             PanelSection("All Episodes")
             Row("Mark all ${allAired.size} as watched", enabled = allAired.isNotEmpty(), modifier = focus) {
-                apply(true, allAired, WatchedScope.SHOW, close = true)
+                confirmAll(true, allAired, WatchedScope.SHOW)
             }
             if (latest != null) {
                 val restAired = rest.flatMap { aired[it.number].orEmpty() }
                 Row("All except Season $latest as watched", enabled = restAired.isNotEmpty()) {
-                    apply(true, restAired, null, close = true)
+                    confirmAll(true, restAired, null, exceptSeason = latest)
                 }
             }
             Row("Mark all ${all.size} as unwatched", enabled = all.isNotEmpty()) {
-                apply(false, all, WatchedScope.SHOW, close = true)
+                confirmAll(false, all, WatchedScope.SHOW)
             }
             if (latest != null) {
                 val restAll = rest.flatMap { it.episodes }
                 Row("All except Season $latest as unwatched", enabled = restAll.isNotEmpty()) {
-                    apply(false, restAll, null, close = true)
+                    confirmAll(false, restAll, null, exceptSeason = latest)
                 }
             }
         }
         if (ordered.isNotEmpty()) item { PanelSection("Seasons") }
         // Keyed by number: a season's ID can be empty, and a repeated key crashes the dialog.
         for (season in ordered) item(key = season.number) {
-            SeasonToggle(season, aired[season.number].orEmpty(), model::isWatched) { w, eps -> apply(w, eps, seasonScope(season), close = false) }
+            SeasonToggle(season, aired[season.number].orEmpty(), model::isWatched) { w, eps ->
+                val prompt = BulkWatchConfirmation.season(w, eps.size, show, seasonName(season))
+                if (prompt == null) apply(w, eps, seasonScope(season), close = false)
+                else pending = prompt to { apply(w, eps, seasonScope(season), close = false) }
+            }
         }
     }
+
+    pending?.let { (prompt, run) ->
+        // Cancel first, so it takes focus; either choice dismisses.
+        ChoiceDialog(
+            title = prompt.title,
+            message = prompt.message,
+            choices = listOf(DialogChoice("Cancel") {}, DialogChoice(prompt.confirm, run)),
+            onDismiss = { pending = null },
+            steady = true,
+        )
+    }
 }
+
+private fun seasonName(season: Season) = if (season.number == 0) "Specials" else "Season ${season.number}"
 
 /** Specials are not a season to Trakt-style providers; they are sent unscoped. */
 private fun seasonScope(season: Season) = if (season.number > 0) WatchedScope.SEASON else null
@@ -120,7 +150,7 @@ private fun seasonScope(season: Season) = if (season.number > 0) WatchedScope.SE
 private fun SeasonToggle(season: Season, aired: List<Episode>, isWatched: (Episode) -> Boolean, apply: (Boolean, List<Episode>) -> Unit) {
     val watchedCount = season.episodes.count(isWatched)
     val complete = aired.isNotEmpty() && aired.all(isWatched)
-    val name = if (season.number == 0) "Specials" else "Season ${season.number}"
+    val name = seasonName(season)
     ListItem(
         selected = complete,
         enabled = aired.isNotEmpty() || watchedCount > 0,
