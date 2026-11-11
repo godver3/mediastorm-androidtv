@@ -19,6 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +97,17 @@ private fun SearchContent(modifier: Modifier) {
     val gridState = rememberLazyGridState()
     // A new query or scope starts the grid at its top.
     LaunchedEffect(normalized, scope) { gridState.scrollToItem(0) }
+    // Pressing the Search tab again focuses the field, bringing up the keyboard.
+    val fieldFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusPending = navigator.searchFocusPending
+    LaunchedEffect(focusPending) {
+        if (!focusPending) return@LaunchedEffect
+        navigator.searchFocusPending = false
+        withFrameNanos { } // the field is attached once a frame has passed
+        runCatching { fieldFocus.requestFocus() }
+        keyboard?.show()
+    }
 
     Column(modifier) {
         SearchField(
@@ -102,6 +116,7 @@ private fun SearchContent(modifier: Modifier) {
             onSubmit = { recents.add(it) },
             onClearRecents = recents::clear,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            focusRequester = fieldFocus,
         )
         Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SearchScope.entries.forEach { s ->

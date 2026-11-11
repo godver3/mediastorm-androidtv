@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.strmr.mobile.ui.components.ArtImage
@@ -55,6 +57,7 @@ fun SearchField(
     onSubmit: (String) -> Unit,
     onClearRecents: () -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
@@ -75,6 +78,7 @@ fun SearchField(
                 trailingIcon = {
                     if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Filled.Close, "Clear") }
                 },
+                modifier = if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier,
             )
         },
         expanded = expanded,
