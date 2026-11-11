@@ -85,7 +85,7 @@ fun SportsStreamPicker(target: SportsWatchTarget, onPick: (SportsStreamMatch) ->
                             AsyncImage(model = match.channel.logoUrl, contentDescription = null, contentScale = ContentScale.Fit,
                                        modifier = Modifier.size(width = 56.dp, height = 32.dp))
                         },
-                        headlineContent = { Text(match.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        headlineContent = { Text(match.rowTitle, maxLines = 3, overflow = TextOverflow.Ellipsis) },
                         supportingContent = {
                             Column {
                                 Text(SportsStreamSearch.details(match), maxLines = 2, overflow = TextOverflow.Ellipsis)

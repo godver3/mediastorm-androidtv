@@ -22,6 +22,10 @@ class SportsStreamOptionsTest {
         val lookups = mapOf(addonUrl to SportsStreamLookup.Found(listOf(stream(2, "1080p"), stream(0, title = "720p"), stream(1))))
         val rows = SportsStreamOptions.rows(listOf(addon, iptv), lookups)
         assertEquals(listOf("ESPN · 1080p", "ESPN · 720p", "ESPN · Feed 2", "TSN"), rows.map { it.title })
+        // The row leads with the stream (what tells them apart); the channel joins the details.
+        assertEquals(listOf("1080p", "720p", "Feed 2", "TSN"), rows.map { it.rowTitle })
+        assertEquals("Addon · ESPN · 90%", com.strmr.tv.ui.sports.SportsStreamSearch.details(rows[0]))
+        assertEquals("", com.strmr.tv.ui.sports.SportsStreamSearch.details(rows[3]))
         assertEquals(listOf(2, 0, 1, null), rows.map { it.stremioStreamIndex })
         // The match's source, confidence and badge carry over; the index reaches the tuned channel.
         assertTrue(rows.take(3).all { it.isStrong && it.sourceName == "Addon" && it.confidence == 0.9 })

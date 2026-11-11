@@ -216,6 +216,9 @@ data class SportsStreamMatch(
     /** "<channel> · <stream>" for a stream of a Stremio channel, else the channel's name. */
     val title: String get() = streamLabel?.let { "$channelName · $it" } ?: channelName
 
+    /** The picker row's headline: the stream's label (what sets a Stremio channel's streams apart; the channel moves to the details), else the channel's name. */
+    val rowTitle: String get() = streamLabel ?: channelName
+
     /** The channel as Live TV tunes it, on the picked Stremio stream if any. */
     val channel: LiveChannel
         get() = LiveChannel(id = channelId, name = channelName, url = channelUrl, logo = channelLogo,

@@ -85,10 +85,11 @@ class SportsStreamSearch(private val target: SportsWatchTarget) {
     }
 
     companion object {
-        /** "Source · Programme · why it matched · 92%". */
+        /** "Source · Programme · why it matched · 92%", with the channel after the source on a stream row (its headline is the stream). */
         fun details(match: SportsStreamMatch): String {
             val percent = match.confidence?.let { "${Math.round(it * 100)}%" }
-            return listOfNotNull(match.sourceName, match.programTitle, match.matchReason, percent).filter { it.isNotEmpty() }.joinToString(" · ")
+            val channel = match.channelName.takeIf { match.streamLabel != null }
+            return listOfNotNull(match.sourceName, channel, match.programTitle, match.matchReason, percent).filter { it.isNotEmpty() }.joinToString(" · ")
         }
     }
 }
