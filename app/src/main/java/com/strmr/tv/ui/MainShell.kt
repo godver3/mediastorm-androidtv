@@ -188,6 +188,7 @@ fun MainShell() {
                     page()
                     // Top centre of the page, where it sits under the tab bar in the top style.
                     switcher?.invoke(Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
+                    if (onHome) ClockText(Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = CLOCK_END))
                 }
             }
         } else {
@@ -201,6 +202,8 @@ fun MainShell() {
                 menuFocus = menuFocus, pageFocus = pageFocus, onMenuFocused = { menuFocused = it },
                 switcher = switcher, switcherFocus = switcherFocus,
             )
+            // Level with the tab bar's pill (centred on it), at the screen's right edge.
+            if (onHome) ClockText(Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = CLOCK_END))
         }
     }
     if (picking) {
@@ -214,3 +217,6 @@ fun MainShell() {
         )
     }
 }
+
+/** The Home clock's inset from the screen's right edge. */
+private val CLOCK_END = 48.dp

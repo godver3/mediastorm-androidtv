@@ -185,6 +185,16 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 trailingContent = { Text(AppearanceSettings.background.label) },
             )
         }
+        item {
+            val enabled = ClockSettings.enabled
+            ListItem(
+                selected = false,
+                onClick = { ClockSettings.set(!enabled) },
+                headlineContent = { Text("Show Clock") },
+                supportingContent = { Text("The time at the top of Home and in the player") },
+                trailingContent = { Text(if (enabled) "On" else "Off") },
+            )
+        }
         item { Header("Card Badges") }
         badgeSettingRows()
         item { Header("Spoilers") }

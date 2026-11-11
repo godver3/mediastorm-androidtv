@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.strmr.tv.ui.AppIcons
+import com.strmr.tv.ui.ClockText
 import kotlinx.coroutines.delay
 
 private enum class Menu { INFO, AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARCH, SUBTITLE_TRANSLATE, SPEED, SOURCES }
@@ -209,6 +210,8 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
 
         AnimatedVisibility(visible && error == null, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.9f)))) {
+                // The time, top right, coming and going with the chrome (Settings › Appearance › Show Clock).
+                ClockText(Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 64.dp))
                 Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 64.dp, vertical = 40.dp)) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 24.dp)) {
