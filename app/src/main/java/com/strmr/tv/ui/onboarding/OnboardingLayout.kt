@@ -173,6 +173,14 @@ fun FormField(
                         if (e.type == KeyEventType.KeyDown) focus.moveFocus(if (e.key == Key.DirectionDown) FocusDirection.Down else FocusDirection.Up)
                         true
                     }
+                    // Not editing, Left / Right reach a control beside the field (Search's mic)
+                    // instead of moving a hidden cursor; with nothing there they act as before.
+                    Key.DirectionLeft, Key.DirectionRight -> when {
+                        editing -> false
+                        e.type == KeyEventType.KeyDown ->
+                            focus.moveFocus(if (e.key == Key.DirectionRight) FocusDirection.Right else FocusDirection.Left)
+                        else -> false
+                    }
                     else -> false
                 }
             },

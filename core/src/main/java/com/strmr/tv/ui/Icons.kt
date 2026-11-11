@@ -17,7 +17,12 @@ object AppIcons {
         "CloudDownload",
         "M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z",
     )
-    val Pause = icon("Pause", "M6 19h4V5H6v14zm8-14v14h4V5h-4z")
+    /** Material "mic", for voice search. */
+    val Mic = icon(
+        "Mic",
+        "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z",
+    )
+    val Pause = icon("Pause","M6 19h4V5H6v14zm8-14v14h4V5h-4z")
     val SkipNext = icon("SkipNext", "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z")
     val Speed = icon(
         "Speed",

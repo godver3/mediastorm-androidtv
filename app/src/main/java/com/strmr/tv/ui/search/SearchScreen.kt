@@ -59,7 +59,7 @@ import com.strmr.tv.ui.onboarding.FormField
 
 /**
  * The Search tab, a port of the Expo TV search (`TVSearchScreen`, as the tvOS app has it):
- * the field (the system keyboard, voice included where the IME has it), then a rail on the
+ * the field (the system keyboard) with a mic beside it where the device has speech input, then a rail on the
  * left (the query and the result names, while there is a query) beside a poster grid (Top 10
  * Today before typing, then movies, series and people merged by relevance). Without the rail
  * (before typing, and always on kids profiles) the grid has 6 columns; curated kids
@@ -92,11 +92,19 @@ fun SearchScreen() {
 
     // Below the tab bar, clipped there.
     Column(Modifier.fillMaxSize().padding(top = 76.dp).clipToBounds()) {
-        Box(Modifier.padding(horizontal = PageMargin).widthIn(max = 640.dp)) {
-            FormField(
-                query, { query = SearchRanking.clamp(it) },
-                label = "Search", placeholder = "Search movies, shows, genres, people...", imeAction = ImeAction.Search,
-            )
+        Row(
+            Modifier.padding(horizontal = PageMargin),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Box(Modifier.widthIn(max = 640.dp).weight(1f, fill = false)) {
+                FormField(
+                    query, { query = SearchRanking.clamp(it) },
+                    label = "Search", placeholder = "Search movies, shows, genres, people...", imeAction = ImeAction.Search,
+                )
+            }
+            // Spoken queries land in the field like typed ones.
+            VoiceSearchButton(onResult = { query = SearchRanking.clamp(it) }, modifier = Modifier.padding(bottom = 4.dp))
         }
         Box(Modifier.padding(start = PageMargin, end = PageMargin, top = 14.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
         Row(Modifier.fillMaxSize()) {
