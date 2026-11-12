@@ -85,7 +85,7 @@ fun ProfilePickerScreen() {
         }
     }
 
-    OnboardingScaffold(title = "Who's Watching?") {
+    OnboardingScaffold(title = "Who's Watching?", profiles = true) {
         when {
             profiles.isNotEmpty() -> {
                 FlowRow(

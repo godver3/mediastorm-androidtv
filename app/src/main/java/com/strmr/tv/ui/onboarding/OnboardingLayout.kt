@@ -187,10 +187,14 @@ fun FormField(
     )
 }
 
-/** The server's uploaded logo (`/api/branding`), else the bundled MediaStorm logo. */
+/**
+ * The server's uploaded logo (`/api/branding`), else the bundled MediaStorm logo.
+ * [profiles] shows the profile-picker image instead (the TV home image, as in the Expo app).
+ */
 @Composable
-fun BrandMark(height: Dp) {
-    val brand by AppSession.brandLogoUrl.collectAsState()
+fun BrandMark(height: Dp, profiles: Boolean = false) {
+    val branding by AppSession.branding.collectAsState()
+    val brand = branding?.let { if (profiles) it.profilePickerPath(tv = true) else it.logoPath }
     val modifier = Modifier.height(height).widthIn(max = height * 3)
     if (brand != null) {
         SubcomposeAsyncImage(

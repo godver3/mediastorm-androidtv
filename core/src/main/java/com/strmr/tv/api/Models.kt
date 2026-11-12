@@ -52,5 +52,37 @@ data class PublicBranding(
 ) {
     /** The wide logo the Expo app's sign-in shows (loading logo, else the mobile logo). */
     val logoPath: String?
-        get() = listOfNotNull(loadingLogoUrl, homeMobileLogoUrl).map { it.trim() }.firstOrNull { it.isNotEmpty() }
+        get() = first(loadingLogoUrl, homeMobileLogoUrl)
+
+    /**
+     * The profile picker's image, as in the Expo app: the TV home image on TV (else the
+     * mobile logo), the mobile logo on phones and tablets (else the TV image).
+     */
+    fun profilePickerPath(tv: Boolean): String? =
+        if (tv) first(homeTvImageUrl, homeMobileLogoUrl) else first(homeMobileLogoUrl, homeTvImageUrl)
+
+    /** Every path resolved to an absolute URL on [server] (blank ones dropped). */
+    fun resolvedAgainst(server: String): PublicBranding = PublicBranding(
+        loadingLogoUrl = resolve(loadingLogoUrl, server),
+        homeMobileLogoUrl = resolve(homeMobileLogoUrl, server),
+        homeTvImageUrl = resolve(homeTvImageUrl, server),
+    )
+
+    companion object {
+        /**
+         * Resolves a branding path against the server. Uploads are stored as
+         * `/branding/images/<slot>?v=…`, which the server serves under `/api`.
+         */
+        fun resolve(path: String?, server: String): String? {
+            val trimmed = path?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                return trimmed
+            }
+            val relative = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
+            return server.trimEnd('/') + if (relative.startsWith("/api/")) relative else "/api$relative"
+        }
+
+        private fun first(vararg paths: String?): String? =
+            paths.mapNotNull { it?.trim() }.firstOrNull { it.isNotEmpty() }
+    }
 }

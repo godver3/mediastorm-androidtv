@@ -111,7 +111,7 @@ fun ProfilePickerScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        BrandMark(height = 110.dp)
+        BrandMark(height = 110.dp, profiles = true)
         Spacer(Modifier.height(14.dp))
         Text("Who's Watching?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(10.dp))

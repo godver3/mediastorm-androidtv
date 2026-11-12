@@ -3,6 +3,7 @@ package com.strmr.tv.app
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
 import com.strmr.tv.api.Profile
+import com.strmr.tv.api.PublicBranding
 import com.strmr.tv.api.ServerVersion
 import com.strmr.tv.api.login
 import com.strmr.tv.api.logout
@@ -49,8 +50,8 @@ object AppSession {
     val serverVersion = MutableStateFlow<ServerVersion?>(null)
     /** Connected over iroh remote access (`serverUrl` is then the loopback proxy). */
     val isRemote: MutableStateFlow<Boolean> get() = RemoteSession.isRemote
-    /** The server's custom logo (admin UI → Appearance & Branding), when one is uploaded. */
-    val brandLogoUrl = MutableStateFlow<String?>(null)
+    /** The server's custom branding images (admin UI → Appearance & Branding), as absolute URLs. */
+    val branding = MutableStateFlow<PublicBranding?>(null)
     /** Shown on the login screen after an involuntary sign-out. */
     val loginNotice = MutableStateFlow<String?>(null)
     val pinChallenge: MutableStateFlow<PinChallenge?> get() = ProfileUnlock.pinChallenge

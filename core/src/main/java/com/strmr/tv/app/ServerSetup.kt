@@ -48,11 +48,11 @@ internal object ServerSetup {
         serverUrl.value = url
         api.baseUrl = url
         api.session = AuthSession.load()
-        brandLogoUrl.value = null
+        branding.value = null
         scope.launch { serverVersion.value = api.serverVersion() }
         scope.launch {
-            val path = api.publicBranding()?.logoPath ?: return@launch
-            if (serverUrl.value == url) brandLogoUrl.value = url.resolve(path)?.toString()
+            val loaded = api.publicBranding() ?: return@launch
+            if (serverUrl.value == url) branding.value = loaded.resolvedAgainst(url.toString())
         }
     }
 
