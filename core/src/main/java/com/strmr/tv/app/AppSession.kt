@@ -66,7 +66,7 @@ object AppSession {
     /** "Use this profile automatically": opened at launch without the picker (or its PIN). */
     val autoProfileId: String? get() = SessionPrefs.autoProfileId
     /** Switching from Settings (rather than first pick) can be cancelled. */
-    val canCancelProfilePick: Boolean get() = profile.value != null
+    val canCancelProfilePick: Boolean get() = profile.value != null && !ResumeLock.pickRequired
 
     // Startup
 
@@ -88,6 +88,7 @@ object AppSession {
             }
         }
         ProfileSetup.watchDisplay(::reportDisplayCapabilities)
+        ResumeLock.install(scope)
         scope.launch {
             val saved = SessionPrefs.server
             if (RemoteSession.paired) {
@@ -246,7 +247,7 @@ object AppSession {
     }
 
     fun cancelProfilePick() {
-        if (profile.value == null) return
+        if (!canCancelProfilePick) return
         _phase.value = Phase.Ready
         LauncherSync.request("profile pick cancelled")
     }
@@ -254,9 +255,11 @@ object AppSession {
     private fun activate(chosen: Profile) {
         ProfileSetup.beforeActivating(chosen, profile.value?.id)
         profile.value = chosen
+        ResumeLock.pickRequired = false
         SessionPrefs.saveLastProfile(chosen.id)
         _phase.value = Phase.Ready
         ProfileSetup.afterActivating(chosen, scope)
+        ResumeLock.refreshSetting()
     }
 
     /**
@@ -271,7 +274,7 @@ object AppSession {
     // Locked profile mid-flow
 
     /** Asks for the PIN over the current screen; on cancel, goes back to the profile picker. */
-    private suspend fun unlockLockedProfile(id: String): Boolean {
+    internal suspend fun unlockLockedProfile(id: String): Boolean {
         // No prompt before a profile is in use: the call fails.
         val locked = (profiles.value.firstOrNull { it.id == id } ?: profile.value?.takeIf { it.id == id })
             ?.takeIf { _phase.value == Phase.Ready }
