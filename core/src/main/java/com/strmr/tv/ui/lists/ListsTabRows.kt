@@ -79,7 +79,8 @@ fun seeds(items: List<ContinueWatchingItem>): List<BrowseList> {
  * so scrolling back and forth or switching Movies / Shows doesn't refetch.
  */
 object BrowsePreviews {
-    private val cache = mutableMapOf<String, TileArt>()
+    // Concurrent: Home's hub cards fill it off the main thread while Lists tiles read it.
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, TileArt>()
 
     suspend fun art(list: BrowseList, version: Int?): TileArt {
         if (list is BrowseList.Similar) return TileArt() // the seed's own backdrop

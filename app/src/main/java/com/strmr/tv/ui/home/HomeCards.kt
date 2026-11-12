@@ -169,10 +169,13 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
     Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1E)), contentAlignment = Alignment.Center) {
         when {
             card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            // A tile without a logo (a hub link whose list has no art) shows its name, as tvOS does.
+            card.logoTile && card.logoUrl == null -> Text(card.title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             card.logoTile -> AsyncImage(
                 model = card.logoUrl, contentDescription = card.title, contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize().padding(18.dp),
             )
+            card.collageUrls.isNotEmpty() -> ArtCollage(card.collageUrls)
             metrics.showsArtwork16x9 -> CardImage(card.artworkUrl ?: card.posterUrl, "w780", card.title, Modifier.fillMaxSize())
             else -> {
                 if (opening) CardImage(card.artworkUrl ?: card.posterUrl, "w780", null, Modifier.fillMaxSize())
@@ -260,6 +263,23 @@ private fun CardOverlay(title: String, subtitle: String, inset: Dp, progress: Bo
         Text(title, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle.isNotEmpty()) {
             Text(subtitle, fontSize = 11.sp, lineHeight = 13.sp, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Four images in the card's quarters (a hub card's preview of its list). */
+@Composable
+private fun ArtCollage(urls: List<String>) {
+    Column(Modifier.fillMaxSize()) {
+        for (r in 0..1) {
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                for (c in 0..1) {
+                    AsyncImage(
+                        model = Artwork.url(urls.getOrNull(r * 2 + c), "w300"), contentDescription = null,
+                        contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
+            }
         }
     }
 }

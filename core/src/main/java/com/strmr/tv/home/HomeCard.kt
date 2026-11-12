@@ -81,6 +81,8 @@ data class HomeCard(
     val genre: String? = null,
     /** The one episode the card stands for, for its long press's Mark as watched. */
     val episode: CardEpisode? = null,
+    /** A hub card's preview of its list: four titles' art, drawn 2×2 in place of artwork. */
+    val collageUrls: List<String> = emptyList(),
 ) {
     val target: DetailsTarget? get() = (link as? HomeLink.Details)?.target
 

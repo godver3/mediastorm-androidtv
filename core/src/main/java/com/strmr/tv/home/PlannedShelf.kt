@@ -127,13 +127,7 @@ data class PlannedShelf(
                              logoUrl = it.logoUrl, logoTile = true)
                 },
             )
-            is HomeSource.Hub -> HomeShelf(
-                id, config.title, cap = cap,
-                cards = s.links.map {
-                    HomeCard("hub-${it.id}", HomeLink.OpenList(it.list), it.name, it.list.title, backdropUrl = it.art,
-                             logoUrl = it.logo, logoTile = it.art == null)
-                },
-            )
+            is HomeSource.Hub -> HomeShelf(id, config.title, cap = cap, cards = HubCards.cards(s.links, cap))
             HomeSource.LiveFavorites -> HomeShelf(id, config.title, api.favoriteChannelCards(cap), cap)
             is HomeSource.Library -> {
                 // Newest first for every source (Plex and Jellyfin default to A–Z), in the view's media type.

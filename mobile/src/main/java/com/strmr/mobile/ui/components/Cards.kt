@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -113,7 +114,9 @@ private fun CardArt(card: HomeCard, wide: Boolean) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
             card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            card.logoTile && card.logoUrl == null -> Text(card.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             card.logoTile -> AsyncImage(card.logoUrl, card.title, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(14.dp))
+            card.collageUrls.isNotEmpty() -> ArtCollage(card.collageUrls)
             wide -> ArtImage(card.artworkUrl ?: card.posterUrl, "w780", card.title, Modifier.fillMaxSize())
             else -> ArtImage(card.posterUrl ?: card.artworkUrl, "w342", card.title, Modifier.fillMaxSize())
         }
@@ -126,6 +129,20 @@ private fun CardArt(card: HomeCard, wide: Boolean) {
         }
         CardBadges(card, Modifier.align(Alignment.TopStart).padding(6.dp), wide = wide)
         if (showsProgress(card.progress)) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(6.dp))
+    }
+}
+
+/** Four images in the card's quarters (a hub card's preview of its list). */
+@Composable
+private fun ArtCollage(urls: List<String>) {
+    Column(Modifier.fillMaxSize()) {
+        for (r in 0..1) {
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                for (c in 0..1) {
+                    ArtImage(urls.getOrNull(r * 2 + c), "w300", null, Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+        }
     }
 }
 
