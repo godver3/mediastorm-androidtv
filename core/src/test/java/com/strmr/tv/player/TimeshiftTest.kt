@@ -8,6 +8,16 @@ import org.junit.Test
 
 class TimeshiftTest {
     @Test
+    fun timeshiftLiveMaySlowDownToBuildALeadButNeverSpeedsUp() {
+        val config = Timeshift.liveConfiguration
+        // Never above 1x: a resumed pause stays where the viewer left it.
+        assertEquals(1f, config.maxPlaybackSpeed)
+        // Below 1x, so a tune that joined at the very edge builds a buffer instead of stalling.
+        assertTrue(config.minPlaybackSpeed < 1f)
+        assertEquals(Timeshift.MIN_LIVE_SPEED, config.minPlaybackSpeed)
+    }
+
+    @Test
     fun behindLiveIsDistanceFromDefaultPosition() {
         assertEquals(0, Timeshift.behindLiveMs(defaultPositionMs = 1_800_000, positionMs = 1_800_000))
         assertEquals(300_000, Timeshift.behindLiveMs(defaultPositionMs = 1_800_000, positionMs = 1_500_000))

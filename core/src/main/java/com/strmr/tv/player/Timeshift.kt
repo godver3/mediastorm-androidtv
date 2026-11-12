@@ -29,16 +29,26 @@ object Timeshift {
     fun isAtLive(behindMs: Long): Boolean = behindMs <= AT_LIVE_TOLERANCE_MS
 
     /**
-     * The item for a live stream. A timeshift one plays at 1x always: ExoPlayer's live speed
-     * control would otherwise creep a resumed pause back toward its target offset.
+     * Slowest a timeshift channel plays while it builds its lead on the live edge (ExoPlayer's own
+     * default floor; the audio is time-stretched, so the pitch holds).
+     */
+    const val MIN_LIVE_SPEED = 0.97f
+
+    /**
+     * The item for a live stream. A timeshift one never plays faster than 1x: ExoPlayer's live
+     * speed control would otherwise creep a resumed pause back toward its target offset. It may
+     * play slower, down to [MIN_LIVE_SPEED], to fall back to that target. A tune joins a fresh
+     * server session whose window is only its first segment, so the player starts at the very edge.
+     * Held at exactly 1x it stayed there with nothing buffered ahead: every segment arrived just in
+     * time over a slow route (iroh relay), and playback stalled every segment, 3 to 4 s apart.
      */
     fun mediaItem(url: String, timeshift: Boolean): MediaItem {
         val builder = MediaItem.Builder().setUri(url)
-        if (timeshift) {
-            builder.setLiveConfiguration(
-                MediaItem.LiveConfiguration.Builder().setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build(),
-            )
-        }
+        if (timeshift) builder.setLiveConfiguration(liveConfiguration)
         return builder.build()
     }
+
+    /** A timeshift item's live configuration: [MIN_LIVE_SPEED] to 1x, ExoPlayer's target offset. */
+    val liveConfiguration: MediaItem.LiveConfiguration
+        get() = MediaItem.LiveConfiguration.Builder().setMinPlaybackSpeed(MIN_LIVE_SPEED).setMaxPlaybackSpeed(1f).build()
 }
