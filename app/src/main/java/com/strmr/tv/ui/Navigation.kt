@@ -26,6 +26,8 @@ import com.strmr.tv.ui.sports.cycling.SportsCyclingScreen
 import com.strmr.tv.ui.sports.game.SportsGameScreen
 import com.strmr.tv.ui.sports.race.SportsRaceScreen
 import com.strmr.tv.ui.settings.SubtitleSettings
+import com.strmr.tv.ui.settings.RowOrderSettings
+import com.strmr.tv.ui.settings.TabOrderSettings
 import com.strmr.tv.ui.settings.TopMenuSettings
 import com.strmr.tv.ui.settings.UpdatePrompt
 
@@ -41,6 +43,10 @@ sealed interface Page {
     data class Person(val person: PersonRef) : Page
     data object HomeLayout : Page
     data object TopMenu : Page
+    /** Settings › Home Layout › Row Order. */
+    data object RowOrder : Page
+    /** Settings › Menu › Tab Order. */
+    data object TabOrder : Page
     data object SubtitleStyle : Page
     /** Live › More › Recordings (Expo's Live drawer entry); also a menu entry when Settings › Menu shows it. */
     data object Recordings : Page
@@ -123,6 +129,8 @@ fun PageStack(content: @Composable () -> Unit) {
                     is Page.Person -> PersonScreen(page.person)
                     Page.HomeLayout -> HomeLayoutSettings()
                     Page.TopMenu -> TopMenuSettings()
+                    Page.RowOrder -> RowOrderSettings()
+                    Page.TabOrder -> TabOrderSettings()
                     Page.SubtitleStyle -> SubtitleSettings()
                     Page.Recordings -> RecordingsScreen(asPage = true)
                     is Page.SportsGame -> SportsGameScreen(page.id)

@@ -25,12 +25,29 @@ internal enum class MainTab(val title: String, val icon: ImageVector, val menu: 
 }
 
 /** An entry of the menu (top bar or side menu): a page, or a Home view shown as its own entry (the Home page in that view). */
-internal data class ShellTab(val key: String, val title: String, val icon: ImageVector, val page: MainTab, val view: String? = null)
+internal data class ShellTab(val key: String, val title: String, val icon: ImageVector, val page: MainTab, val view: String? = null) {
+    /** Its key in Settings › Menu › Tab Order ([MenuTabs.tabOrder]): the view id, else the page's menu key. */
+    val orderKey: String get() = view ?: page.name.lowercase()
+    /** Home leads the menu and Settings ends it; the rest follow this device's Tab Order. */
+    val pinnedFirst: Boolean get() = page == MainTab.HOME && view == null
+    val pinnedLast: Boolean get() = page == MainTab.SETTINGS
+}
 
 /** The menu's entries, the same in both menu styles. */
 internal object ShellTabs {
-    /** Visible entries in order: Home, the views with their own tab, then the pages. Kids profiles don't get Live TV (as in Expo). */
-    fun build(profile: Profile?, viewTabs: List<String>): List<ShellTab> = MainTab.entries.filter { tab ->
+    /**
+     * Visible entries in order: Home, then the views with their own tab and the pages in this
+     * device's Tab Order (by default the views, then the pages), then Settings. Kids profiles
+     * don't get Live TV (as in Expo).
+     */
+    fun build(profile: Profile?, viewTabs: List<String>): List<ShellTab> =
+        MenuTabs.ordered(defaultOrder(profile, viewTabs), ShellTab::orderKey, ShellTab::pinnedFirst, ShellTab::pinnedLast)
+
+    /** The entries Tab Order can move, in their current order. */
+    fun orderable(profile: Profile?, viewTabs: List<String>): List<ShellTab> =
+        build(profile, viewTabs).filterNot { it.pinnedFirst || it.pinnedLast }
+
+    private fun defaultOrder(profile: Profile?, viewTabs: List<String>): List<ShellTab> = MainTab.entries.filter { tab ->
         val menu = tab.menu ?: return@filter true
         MenuTabs.isVisible(menu) && !(menu == MenuTab.LIVE && profile?.isKidsProfile == true)
     }.flatMap { tab ->

@@ -9,6 +9,8 @@ object SettingsKeys {
     const val HOME = "home"
     const val CARDS = "cards"
     const val MENU = "menu"
+    const val ROW_ORDER = "rowOrder"
+    const val TAB_ORDER = "tabOrder"
     const val SERVER = "server"
     const val UPDATES = "updates"
     const val ABOUT = "about"
@@ -25,6 +27,8 @@ fun SettingsPageScreen(key: String, title: String) {
         SettingsKeys.HOME -> HomeSettingsPage()
         SettingsKeys.CARDS -> CardSettingsPage()
         SettingsKeys.MENU -> MenuSettingsPage()
+        SettingsKeys.ROW_ORDER -> RowOrderPage()
+        SettingsKeys.TAB_ORDER -> TabOrderPage()
         SettingsKeys.SERVER -> ServerSettingsPage()
         SettingsKeys.UPDATES -> UpdateSettingsPage()
         SettingsKeys.ABOUT -> AboutSettingsPage()

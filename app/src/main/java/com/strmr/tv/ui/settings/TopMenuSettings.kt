@@ -26,13 +26,15 @@ import com.strmr.tv.app.MenuStyle
 import com.strmr.tv.app.MenuTab
 import com.strmr.tv.app.MenuTabs
 import com.strmr.tv.home.HomeViewStore
+import com.strmr.tv.ui.LocalNavigator
+import com.strmr.tv.ui.Page
 import com.strmr.tv.ui.pageBackground
 
 /**
  * Settings › Menu: the menu style (top bar or side menu, device only; the side menu's rail can
  * hide while closed), then each hideable entry, which follows the profile ("Default") or is on
  * or off on this device. The Home views (Movies, Shows, custom pages) can also show as their
- * own entries, off by default. Both styles show the same entries.
+ * own entries, off by default. Both styles show the same entries, in Tab Order ([TabOrderSettings]).
  */
 @Composable
 fun TopMenuSettings() {
@@ -58,6 +60,15 @@ fun TopMenuSettings() {
             item {
                 Text("Entries", style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.6f),
                      modifier = Modifier.padding(top = 14.dp, start = 4.dp))
+            }
+            item(key = "order") {
+                val navigator = LocalNavigator.current
+                ListItem(
+                    selected = false,
+                    onClick = { navigator.open(Page.TabOrder) },
+                    headlineContent = { Text("Tab Order") },
+                    supportingContent = { Text(if (MenuTabs.tabOrder.isEmpty()) "Default" else "Custom") },
+                )
             }
             items(MenuTab.entries, key = { it.key }) { tab -> TabChoice(tab.key, tab.label) }
             val views = HomeViewStore.pageIds

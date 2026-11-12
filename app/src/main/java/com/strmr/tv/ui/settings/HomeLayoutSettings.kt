@@ -33,6 +33,8 @@ import com.strmr.tv.home.HomeLayoutOptions
 import com.strmr.tv.home.ShelfLayoutInfo
 import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.home.ShelfTransition
+import com.strmr.tv.ui.LocalNavigator
+import com.strmr.tv.ui.Page
 import com.strmr.tv.ui.pageBackground
 
 /**
@@ -127,7 +129,11 @@ fun HomeLayoutSettings() {
                 Choice("Show Info When Expanded", onOff(s.expandedCardInfo)) { s.chooseExpandedCardInfo(!s.expandedCardInfo) }
             }
             if (s.shelves.isNotEmpty()) item { Header("Rows") }
-            items(s.shelves, key = { it.id }) { shelf ->
+            if (s.shelves.isNotEmpty()) item(key = "row-order") {
+                val navigator = LocalNavigator.current
+                Choice("Row Order", if (s.shelfOrder.isEmpty()) "Default" else "Custom") { navigator.open(Page.RowOrder) }
+            }
+            items(s.ordered(s.shelves) { it.id }, key = { it.id }) { shelf ->
                 val hidden = s.isHidden(shelf.id)
                 val chosen = s.shelfStyles[shelf.id]
                 val value = if (hidden) "Hidden" else label(chosen?.label, s.defaultStyle(shelf.id).label)

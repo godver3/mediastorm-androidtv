@@ -46,6 +46,22 @@ object MenuTabs {
     /** This device's choices, by tab key. */
     var overrides by mutableStateOf(readOverrides())
         private set
+    /**
+     * This device's menu order (Settings › Menu › Tab Order), by entry key: a [MenuTab.key], a
+     * Home view id, or another always-shown section's lowercase name. Empty follows the app's order.
+     */
+    var tabOrder by mutableStateOf(DeviceOrder.decode(prefs.getString(TAB_ORDER, null)))
+        private set
+
+    /** Saves the menu order; empty returns to the app's. */
+    fun chooseTabOrder(order: List<String>) {
+        tabOrder = order
+        prefs.edit().apply { if (order.isEmpty()) remove(TAB_ORDER) else putString(TAB_ORDER, DeviceOrder.encode(order)) }.apply()
+    }
+
+    /** [entries] (in the app's order) in this device's order; [first] stay in front and [last] at the end. */
+    fun <T> ordered(entries: List<T>, key: (T) -> String, first: (T) -> Boolean, last: (T) -> Boolean = { false }): List<T> =
+        DeviceOrder.applyPinned(entries, tabOrder, key, first, last)
 
     fun profileShows(tab: MenuTab) = profileShows(tab.key)
 
@@ -95,6 +111,9 @@ object MenuTabs {
         listOf(devicePrefs?.navigationTabVisibility, userPrefs?.navigationTabVisibility)
             .firstOrNull { !it.isNullOrEmpty() }?.toSet()
     }
+
+    /** Not "override.…": [readOverrides] reads those. */
+    private const val TAB_ORDER = "tabOrder"
 
     private fun readOverrides(): Map<String, Boolean> = prefs.all.mapNotNull { (key, value) ->
         if (key.startsWith("override.") && value is Boolean) key.removePrefix("override.") to value else null

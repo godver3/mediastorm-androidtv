@@ -69,8 +69,8 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
     private var calendarRetry: Job? = null
 
     init {
-        // Hiding or showing a row in Settings › Home Layout republishes.
-        scope.launch { snapshotFlow { HomeLayoutStore.hiddenShelves }.collect { publish() } }
+        // Hiding, showing or reordering a row in Settings › Home Layout republishes.
+        scope.launch { snapshotFlow { HomeLayoutStore.hiddenShelves to HomeLayoutStore.shelfOrder }.collect { publish() } }
         // Hiding or unhiding a title drops it from, or returns it to, every row.
         scope.launch { snapshotFlow { HiddenItemsStore.revision to HiddenItemsStore.items }.collect { publish() } }
     }
@@ -119,7 +119,8 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
         val skipped = loaded.shelves.filter { c -> c.enabled == true && plan.none { it.id == c.id } }.map { it.id }
         AppLog.i("Home", "view $view: shelves: ${plan.joinToString { it.id }}" + if (skipped.isEmpty()) "" else "; not supported: ${skipped.joinToString()}")
         rows.keys.retainAll(plan.map { it.id }.toSet())
-        loadRows(plan, gen)
+        // Rows load top first, in this device's order.
+        loadRows(HomeLayoutStore.ordered(plan) { it.id }, gen)
     }
 
     /** Tells Settings › Home Layout this view's profile layout and rows (on load, and on returning to the view). */
@@ -289,7 +290,8 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
             return false
         }
 
-    private val visiblePlan get() = plan.filterNot { HomeLayoutStore.isHidden(it.id) }
+    /** The rows Home shows: this device's order (Row Order), minus those hidden in Settings › Home Layout. */
+    private val visiblePlan get() = HomeLayoutStore.ordered(plan) { it.id }.filterNot { HomeLayoutStore.isHidden(it.id) }
 
     /** The row without titles hidden from this profile. */
     private fun visible(row: HomeShelf): HomeShelf {

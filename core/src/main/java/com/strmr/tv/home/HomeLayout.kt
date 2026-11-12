@@ -217,6 +217,9 @@ object HomeLayoutStore {
     /** Rows hidden from Home on this device; they still load, so showing one again is immediate. */
     var hiddenShelves by mutableStateOf(prefs.getStringSet("hiddenShelves", emptySet())!!.toSet())
         private set
+    /** This device's row order (Settings › Home Layout › Row Order), by shelf id; empty follows the profile's ([com.strmr.tv.app.DeviceOrder]). */
+    var shelfOrder by mutableStateOf(com.strmr.tv.app.DeviceOrder.decode(prefs.getString(SHELF_ORDER, null)))
+        private set
 
     val effectiveFocusPosition get() = focusPosition ?: profile.focusPosition
     val effectiveExpandPosters get() = expandPosters ?: profile.expandPosters
@@ -286,6 +289,15 @@ object HomeLayoutStore {
         prefs.edit().putStringSet("hiddenShelves", hiddenShelves).apply()
     }
 
+    /** Saves the row order; empty returns to the profile's. */
+    fun chooseShelfOrder(order: List<String>) {
+        shelfOrder = order
+        prefs.edit().apply { if (order.isEmpty()) remove(SHELF_ORDER) else putString(SHELF_ORDER, com.strmr.tv.app.DeviceOrder.encode(order)) }.apply()
+    }
+
+    /** [shelves] (in the profile's order) in this device's row order. */
+    fun <T> ordered(shelves: List<T>, id: (T) -> String): List<T> = com.strmr.tv.app.DeviceOrder.apply(shelves, shelfOrder, id)
+
     /** Called by Home after loading the profile's settings and planning its rows. */
     fun update(profile: ProfileHomeLayout, shelves: List<ShelfLayoutInfo>) {
         if (profile != this.profile) this.profile = profile
@@ -306,6 +318,7 @@ object HomeLayoutStore {
     private const val PEEK_NEXT_ROW = "peekNextRow"
     private const val FOCUSED_INFO = "focusedInfo"
     private const val STYLE_CARD_SIZES = "styleCardSizes"
+    private const val SHELF_ORDER = "shelfOrder"
     private const val ANIMATE_EXPANSION = "animateExpansion"
     private const val EXPANDED_CARD_INFO = "expandedCardInfo"
 

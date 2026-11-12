@@ -45,14 +45,27 @@ enum class Section(val title: String, val icon: ImageVector, val selectedIcon: I
     /** Phones: the bar's last slot, listing the sections that don't fit. Never in [visible]. */
     MORE("More", Icons.Outlined.MoreHoriz, Icons.Filled.MoreHoriz, null);
 
+    /** Its key in Settings › Menu › Tab Order ([MenuTabs.tabOrder]); a menu tab's own key for those that have one. */
+    val orderKey: String get() = menuTab?.key ?: name.lowercase()
+
     companion object {
-        /** The sections the profile's menu shows; kids profiles get no Live TV (as Expo). */
-        fun visible(kids: Boolean): List<Section> = entries.filter { s ->
-            if (s == MORE) return@filter false
-            val tab = s.menuTab ?: return@filter true
-            if (s == LIVE && kids) return@filter false
-            MenuTabs.isVisible(tab)
-        }
+        /**
+         * The sections the profile's menu shows, Home first and the rest in this device's Tab
+         * Order (by default the Expo order); kids profiles get no Live TV (as Expo).
+         */
+        fun visible(kids: Boolean): List<Section> = MenuTabs.ordered(
+            entries.filter { s ->
+                if (s == MORE) return@filter false
+                val tab = s.menuTab ?: return@filter true
+                if (s == LIVE && kids) return@filter false
+                MenuTabs.isVisible(tab)
+            },
+            Section::orderKey,
+            first = { it == HOME },
+        )
+
+        /** The sections Tab Order can move, in their current order. */
+        fun orderable(kids: Boolean): List<Section> = visible(kids).filter { it != HOME }
     }
 }
 

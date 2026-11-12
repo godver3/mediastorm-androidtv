@@ -17,7 +17,7 @@ import com.strmr.tv.ui.settings.SpoilerSettings
 
 /**
  * Settings › Home Layout on the phone (as the iPhone's): the Top Carousel and its row, then
- * each Home row's card style or Hidden, saved on this device in [HomeLayoutStore]. The TV's
+ * each Home row's card style or Hidden, and the rows' order (Row Order), saved on this device in [HomeLayoutStore]. The TV's
  * focus, hero and card size choices have no phone Home to apply to.
  */
 @Composable
@@ -41,7 +41,10 @@ fun HomeSettingsPage() {
                     modifier = Modifier.padding(16.dp),
                 )
             }
-            s.shelves.forEach { shelf -> ShelfRow(shelf) }
+            s.ordered(s.shelves) { it.id }.forEach { shelf -> ShelfRow(shelf) }
+        }
+        if (s.shelves.isNotEmpty()) {
+            SettingsSection { PageRow("Row Order", SettingsKeys.ROW_ORDER, if (s.shelfOrder.isEmpty()) "Default" else "Custom") }
         }
         if (s.shelfStyles.isNotEmpty() || s.hiddenShelves.isNotEmpty()) {
             SettingsSection {
@@ -122,6 +125,7 @@ fun MenuSettingsPage() {
                 ) { i -> MenuTabs.setOverride(tab, i?.let { it == 0 }) }
             }
         }
+        SettingsSection { PageRow("Tab Order", SettingsKeys.TAB_ORDER, if (MenuTabs.tabOrder.isEmpty()) "Default" else "Custom") }
         if (MenuTabs.overrides.isNotEmpty()) {
             SettingsSection { SettingsRow("Reset All to Default") { MenuTab.entries.forEach { MenuTabs.setOverride(it, null) } } }
         }
