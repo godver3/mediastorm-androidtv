@@ -109,7 +109,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     var catchup: CatchupJoin? = null
         private set
     val upNext: UpNext? = if (session.reportsProgress && !session.isLive) {
-        UpNext(request, session.streamPath?.takeIf { !session.localFile }, scope, { videoSurface }) { next ->
+        UpNext(request, session.streamPath?.takeIf { !session.localFile }, scope, { videoSurface }, onSkip = { seekTo(it) }) { next ->
             report(ended = true)
             advanceTo.value = next.copy(speed = speed.value)
         }

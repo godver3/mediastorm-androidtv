@@ -24,6 +24,7 @@ class UpNext(
     streamPath: String?,
     private val scope: CoroutineScope,
     private val surface: () -> android.view.SurfaceView?,
+    private val onSkip: (Long) -> Unit = {},
     private val onAdvance: (PlaybackRequest) -> Unit,
 ) {
     val nextEpisode: PlaybackRequest? = request.nextEpisode
@@ -37,15 +38,20 @@ class UpNext(
     private var active: SkipSegment? = null
     private var dismissed: SkipSegment? = null
     private var autoSkip = false
+    private var introAutoSkip = false
+    private var recapAutoSkip = false
+    private val skipped = mutableSetOf<SkipSegment>()
     private var countdown: Int? = null
     private var countdownTickMs = 0L
     private var prefetched = false
     private var advanced = false
 
     init {
-        if (nextEpisode != null) scope.launch {
+        scope.launch {
             val settings = ApiClient.playbackSettings()
             autoSkip = settings.creditsAutoSkip
+            introAutoSkip = settings.introAutoSkip
+            recapAutoSkip = settings.recapAutoSkip
             if (request.isEpisode && CreditsDetectionSettings.enabled(settings.creditsDetection) && !advanced && !cancelled) {
                 detector = CreditsDetector { start -> segments.detectedCredits(start, durationSec) }
             }
@@ -54,11 +60,22 @@ class UpNext(
 
     /** Called about twice a second with the player's state. */
     fun tick(positionMs: Long, durationMs: Long, playing: Boolean) {
-        if (advanced) return
+        if (advanced || cancelled) return
         segments.refresh(scope, durationMs)
         durationSec = durationMs / 1000.0
         if (!segments.hasOutro) detector?.tick(positionMs / 1000.0, durationSec, surface())
         val found = segments.active(positionMs).takeIf { it != dismissed }
+        val automatic = found?.let {
+            ProfileSkipPolicy.enabled(it.type, introAutoSkip, recapAutoSkip, autoSkip, nextEpisode != null)
+        } == true
+        if (playing && automatic && skipped.add(found)) {
+            dismissed = found
+            active = null
+            countdown = null
+            _action.value = null
+            onSkip((found.end * 1000).toLong())
+            return
+        }
         if (found != active) {
             active = found
             countdown = if (found?.type == "outro" && nextEpisode != null && autoSkip) COUNTDOWN_SECONDS else null

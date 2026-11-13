@@ -68,6 +68,8 @@ data class PlaybackSettings(
     val autoPlayTrailers: Boolean = false,
     /** Next Episode counts down over the credits and plays by itself (`playback.creditsAutoSkip`). */
     val creditsAutoSkip: Boolean = false,
+    val introAutoSkip: Boolean = false,
+    val recapAutoSkip: Boolean = false,
     /** Episodes with no known credits are read on screen for them (`playback.creditsDetectionEnabled`). */
     val creditsDetection: Boolean = false,
     /** The Expo app's subtitle style (`playback.subtitle*`) under this device's; null from servers that send none. */
@@ -87,6 +89,8 @@ private data class PlaybackFields(
     val disablePrequeue: Boolean? = null,
     val autoPlayTrailersTV: Boolean? = null,
     val creditsAutoSkip: Boolean? = null,
+    val introAutoSkip: Boolean? = null,
+    val recapAutoSkip: Boolean? = null,
     /** The older name of `creditsAutoSkip`. */
     val creditsDetection: Boolean? = null,
     val creditsDetectionEnabled: Boolean? = null,
@@ -132,7 +136,11 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
     PlaybackSettings(
         prequeueOnOpen = !(d?.disablePrequeue ?: u?.disablePrequeue ?: false),
         autoPlayTrailers = d?.autoPlayTrailersTV ?: u?.autoPlayTrailersTV ?: false,
-        creditsAutoSkip = d?.autoSkip ?: u?.autoSkip ?: false,
+        // Segment skipping follows the profile across devices. Device-local
+        // settings must not override another family member's preferences.
+        creditsAutoSkip = u?.autoSkip ?: false,
+        introAutoSkip = u?.introAutoSkip ?: false,
+        recapAutoSkip = u?.recapAutoSkip ?: false,
         creditsDetection = d?.creditsDetectionEnabled ?: u?.creditsDetectionEnabled ?: false,
         subtitleStyle = d?.style?.mergedOver(u?.style) ?: u?.style,
         preferredSubtitleLanguage = (d?.preferredSubtitleLanguage?.ifEmpty { null } ?: u?.preferredSubtitleLanguage)?.ifEmpty { null },
