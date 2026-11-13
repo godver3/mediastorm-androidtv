@@ -31,6 +31,7 @@ import com.strmr.tv.app.AppSession
 import com.strmr.tv.app.Config
 import com.strmr.tv.auth.ServerAddress
 import com.strmr.tv.diagnostics.LogUploader
+import com.strmr.tv.remote.IrohRoute
 import com.strmr.tv.ui.LocalNavigator
 import com.strmr.tv.ui.Page
 import com.strmr.tv.ui.PageMargin
@@ -41,6 +42,7 @@ import com.strmr.tv.ui.onboarding.ProfileAvatar
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl
 
@@ -91,6 +93,14 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
     val version by session.serverVersion.collectAsState()
     val scope = rememberCoroutineScope()
     val navigator = LocalNavigator.current
+    var route by remember { mutableStateOf(IrohRoute.Detecting) }
+    LaunchedEffect(remote) {
+        if (!remote) return@LaunchedEffect
+        while (true) {
+            route = IrohRoute.current()
+            delay(IrohRoute.POLL_MS)
+        }
+    }
     var pickingBackground by remember { mutableStateOf(false) }
     if (pickingBackground) {
         val options = AppearanceSettings.Background.entries
@@ -124,6 +134,16 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                     Text(if (remote) "Remote access (iroh)" else server?.let { ServerAddress.display(it) } ?: "Not connected")
                 },
             )
+        }
+        if (remote) {
+            item {
+                ListItem(
+                    selected = false, onClick = {},
+                    headlineContent = { Text("Route") },
+                    supportingContent = { Text("Direct is a peer-to-peer link; Relay goes through an iroh relay server") },
+                    trailingContent = { Text(route.label) },
+                )
+            }
         }
         item {
             ListItem(

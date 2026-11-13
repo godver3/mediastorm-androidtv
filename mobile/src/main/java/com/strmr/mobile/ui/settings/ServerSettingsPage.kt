@@ -33,6 +33,7 @@ import com.strmr.tv.api.checkHealth
 import com.strmr.tv.app.AppSession
 import kotlinx.coroutines.delay
 import com.strmr.tv.auth.ServerAddress
+import com.strmr.tv.remote.IrohRoute
 import com.strmr.tv.ui.settings.SpeedTestState
 import java.time.Instant
 import java.time.ZoneId
@@ -74,6 +75,14 @@ fun ServerSettingsPage() {
         }
     }
     LaunchedEffect(Unit) { check() }
+    var route by remember { mutableStateOf(IrohRoute.Detecting) }
+    LaunchedEffect(remote) {
+        if (!remote) return@LaunchedEffect
+        while (true) {
+            route = IrohRoute.current()
+            delay(IrohRoute.POLL_MS)
+        }
+    }
     LaunchedEffect(Unit) { SpeedTestState.adaptiveEnabled = runCatching { ApiClient.adaptivePlaybackEnabled() }.getOrNull() }
 
     SettingsPage("Server") {
@@ -91,6 +100,7 @@ fun ServerSettingsPage() {
                     is Health.Unreachable -> Icon(Icons.Filled.Warning, h.message, tint = MaterialTheme.colorScheme.error)
                 }
             }) { check() }
+            if (remote) ValueRow("Route", route.label)
         }
         if (remote) {
             SettingsSection("Remote Access", "Remote access reaches the server through an encrypted peer-to-peer link (iroh) when it isn't on this network.") {
