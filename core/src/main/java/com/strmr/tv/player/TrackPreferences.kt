@@ -90,7 +90,11 @@ class TrackPreferences(private val selection: TrackSelection?, private val effec
 
         /** Compares ISO 639-1 / 639-2 (B or T) tags through their 3-letter form. */
         fun sameLanguage(a: String?, b: String?): Boolean {
-            if (a == null || b == null) return a == null && b == null
+            // Untagged tracks (null, blank, `und`, `unknown`) are one group, however each side spells it.
+            val aUntagged = ClientTrackSelector.isUntagged(a)
+            val bUntagged = ClientTrackSelector.isUntagged(b)
+            if (aUntagged || bUntagged) return aUntagged && bUntagged
+            if (a == null || b == null) return false
             return normalize(a) == normalize(b)
         }
 

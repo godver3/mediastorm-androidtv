@@ -140,7 +140,8 @@ object ClientTrackSelector {
         if (selectable.isEmpty()) return -1
         val pref = preferred?.trim()?.lowercase().orEmpty()
         fun matches(s: Subtitle) = matchesLanguage(s.language, s.title, pref)
-        if (mode == "forced-only") return selectable.firstOrNull { forced(it.value) && matches(it.value) }?.index ?: -1
+        if (mode == "forced-only") return selectable.firstOrNull { forced(it.value) && matches(it.value) }?.index
+            ?: untagged(selectable, forced = true)
         if (pref.isEmpty()) return -1
         val nonForced = selectable.filter { !forced(it.value) && matches(it.value) }
         if (nonForced.isNotEmpty()) {
@@ -152,6 +153,17 @@ object ClientTrackSelector {
             for (rule in order) nonForced.firstOrNull { rule(it.value) }?.let { return it.index }
             return nonForced.first().index
         }
-        return selectable.firstOrNull { forced(it.value) && matches(it.value) }?.index ?: -1
+        return selectable.firstOrNull { forced(it.value) && matches(it.value) }?.index
+            ?: untagged(selectable, forced = false)
     }
+
+    /**
+     * The server's `findUntaggedSubtitleTrack`: with no language match, the first track with no
+     * language tag (forced or not, as asked, never signs/songs), often a file's only subtitle.
+     */
+    private fun untagged(tracks: List<IndexedValue<Subtitle>>, forced: Boolean): Int =
+        tracks.firstOrNull { isUntagged(it.value.language) && forced(it.value) == forced && !isSigns(it.value.title) }?.index ?: -1
+
+    /** The server's `IsUntaggedLanguage`: blank, `und`, `unk` / `unknown` or `mis`. */
+    fun isUntagged(language: String?): Boolean = language.orEmpty().trim().lowercase() in setOf("", "und", "unk", "unknown", "mis")
 }
