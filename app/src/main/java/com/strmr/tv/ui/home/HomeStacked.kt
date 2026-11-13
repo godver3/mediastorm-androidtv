@@ -101,8 +101,10 @@ internal fun StackedHome(
         if (info) InfoText(hero, size, textScale, infoRowTop - gap - heroHeight(size, textScale), toRows, fade)
         // The controls' item runs FOCUS_ROOM past the rows area under the buttons, so a focused
         // button isn't cut off at its foot (under hero text that is the bottom safe area).
-        // Peeking, the buttons sit inside the area and it is the plain clip.
-        val header = RowsHeader(carousel.focus, active, tail = if (info) areaHeight else 0.dp, overflow = if (peeking) 0.dp else FOCUS_ROOM) { onDown ->
+        // Peeking, the buttons sit inside the area and the peeking row runs on past it to the
+        // screen's bottom edge: under hero text the area ends on the bottom safe area, and
+        // clipped there the row stopped short of the edge with the carousel's art under it.
+        val header = RowsHeader(carousel.focus, active, tail = if (info) areaHeight else 0.dp, overflow = if (peeking) areaBottom else FOCUS_ROOM) { onDown ->
             if (peeking) {
                 CarouselControls(carousel.slides, carousel.state, carousel.focus, areaHeight - peek, FOCUS_ROOM, onDown)
             } else {
