@@ -103,7 +103,7 @@ class MobilePlayerActivity : ComponentActivity() {
                 LaunchedEffect(switch) {
                     switch?.let {
                         finish()
-                        PlaybackCoordinator.play(it.request, it.source, carried = it.carried, resolved = it.resolved)
+                        PlaybackCoordinator.play(it.request, it.source, carried = it.carried, resolved = it.resolved, prepared = it.prepared)
                     }
                 }
                 PlayerScreen(

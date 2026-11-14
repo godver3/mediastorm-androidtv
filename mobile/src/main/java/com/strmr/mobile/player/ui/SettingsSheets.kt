@@ -59,6 +59,7 @@ fun SettingsSheet(controller: PlayerController, ui: PlayerUiState, tablet: Boole
         if (!live) SettingRow(Icons.Filled.Speed, "Playback Speed", speedLabel(speed)) { ui.sheet = PlayerSheet.SPEED }
         SettingRow(Icons.Filled.AspectRatio, "Aspect Ratio", aspectMode.title) { ui.sheet = PlayerSheet.ASPECT }
         if (switchable(controller)) SettingRow(Icons.Filled.SwapHoriz, "Switch Source", controller.session.releaseName) { ui.sheet = PlayerSheet.SOURCES }
+        if (controller.canReportRelease) SettingRow(Icons.Filled.Info, "Report / change source", "Report a problem or prepare an alternative") { ui.sheet = PlayerSheet.REPORT }
         SettingRow(Icons.Filled.Info, if (live) "Channel Info" else "Stream Info", null) { ui.sheet = PlayerSheet.INFO }
         HorizontalDivider(Modifier.padding(vertical = 8.dp))
         // A tablet always turns with the device.

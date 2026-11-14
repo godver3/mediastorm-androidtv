@@ -24,6 +24,7 @@ class ProgressReporter(
     private val onMigration: (reason: String) -> Unit,
 ) {
     private val request = session.request
+    private var discarded = false
     private var periodic: Job? = null
     /** The latest report in flight, which pages reloading after playback wait on. */
     var lastReport: Job? = null
@@ -41,6 +42,9 @@ class ProgressReporter(
         }
     }
 
+    /** Do not save further progress for a source the viewer identified as the wrong content. */
+    fun discardFuture() { discarded = true; stop() }
+
     fun stop() {
         periodic?.cancel()
     }
@@ -52,7 +56,7 @@ class ProgressReporter(
     }
 
     fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) {
-        if (!session.reportsProgress) return
+        if (!session.reportsProgress || discarded) return
         val (position, duration) = times() ?: return
         val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath, stream = streamHealth())
         val kind = when {

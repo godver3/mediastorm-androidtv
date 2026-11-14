@@ -64,6 +64,8 @@ data class PlayerSession(
     val localFile: Boolean = false,
     /** Also told about every progress report ([ProgressSink]): a download's local resume point and offline queue. */
     val progressSink: ProgressSink? = null,
+    /** Server preparation binding for release reports; absent for direct/manual/offline playback. */
+    val prequeueId: String? = null,
 )
 
 /** A resolved stream: its path, the server's track choice and what online subtitles match against. */
@@ -76,4 +78,5 @@ data class ResolvedStream(
     val pickTracksOnDevice: Boolean = false,
     /** The server's service type / provider / indexer for the source, for Info's Source row. */
     val source: SourceHints? = null,
+    val prequeueId: String? = null,
 )
