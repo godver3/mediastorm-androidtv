@@ -110,12 +110,13 @@ fun ReconnectingCover(request: PlaybackRequest, note: String?, modifier: Modifie
 }
 
 @Composable
-fun PlaybackErrorDialog(message: String, onClose: () -> Unit) {
+fun PlaybackErrorDialog(message: String, onClose: () -> Unit, onReport: (() -> Unit)? = null) {
     AlertDialog(
         onDismissRequest = onClose,
         title = { Text("Playback Error") },
         text = { Text(message) },
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
+        dismissButton = { if (onReport != null) TextButton(onClick = onReport) { Text("Report / change source") } },
     )
 }
 

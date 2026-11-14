@@ -20,6 +20,8 @@ data class SourceSwitchRequest(
     val source: SourceResult,
     val carried: CarriedTracks,
     val resolved: Pair<String, TrackSelection?>? = null,
+    /** A server-prepared replacement retains its report binding and verified track metadata. */
+    val prepared: com.strmr.tv.api.PrequeueStatus? = null,
 )
 
 /**

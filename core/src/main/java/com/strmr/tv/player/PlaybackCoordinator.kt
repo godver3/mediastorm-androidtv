@@ -86,13 +86,13 @@ object PlaybackCoordinator {
         }
         when {
             m == null || m.choice.isEmpty ->
-                ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles, source = source)
+                ResolvedStream(status.streamPath!!, status.trackSelection, status.displayName, subtitles, source = source, prequeueId = status.prequeueId)
             else -> {
                 val applied = ManualTracks.applied(status.trackSelection, m.choice, m.audio, m.subtitles)
                 AppLog.i("ManualTracks", "play prequeue with ${m.choice}: audio=${applied.audio?.streamIndex} " +
                     "subtitle=${applied.subtitle?.streamIndex} mode=${applied.subtitleMode} (server audio=" +
                     "${status.trackSelection?.audio?.streamIndex} subtitle=${status.trackSelection?.subtitle?.streamIndex})")
-                ResolvedStream(status.streamPath!!, applied, status.displayName, subtitles, manualTracks = true, source = source)
+                ResolvedStream(status.streamPath!!, applied, status.displayName, subtitles, manualTracks = true, source = source, prequeueId = status.prequeueId)
             }
         }
     })
@@ -106,9 +106,14 @@ object PlaybackCoordinator {
     fun play(
         request: PlaybackRequest, source: SourceResult, manual: ManualSourceTracks? = null, carried: CarriedTracks? = null,
         resolved: Pair<String, TrackSelection?>? = null,
+        prepared: com.strmr.tv.api.PrequeueStatus? = null,
     ) =
         // A stream picked over a library copy (Switch Source) is no longer that copy.
         begin(request.copy(libraryVersion = null), "Preparing…", carried = carried, resolve = {
+            if (prepared != null) {
+                return@begin ResolvedStream(requireNotNull(prepared.streamPath), prepared.trackSelection, prepared.displayName,
+                    prepared.subtitleTracks.orEmpty(), manualTracks = true, source = sourceHints(prepared), prequeueId = prepared.prequeueId)
+            }
             val (path, tracks) = resolved ?: ApiClient.resolveSource(source, request.title.titleId, request.startPosition)
             val hints = SourceHints(source.serviceType.ifEmpty { null }, indexer = source.indexer.ifEmpty { null },
                                     attributes = source.attributes)
@@ -253,7 +258,7 @@ object PlaybackCoordinator {
                     }
                     PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path) + StreamInfo.trackerQuery(r.path, r.source)), r.tracks, streamPath = r.path,
                                   releaseName = r.releaseName?.ifEmpty { null } ?: releaseFileName(r.path), subtitleStreams = r.subtitleStreams,
-                                  playback = settings.await(), manualTracks = r.manualTracks, carried = carried,
+                                  playback = settings.await(), manualTracks = r.manualTracks, carried = carried, prequeueId = r.prequeueId,
                                   pickTracksOnDevice = r.pickTracksOnDevice,
                                   sourceLabel = StreamInfo.source(r.path, r.source, request.libraryVersion?.origin),
                                   sourceDolbyVision = r.source?.dolbyVisionProfile, sourceHdr10 = r.source?.hdr10 == true)

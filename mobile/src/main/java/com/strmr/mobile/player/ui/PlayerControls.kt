@@ -159,7 +159,8 @@ fun PlayerControls(
             StatusPill(text, Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(top = 64.dp))
         }
         SubtitleStatus(controller, Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(top = 64.dp, end = 16.dp))
-        error?.let { PlaybackErrorDialog(it, onExit) }
+        error?.takeIf { ui.sheet != PlayerSheet.REPORT }?.let { PlaybackErrorDialog(it, onExit,
+            onReport = if (controller.canReportRelease) ({ ui.sheet = PlayerSheet.REPORT }) else null) }
         PlayerSheetHost(controller, ui, tablet, aspectMode, onAspectMode)
         if (castPicker) PlayerCastPicker(controller, onExit, onDismiss = { castPicker = false })
     }

@@ -66,6 +66,33 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val advanceTo = MutableStateFlow<PlaybackRequest?>(null)
     /** Set by Switch Source; the activity closes and resumes on the chosen source. */
     val switchTo = MutableStateFlow<SourceSwitchRequest?>(null)
+    var releaseReportOpen = false
+        private set
+    private var releaseReports: ReleaseReports? = null
+    internal var audioPreferenceSave: Job? = null
+    internal var audioPreferenceFailed = false
+    val canReportRelease get() = !session.isLive && !session.localFile && session.reportsProgress && session.prequeueId != null
+
+    fun openReleaseReports(): ReleaseReports {
+        releaseReportOpen = true
+        return ReleaseReports(requireNotNull(session.prequeueId), ServerReleaseReportGateway(), scope,
+            { player.currentPosition }, { status, offset, wrong ->
+                autoSwitch.cancel()
+                if (wrong) progress.discardFuture()
+                val carried = CarriedTracks.capture(player.currentTracks, player.trackSelectionParameters, external.selected.value).copy(audioLanguage = null)
+                val source = SourceResult.from(kotlinx.serialization.json.buildJsonObject {
+                    put("title", kotlinx.serialization.json.JsonPrimitive(status.selectedResult?.title ?: status.displayName ?: "Prepared alternative"))
+                    put("serviceType", kotlinx.serialization.json.JsonPrimitive(status.serviceType ?: ""))
+                }, 0)!!
+                val next = SourceSwitchRules.resumeAt(request, offset).copy(speed = speed.value)
+                switchTo.value = SourceSwitchRequest(next, source, carried, prepared = status)
+            }, beforeOptions = { audioPreferenceSave?.join(); check(!audioPreferenceFailed) { "Audio preference could not be saved" } }).also { releaseReports = it }
+    }
+    fun closeReleaseReports() {
+        releaseReports?.close()
+        releaseReports = null
+        releaseReportOpen = false
+    }
     /** The cues on screen, drawn by [SubtitleOverlay] in the device's style. */
     val cues = MutableStateFlow<List<Cue>>(emptyList())
     /** The video's display aspect (0 until known), so subtitles sit on the picture. */
@@ -342,6 +369,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** Saves the position and lets go of the player; returns the last report, still finishing. */
     fun release(): Job? {
         if (!ended.value && advanceTo.value == null) report(paused = true, closing = true)
+        closeReleaseReports()
         clock.cancel()
         online.cancel()
         external.cancel()

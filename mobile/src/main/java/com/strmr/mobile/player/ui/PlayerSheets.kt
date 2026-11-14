@@ -21,6 +21,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import com.strmr.tv.player.releaseReportChoices
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,7 +38,7 @@ import com.strmr.tv.player.subtitleStyleChoices
 import com.strmr.tv.player.trackMenuChoices
 
 /** The player's bottom sheets. */
-enum class PlayerSheet { AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARCH, TRANSLATE, SETTINGS, SPEED, ASPECT, ORIENTATION, SOURCES, INFO }
+enum class PlayerSheet { AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARCH, TRANSLATE, SETTINGS, SPEED, ASPECT, ORIENTATION, SOURCES, INFO, REPORT }
 
 /**
  * The open sheet as a Material bottom sheet; moving from one to another (Subtitles › Style)
@@ -88,6 +90,13 @@ fun PlayerSheetHost(
                 val candidates = remember { SourceSwitchCandidates(controller) }
                 LaunchedEffect(Unit) { candidates.load() }
                 ChoiceSheet("Switch Source", candidates.choices(done), candidates.emptyText)
+            }
+            PlayerSheet.REPORT -> {
+                val flow = remember(controller) { controller.openReleaseReports() }
+                val report by flow.state.collectAsState()
+                LaunchedEffect(flow) { flow.load() }
+                DisposableEffect(flow) { onDispose { controller.closeReleaseReports() } }
+                ChoiceSheet("Report / change source", releaseReportChoices(flow, report, done), "Loading selected release...")
             }
             PlayerSheet.SETTINGS -> SettingsSheet(controller, ui, tablet, aspectMode)
             PlayerSheet.INFO -> InfoSheet(controller)

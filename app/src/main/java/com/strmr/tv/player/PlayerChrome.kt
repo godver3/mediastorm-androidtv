@@ -53,7 +53,7 @@ import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.ClockText
 import kotlinx.coroutines.delay
 
-private enum class Menu { INFO, AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARCH, SUBTITLE_TRANSLATE, SPEED, SOURCES }
+private enum class Menu { INFO, AUDIO, SUBTITLES, SUBTITLE_STYLE, SUBTITLE_SEARCH, SUBTITLE_TRANSLATE, SPEED, SOURCES, REPORT }
 
 /**
  * Media3 has no TV transport UI, so this is the player's chrome in Compose for TV, laid out
@@ -200,7 +200,8 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
         } else if ((buffering || switching) && error == null && !scrub.active) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White, strokeWidth = 3.dp)
         }
-        error?.let { ErrorPanel(it, onExit, Modifier.align(Alignment.Center)) }
+        error?.takeIf { menu != Menu.REPORT }?.let { ErrorPanel(it, onExit, Modifier.align(Alignment.Center),
+            onReport = if (controller.canReportRelease) ({ menu = Menu.REPORT }) else null) }
         notice?.let { text ->
             LaunchedEffect(text) { delay(4_000); controller.notice.value = null }
             Text(text, style = MaterialTheme.typography.titleMedium,
@@ -235,6 +236,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                             if (!live) MenuButton(Menu.SPEED, AppIcons.Speed, "Playback Speed")
                             // Not for live TV or trailers: only a resolved title has other sources.
                             if (switchable) MenuButton(Menu.SOURCES, AppIcons.SwapSource, "Switch Source")
+                            if (controller.canReportRelease) MenuButton(Menu.REPORT, Icons.Filled.Info, "Report / change source")
                             // A live channel: this channel and another side by side (the multiscreen).
                             if (live && onAddScreen != null) {
                                 TransportButton(AppIcons.Multiscreen, "Add Screen", transportFocusable) { onAddScreen() }
@@ -303,6 +305,7 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
                                                         modifier = Modifier.align(Alignment.CenterEnd).padding(end = 64.dp))
             Menu.SUBTITLE_STYLE -> SubtitleStyleMenu(popover)
             Menu.SPEED -> SpeedMenu(controller, onDone = { menu = null }, modifier = popover)
+            Menu.REPORT -> ReleaseReportMenu(controller, onDone = { menu = null }, modifier = popover)
             Menu.SOURCES -> SourceSwitchMenu(controller, onDone = { menu = null }, modifier = popover)
             else -> Unit
         }
@@ -319,7 +322,7 @@ private fun LiveBadge(modifier: Modifier) {
 }
 
 @Composable
-private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier) {
+private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier, onReport: (() -> Unit)? = null) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Column(
@@ -330,6 +333,7 @@ private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier) 
         Text("Playback Error", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text(message, color = Color.White.copy(alpha = 0.7f))
         androidx.tv.material3.Button(onClick = onExit, modifier = Modifier.focusRequester(focus)) { Text("Close") }
+        if (onReport != null) androidx.tv.material3.Button(onClick = onReport) { Text("Report / change source") }
     }
 }
 
