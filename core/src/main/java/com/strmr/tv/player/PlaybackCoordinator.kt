@@ -92,7 +92,8 @@ object PlaybackCoordinator {
                 AppLog.i("ManualTracks", "play prequeue with ${m.choice}: audio=${applied.audio?.streamIndex} " +
                     "subtitle=${applied.subtitle?.streamIndex} mode=${applied.subtitleMode} (server audio=" +
                     "${status.trackSelection?.audio?.streamIndex} subtitle=${status.trackSelection?.subtitle?.streamIndex})")
-                ResolvedStream(status.streamPath!!, applied, status.displayName, subtitles, manualTracks = true, source = source, prequeueId = status.prequeueId)
+                ResolvedStream(status.streamPath!!, applied, status.displayName, subtitles, manualTracks = true, source = source,
+                    prequeueId = status.prequeueId, explicitAudioLanguage = m.explicitAudioLanguage)
             }
         }
     })
@@ -124,7 +125,7 @@ object PlaybackCoordinator {
                 AppLog.i("ManualTracks", "play with ${manual.choice}: audio=${applied.audio?.streamIndex} " +
                     "subtitle=${applied.subtitle?.streamIndex} mode=${applied.subtitleMode} (server audio=${tracks?.audio?.streamIndex} " +
                     "subtitle=${tracks?.subtitle?.streamIndex})")
-                ResolvedStream(path, applied, source.title, manualTracks = true, source = hints)
+                ResolvedStream(path, applied, source.title, manualTracks = true, source = hints, explicitAudioLanguage = manual.explicitAudioLanguage)
             }
         })
 
@@ -258,7 +259,7 @@ object PlaybackCoordinator {
                     }
                     PlayerSession(request, ApiClient.streamUrl(r.path, request.streamMetadata(r.path) + StreamInfo.trackerQuery(r.path, r.source)), r.tracks, streamPath = r.path,
                                   releaseName = r.releaseName?.ifEmpty { null } ?: releaseFileName(r.path), subtitleStreams = r.subtitleStreams,
-                                  playback = settings.await(), manualTracks = r.manualTracks, carried = carried, prequeueId = r.prequeueId,
+                                  playback = settings.await(), manualTracks = r.manualTracks, carried = carried, prequeueId = r.prequeueId, explicitAudioLanguage = r.explicitAudioLanguage,
                                   pickTracksOnDevice = r.pickTracksOnDevice,
                                   sourceLabel = StreamInfo.source(r.path, r.source, request.libraryVersion?.origin),
                                   sourceDolbyVision = r.source?.dolbyVisionProfile, sourceHdr10 = r.source?.hdr10 == true)

@@ -2,6 +2,8 @@ package com.strmr.tv.player
 
 import com.strmr.tv.app.AppBuild
 import android.content.Context
+import android.os.SystemClock
+import com.strmr.tv.ui.settings.AutoSwitchSettings
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -73,9 +75,17 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     internal var audioPreferenceFailed = false
     val canReportRelease get() = !session.isLive && !session.localFile && session.reportsProgress && session.prequeueId != null
 
+    private val recoveryContext = ServerReleaseReportGateway()
+    private val audioRecoveryPolicy = AudioRecoveryPolicy()
+    val audioRecovery by lazy { AudioRecoveryAssistant(scope, { createReleaseReports(true) }, { recoveryContext.isCurrent() }) }
+    val audioRecoveryActive get() = audioRecovery.active
+
     fun openReleaseReports(): ReleaseReports {
         releaseReportOpen = true
-        return ReleaseReports(requireNotNull(session.prequeueId), ServerReleaseReportGateway(), scope,
+        return (audioRecovery.flow ?: createReleaseReports(false)).also { releaseReports = it }
+    }
+    private fun createReleaseReports(recovery: Boolean): ReleaseReports =
+        ReleaseReports(requireNotNull(session.prequeueId), recoveryContext, scope,
             { player.currentPosition }, { status, offset, wrong ->
                 autoSwitch.cancel()
                 if (wrong) progress.discardFuture()
@@ -84,14 +94,27 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                     put("title", kotlinx.serialization.json.JsonPrimitive(status.selectedResult?.title ?: status.displayName ?: "Prepared alternative"))
                     put("serviceType", kotlinx.serialization.json.JsonPrimitive(status.serviceType ?: ""))
                 }, 0)!!
-                val next = SourceSwitchRules.resumeAt(request, offset).copy(speed = speed.value)
+                val next = SourceSwitchRules.resumeAt(request, offset).copy(speed = speed.value,
+                    audioRecoveryCount = request.audioRecoveryCount + if (recovery) 1 else 0)
                 switchTo.value = SourceSwitchRequest(next, source, carried, prepared = status)
-            }, beforeOptions = { audioPreferenceSave?.join(); check(!audioPreferenceFailed) { "Audio preference could not be saved" } }).also { releaseReports = it }
-    }
+            }, beforeOptions = { audioPreferenceSave?.join(); check(!audioPreferenceFailed) { "Audio preference could not be saved" } })
+
     fun closeReleaseReports() {
         releaseReports?.close()
         releaseReports = null
         releaseReportOpen = false
+        audioRecovery.dismiss()
+    }
+    private fun canPrepareAudioAlternative() = audioRecoveryEligible(session, AutoSwitchSettings.enabled, recoveryContext.isCurrent()) &&
+        !releaseReportOpen && !audioRecovery.active && !autoSwitch.preparing && switchTo.value == null && advanceTo.value == null && !ended.value
+
+    private fun observeAudioAvailability() {
+        if (!audioRecoveryEligible(session, AutoSwitchSettings.enabled, recoveryContext.isCurrent())) audioRecovery.dismiss()
+        val next = tracks.value
+        audioRecoveryPolicy.observe(AudioAvailability(SystemClock.elapsedRealtime(), player.currentPosition, player.isPlaying,
+            next.ofType(C.TRACK_TYPE_VIDEO).any { it.selected }, session.tracks?.audio != null,
+            next.ofType(C.TRACK_TYPE_AUDIO).isNotEmpty(), C.TRACK_TYPE_AUDIO !in player.trackSelectionParameters.disabledTrackTypes,
+            player.volume), canPrepareAudioAlternative())?.let { audioRecovery.suggest(it) }
     }
     /** The cues on screen, drawn by [SubtitleOverlay] in the device's style. */
     val cues = MutableStateFlow<List<Cue>>(emptyList())
@@ -233,6 +256,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 AppLog.w("Player", "live source error ${e.errorCodeName}: ${e.message}")
                 return
             }
+            audioRecoveryPolicy.terminalFailure(e, canPrepareAudioAlternative())?.let { audioRecovery.suggest(it) }
             AppLog.e("Player", "playback error ${e.errorCodeName}: ${e.message}", e)
             thumbnails?.cancel()
             error.value = e.message ?: e.errorCodeName
@@ -277,6 +301,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             ?: player.setMediaItem(Timeshift.mediaItem(session.url, timeshift.value))
         request.startPosition?.let { player.seekTo((it * 1000).toLong()) }
         // Up Next / Switch Source: the previous playback's speed (live always plays at 1x).
+        session.explicitAudioLanguage?.let { rememberAudioLanguage(it) }
         if (request.speed != 1f && !session.isLive) setSpeed(request.speed)
         player.playWhenReady = true
         player.prepare()
@@ -296,6 +321,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             duration.value = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
             if (timeshift.value && catchup?.inArchive?.value != true) behindLive.value = Timeshift.behindLiveMs(player)
             catchup?.tick()
+            observeAudioAvailability()
             upNext?.tick(position.value, duration.value, player.isPlaying)
             delay(250)
         }
@@ -360,6 +386,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
      * request; the activity closes this playback (saving the position) and starts the other.
      */
     fun switchSource(source: SourceResult) {
+        audioRecovery.dismiss()
         val position = player.currentPosition
         val carried = CarriedTracks.capture(player.currentTracks, player.trackSelectionParameters, external.selected.value)
         AppLog.i("SourceSwitch", "switch from \"${session.releaseName}\" to \"${source.title}\" at ${position / 1000}s carried=$carried")

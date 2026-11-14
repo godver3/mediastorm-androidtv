@@ -35,6 +35,8 @@ data class PlaybackRequest(
      */
     val autoSwitchTried: Set<String> = emptySet(),
     val autoSwitchCount: Int = 0,
+    /** One automatic audio alternative across a handoff chain, to prevent repeated preparations. */
+    val audioRecoveryCount: Int = 0,
     /** The playback speed picked in the player, carried into Up Next and a source switch (a new playback starts at 1x). */
     val speed: Float = 1f,
 ) {
@@ -86,7 +88,8 @@ data class PlaybackRequest(
             val next = following.firstOrNull() ?: return null
             val art = listOfNotNull(next.imageUrl) + backdrops.filter { it != episode?.imageUrl && it != next.imageUrl }
             // It plays its own library copy, if it has one.
-            return copy(episode = next, start = null, following = following.drop(1), backdrops = art, libraryVersion = null)
+            return copy(episode = next, start = null, following = following.drop(1), backdrops = art, libraryVersion = null,
+                        audioRecoveryCount = 0)
         }
 
     val displayTitle: String get() = episode?.let { "${title.name} · ${it.code}" } ?: title.name

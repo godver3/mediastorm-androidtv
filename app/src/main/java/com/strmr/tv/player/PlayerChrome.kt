@@ -73,6 +73,9 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
     val playing by controller.isPlaying.collectAsState()
     val buffering by controller.buffering.collectAsState()
     val error by controller.error.collectAsState()
+    val recovery by controller.audioRecovery.suggestion.collectAsState()
+    val recoveryState by (recovery?.flow?.state ?: remember { kotlinx.coroutines.flow.MutableStateFlow(ReleaseReportState()) }).collectAsState()
+    val recoveryMessage = recovery?.let { audioRecoveryMessage(it.hint, recoveryState) }
     val skip by (controller.upNext?.action ?: remember { kotlinx.coroutines.flow.MutableStateFlow<SkipAction?>(null) }).collectAsState()
     val reconnecting by (controller.liveRetune?.reconnecting ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsState()
     val reconnectNote by (controller.liveRetune?.note ?: remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }).collectAsState()
@@ -201,7 +204,12 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White, strokeWidth = 3.dp)
         }
         error?.takeIf { menu != Menu.REPORT }?.let { ErrorPanel(it, onExit, Modifier.align(Alignment.Center),
-            onReport = if (controller.canReportRelease) ({ menu = Menu.REPORT }) else null) }
+            onReport = if (controller.canReportRelease) ({ menu = Menu.REPORT }) else null,
+            recoveryMessage = recoveryMessage, onDismissRecovery = { controller.audioRecovery.dismiss() }) }
+        if (recoveryMessage != null && error == null && menu == null) {
+            AudioRecoveryCard(recoveryMessage, { open(Menu.REPORT, buttons.getValue(Menu.REPORT)) },
+                { controller.audioRecovery.dismiss() }, Modifier.align(Alignment.TopStart).padding(start = 64.dp, top = 64.dp))
+        }
         notice?.let { text ->
             LaunchedEffect(text) { delay(4_000); controller.notice.value = null }
             Text(text, style = MaterialTheme.typography.titleMedium,
@@ -322,7 +330,8 @@ private fun LiveBadge(modifier: Modifier) {
 }
 
 @Composable
-private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier, onReport: (() -> Unit)? = null) {
+private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier, onReport: (() -> Unit)? = null,
+                       recoveryMessage: String? = null, onDismissRecovery: () -> Unit = {}) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Column(
@@ -333,7 +342,9 @@ private fun ErrorPanel(message: String, onExit: () -> Unit, modifier: Modifier, 
         Text("Playback Error", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text(message, color = Color.White.copy(alpha = 0.7f))
         androidx.tv.material3.Button(onClick = onExit, modifier = Modifier.focusRequester(focus)) { Text("Close") }
-        if (onReport != null) androidx.tv.material3.Button(onClick = onReport) { Text("Report / change source") }
+        recoveryMessage?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp)) }
+        if (onReport != null) androidx.tv.material3.Button(onClick = onReport) { Text(if (recoveryMessage != null) "Review alternative" else "Report / change source") }
+        if (recoveryMessage != null) androidx.tv.material3.Button(onClick = onDismissRecovery) { Text("Dismiss suggestion") }
     }
 }
 

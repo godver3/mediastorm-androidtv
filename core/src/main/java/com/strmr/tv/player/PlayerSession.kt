@@ -13,7 +13,12 @@ data class ManualSourceTracks(
     val choice: ManualTrackChoice,
     val audio: List<ProbedAudioTrack>,
     val subtitles: List<ProbedSubtitleTrack>,
-)
+) {
+    /** A deliberate audio choice, excluding unknown tags and subtitle-only changes. */
+    val explicitAudioLanguage: String?
+        get() = choice.audio?.let { index -> audio.firstOrNull { it.index == index }?.language?.trim() }
+            ?.takeIf { it.isNotEmpty() && !it.equals("und", ignoreCase = true) }
+}
 
 /** What the player opens: the stream and the server's track choice for it. */
 data class PlayerSession(
@@ -66,6 +71,8 @@ data class PlayerSession(
     val progressSink: ProgressSink? = null,
     /** Server preparation binding for release reports; absent for direct/manual/offline playback. */
     val prequeueId: String? = null,
+    /** Audio explicitly chosen on details/manual selection, saved before any recovery request. */
+    val explicitAudioLanguage: String? = null,
 )
 
 /** A resolved stream: its path, the server's track choice and what online subtitles match against. */
@@ -79,4 +86,6 @@ data class ResolvedStream(
     /** The server's service type / provider / indexer for the source, for Info's Source row. */
     val source: SourceHints? = null,
     val prequeueId: String? = null,
+    /** Audio explicitly chosen on details/manual selection, saved before any recovery request. */
+    val explicitAudioLanguage: String? = null,
 )

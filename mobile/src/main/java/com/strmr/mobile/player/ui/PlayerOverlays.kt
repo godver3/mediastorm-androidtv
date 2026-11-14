@@ -110,13 +110,20 @@ fun ReconnectingCover(request: PlaybackRequest, note: String?, modifier: Modifie
 }
 
 @Composable
-fun PlaybackErrorDialog(message: String, onClose: () -> Unit, onReport: (() -> Unit)? = null) {
+fun PlaybackErrorDialog(message: String, onClose: () -> Unit, onReport: (() -> Unit)? = null,
+                        recoveryMessage: String? = null, onDismissRecovery: () -> Unit = {}) {
     AlertDialog(
         onDismissRequest = onClose,
         title = { Text("Playback Error") },
-        text = { Text(message) },
+        text = { Column {
+            Text(message)
+            if (recoveryMessage != null) {
+                Text(recoveryMessage, modifier = Modifier.padding(top = 12.dp))
+                TextButton(onClick = onDismissRecovery) { Text("Dismiss audio suggestion") }
+            }
+        } },
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
-        dismissButton = { if (onReport != null) TextButton(onClick = onReport) { Text("Report / change source") } },
+        dismissButton = { if (onReport != null) TextButton(onClick = onReport) { Text(if (recoveryMessage != null) "Review alternative" else "Report / change source") } },
     )
 }
 

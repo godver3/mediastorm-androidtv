@@ -13,7 +13,10 @@ fun PlayerController.select(track: PlayerTrack, byUser: Boolean = true) {
         if (byUser) online.userChose()
         external.deselect()
     }
-    if (byUser && track.group.type == C.TRACK_TYPE_AUDIO) rememberAudioLanguage(track.format.language)
+    if (byUser && track.group.type == C.TRACK_TYPE_AUDIO) {
+        audioRecovery.dismiss()
+        rememberAudioLanguage(track.format.language)
+    }
     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
         .setTrackTypeDisabled(track.group.type, false)
         .setOverrideForType(TrackSelectionOverride(track.group.mediaTrackGroup, track.index))
@@ -46,7 +49,7 @@ private fun PlayerController.disableEmbeddedSubtitles() {
 }
 
 /** Only an explicit menu choice changes language intent; a decoder fallback does not. */
-private fun PlayerController.rememberAudioLanguage(raw: String?) {
+internal fun PlayerController.rememberAudioLanguage(raw: String?) {
     val language = raw?.trim()?.takeIf { it.isNotEmpty() && it != "und" } ?: return
     if (session.isLive || !session.reportsProgress || session.localFile) return
     val previous = audioPreferenceSave

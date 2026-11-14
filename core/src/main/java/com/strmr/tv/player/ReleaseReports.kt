@@ -109,9 +109,12 @@ class ReleaseReports(
     private var job: Job? = null
     private var pending: String? = null
     private var closed = false
+    private var loadStarted = false
     private fun checkCurrent() { check(!closed && gateway.isCurrent()) { "Playback context changed. Reopen this menu." } }
 
     suspend fun load() {
+        if (loadStarted || closed) return
+        loadStarted = true
         mutable.value = mutable.value.copy(busy = true, message = null)
         try {
             beforeOptions(); checkCurrent()

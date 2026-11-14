@@ -5,11 +5,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.strmr.mobile.cast.castable
 import com.strmr.mobile.ui.cast.PlayerCastPicker
 import com.strmr.tv.player.PlayerController
+import com.strmr.tv.player.ReleaseReportState
+import com.strmr.tv.player.audioRecoveryMessage
 import com.strmr.tv.player.ProgrammeTimeline
 import com.strmr.tv.player.SkipAction
 import com.strmr.tv.player.Timeshift
@@ -55,6 +63,9 @@ fun PlayerControls(
     val playing by controller.isPlaying.collectAsState()
     val buffering by controller.buffering.collectAsState()
     val error by controller.error.collectAsState()
+    val recovery by controller.audioRecovery.suggestion.collectAsState()
+    val recoveryState by (recovery?.flow?.state ?: remember { MutableStateFlow(ReleaseReportState()) }).collectAsState()
+    val recoveryMessage = recovery?.let { audioRecoveryMessage(it.hint, recoveryState) }
     val switching by controller.switching.collectAsState()
     val notice by controller.notice.collectAsState()
     val skip by (controller.upNext?.action ?: remember { MutableStateFlow<SkipAction?>(null) }).collectAsState()
@@ -159,8 +170,20 @@ fun PlayerControls(
             StatusPill(text, Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(top = 64.dp))
         }
         SubtitleStatus(controller, Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(top = 64.dp, end = 16.dp))
+        if (recoveryMessage != null && error == null && ui.sheet == null) {
+            Column(Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(top = 80.dp, start = 16.dp, end = 16.dp)
+                .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp)).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(recoveryMessage, color = Color.White)
+                Row {
+                    TextButton(onClick = { open(PlayerSheet.REPORT) }) { Text("Review alternative") }
+                    TextButton(onClick = { controller.audioRecovery.dismiss() }) { Text("Dismiss") }
+                }
+            }
+        }
         error?.takeIf { ui.sheet != PlayerSheet.REPORT }?.let { PlaybackErrorDialog(it, onExit,
-            onReport = if (controller.canReportRelease) ({ ui.sheet = PlayerSheet.REPORT }) else null) }
+            onReport = if (controller.canReportRelease) ({ ui.sheet = PlayerSheet.REPORT }) else null,
+            recoveryMessage = recoveryMessage, onDismissRecovery = { controller.audioRecovery.dismiss() }) }
         PlayerSheetHost(controller, ui, tablet, aspectMode, onAspectMode)
         if (castPicker) PlayerCastPicker(controller, onExit, onDismiss = { castPicker = false })
     }

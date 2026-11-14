@@ -24,6 +24,7 @@ class AutoSwitch(private val controller: PlayerController) {
     private val watch = StallWatch()
     private var job: Job? = null
     private var switching = false
+    val preparing get() = switching
     /** Sources that failed to resolve on an earlier try from this player. */
     private val failed = mutableSetOf<String>()
     private var sources: List<SourceResult>? = null
@@ -61,7 +62,7 @@ class AutoSwitch(private val controller: PlayerController) {
 
     /** Resolves the next untried source and switches to it; with none left, stays put. */
     fun trigger(reason: String) {
-        if (!AutoSwitchSettings.enabled || !applies || controller.releaseReportOpen || switching || controller.switchTo.value != null ||
+        if (!AutoSwitchSettings.enabled || !applies || controller.releaseReportOpen || controller.audioRecoveryActive || switching || controller.switchTo.value != null ||
             controller.advanceTo.value != null || controller.ended.value) return
         if (request.autoSwitchCount >= LIMIT) {
             AppLog.i(TAG, "$reason; already switched ${request.autoSwitchCount} times, staying")
@@ -80,12 +81,12 @@ class AutoSwitch(private val controller: PlayerController) {
                     keys(r).none { it in tried } && r.health?.state !in setOf("unhealthy", "not_cached")
             }
             for (candidate in candidates.take(CANDIDATES)) {
-                if (controller.releaseReportOpen) { switching = false; watch.reset(); return@launch }
+                if (controller.releaseReportOpen || controller.audioRecoveryActive) { switching = false; watch.reset(); return@launch }
                 if (controller.switchTo.value != null || controller.ended.value) return@launch
                 tried += keys(candidate)
                 try {
                     val resolved = ApiClient.resolveSource(candidate, request.title.titleId, controller.player.currentPosition / 1000.0)
-                    if (controller.releaseReportOpen) { switching = false; watch.reset(); return@launch }
+                    if (controller.releaseReportOpen || controller.audioRecoveryActive) { switching = false; watch.reset(); return@launch }
                     if (controller.switchTo.value != null || controller.ended.value) return@launch
                     switchTo(candidate, resolved, tried)
                     return@launch
