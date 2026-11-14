@@ -154,6 +154,7 @@ fun PosterCard(
     /** Room for the focus scale over the title: more for a grid's bigger card sizes. */
     captionGap: Dp = POSTER_CAPTION_GAP,
 ) {
+    val sourceHint = rememberSourceHint(card.sourceAvailability)
     Column(verticalArrangement = Arrangement.spacedBy(captionGap)) {
         Card(
             onClick = onClick,
@@ -164,9 +165,9 @@ fun PosterCard(
             Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
                 AsyncImage(
                     model = Artwork.url(card.posterUrl ?: card.artworkUrl, "w342"), contentDescription = card.title,
-                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().sourceHintArtwork(sourceHint),
                 )
-                Badges(card, Modifier.align(Alignment.TopStart).padding(5.dp))
+                Badges(card, Modifier.align(Alignment.TopStart).padding(5.dp), sourceHint = sourceHint)
                 if (showsProgress(card.progress)) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(5.dp))
             }
         }

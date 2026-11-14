@@ -46,6 +46,8 @@ import com.strmr.tv.home.CardText
 import com.strmr.tv.home.ExploreCard
 import com.strmr.tv.home.HomeSlot
 import com.strmr.tv.home.HomeLayoutStore
+import com.strmr.tv.ui.rememberSourceHint
+import com.strmr.tv.ui.sourceHintArtwork
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.ShelfStyle
 import com.strmr.tv.ui.Accent
@@ -163,27 +165,30 @@ private fun openPast(open: () -> Float, test: (Float) -> Boolean): Boolean {
  */
 @Composable
 private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float, forceOverlay: Boolean) {
+    val sourceHint = rememberSourceHint(card.sourceAvailability)
     val opening = openPast(open) { it > 0f }
     val folded = openPast(open) { it < 1f }
     val wide = metrics.showsArtwork16x9 || openPast(open) { it > 0.5f }
     Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1E)), contentAlignment = Alignment.Center) {
-        when {
-            card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            // A tile without a logo (a hub link whose list has no art) shows its name, as tvOS does.
-            card.logoTile && card.logoUrl == null -> Text(card.title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            card.logoTile -> AsyncImage(
-                model = card.logoUrl, contentDescription = card.title, contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(18.dp),
-            )
-            card.collageUrls.isNotEmpty() -> ArtCollage(card.collageUrls)
-            metrics.showsArtwork16x9 -> CardImage(card.artworkUrl ?: card.posterUrl, "w780", card.title, Modifier.fillMaxSize())
-            else -> {
-                if (opening) CardImage(card.artworkUrl ?: card.posterUrl, "w780", null, Modifier.fillMaxSize())
-                if (folded) {
-                    CardImage(
-                        card.posterUrl ?: card.artworkUrl, "w342", card.title,
-                        Modifier.width(metrics.width).fillMaxHeight().graphicsLayer { alpha = 1f - open() },
-                    )
+        Box(Modifier.fillMaxSize().sourceHintArtwork(sourceHint)) {
+            when {
+                card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                // A tile without a logo (a hub link whose list has no art) shows its name, as tvOS does.
+                card.logoTile && card.logoUrl == null -> Text(card.title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                card.logoTile -> AsyncImage(
+                    model = card.logoUrl, contentDescription = card.title, contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(18.dp),
+                )
+                card.collageUrls.isNotEmpty() -> ArtCollage(card.collageUrls)
+                metrics.showsArtwork16x9 -> CardImage(card.artworkUrl ?: card.posterUrl, "w780", card.title, Modifier.fillMaxSize())
+                else -> {
+                    if (opening) CardImage(card.artworkUrl ?: card.posterUrl, "w780", null, Modifier.fillMaxSize())
+                    if (folded) {
+                        CardImage(
+                            card.posterUrl ?: card.artworkUrl, "w342", card.title,
+                            Modifier.width(metrics.width).fillMaxHeight().graphicsLayer { alpha = 1f - open() },
+                        )
+                    }
                 }
             }
         }
@@ -205,10 +210,10 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float, for
         if (!wide && new != null) {
             Column(Modifier.align(Alignment.TopStart).padding(inset), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NewEpisodeBadgeView(new)
-                Badges(card)
+                Badges(card, sourceHint = sourceHint)
             }
         } else {
-            Badges(card, Modifier.align(Alignment.TopStart).padding(inset), wide = wide)
+            Badges(card, Modifier.align(Alignment.TopStart).padding(inset), wide = wide, sourceHint = sourceHint)
             if (new != null) NewEpisodeBadgeView(new, Modifier.align(Alignment.TopEnd).padding(inset))
         }
         if (progress) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(inset))

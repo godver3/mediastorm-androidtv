@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.strmr.tv.api.Artwork
+import com.strmr.tv.ui.rememberSourceHint
+import com.strmr.tv.ui.sourceHintArtwork
 import com.strmr.tv.home.HomeCard
 
 val CardShape = RoundedCornerShape(10.dp)
@@ -111,14 +113,17 @@ fun LandscapeCard(
 
 @Composable
 private fun CardArt(card: HomeCard, wide: Boolean, forceOverlay: Boolean) {
+    val sourceHint = rememberSourceHint(card.sourceAvailability)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        when {
-            card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            card.logoTile && card.logoUrl == null -> Text(card.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            card.logoTile -> AsyncImage(card.logoUrl, card.title, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(14.dp))
-            card.collageUrls.isNotEmpty() -> ArtCollage(card.collageUrls)
-            wide -> ArtImage(card.artworkUrl ?: card.posterUrl, "w780", card.title, Modifier.fillMaxSize())
-            else -> ArtImage(card.posterUrl ?: card.artworkUrl, "w342", card.title, Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().sourceHintArtwork(sourceHint)) {
+            when {
+                card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                card.logoTile && card.logoUrl == null -> Text(card.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                card.logoTile -> AsyncImage(card.logoUrl, card.title, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(14.dp))
+                card.collageUrls.isNotEmpty() -> ArtCollage(card.collageUrls)
+                wide -> ArtImage(card.artworkUrl ?: card.posterUrl, "w780", card.title, Modifier.fillMaxSize())
+                else -> ArtImage(card.posterUrl ?: card.artworkUrl, "w342", card.title, Modifier.fillMaxSize())
+            }
         }
         if (card.drawable != null) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))))
@@ -137,7 +142,7 @@ private fun CardArt(card: HomeCard, wide: Boolean, forceOverlay: Boolean) {
                 Text(card.subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
         }
-        CardBadges(card, Modifier.align(Alignment.TopStart).padding(6.dp), wide = wide)
+        CardBadges(card, Modifier.align(Alignment.TopStart).padding(6.dp), wide = wide, sourceHint = sourceHint)
         if (showsProgress(card.progress)) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(6.dp))
     }
 }

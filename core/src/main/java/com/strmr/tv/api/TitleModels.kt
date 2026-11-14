@@ -117,6 +117,7 @@ data class Title(
     val cardImage: ImageRef? = null,
     /** Keep shelf context readable when the layout normally hides card text. */
     val forceTitleOverlay: Boolean = false,
+    val sourceAvailability: SourceAvailability? = null,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
 }

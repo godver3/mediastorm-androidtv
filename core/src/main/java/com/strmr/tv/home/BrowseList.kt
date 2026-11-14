@@ -168,6 +168,9 @@ data class WatchlistItem(
     val status: String? = null,
     val releaseDate: String? = null,
     val availability: String? = null,
+    val cardSubtitle: String? = null,
+    val forceTitleOverlay: Boolean = false,
+    val sourceAvailability: com.strmr.tv.api.SourceAvailability? = null,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
 }

@@ -51,6 +51,7 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.LibraryEntry
 import com.strmr.tv.api.isEpisodeWatched
 import com.strmr.tv.api.isMovieWatched
+import com.strmr.tv.ui.rememberSourceHint
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.HomeLink
 import com.strmr.tv.library.CustomListsStore
@@ -81,6 +82,7 @@ internal fun TitleMenuSheet(
     onDismiss: () -> Unit,
 ) {
     val navigator = LocalNavigator.current
+    val sourceHint = rememberSourceHint(card.sourceAvailability)
     val target = card.target
     var watched by remember { mutableStateOf<Boolean?>(null) }
     val episode = card.episode
@@ -136,7 +138,14 @@ internal fun TitleMenuSheet(
             add(SheetAction("Hide from This Profile", Icons.Outlined.VisibilityOff, destructive = true) { act { TitleActions.hide(target) } })
         }
     }
-    ActionSheet(onDismiss, header = { SheetHeader(card.title, card.subtitle, card.posterUrl ?: card.artworkUrl) }, actions = actions)
+    ActionSheet(onDismiss, header = {
+        Column {
+            SheetHeader(card.title, card.subtitle, card.posterUrl ?: card.artworkUrl)
+            sourceHint?.let {
+                Text(it.description(), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }, actions = actions)
 }
 
 /**

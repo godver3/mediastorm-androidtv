@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import com.strmr.tv.home.CardBadge
+import com.strmr.tv.ui.SourceHintBadge
+import com.strmr.tv.home.SourceHint
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.settings.BadgeSettings
@@ -58,10 +60,13 @@ fun Badge(badge: CardBadge, modifier: Modifier = Modifier, wide: Boolean = false
 
 /** A card's badges stacked in its top-left corner, as the Expo app stacks a release status with the watch state. */
 @Composable
-fun Badges(card: HomeCard, modifier: Modifier = Modifier, wide: Boolean = false) {
+fun Badges(card: HomeCard, modifier: Modifier = Modifier, wide: Boolean = false, sourceHint: SourceHint? = null) {
     val badges = card.visibleBadges(BadgeSettings.visibility)
-    if (badges.isEmpty()) return
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) { badges.forEach { Badge(it, wide = wide) } }
+    if (badges.isEmpty() && sourceHint == null) return
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        sourceHint?.let { SourceHintBadge(it) }
+        badges.forEach { Badge(it, wide = wide) }
+    }
 }
 
 /**

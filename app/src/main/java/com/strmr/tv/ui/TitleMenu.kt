@@ -36,6 +36,7 @@ fun TitleMenu(
     onDismiss: () -> Unit,
 ) {
     val target = card.target ?: return
+    val sourceHint = rememberSourceHint(card.sourceAvailability)
     val navigator = LocalNavigator.current
     val inWatchlist = WatchlistStore.contains(target)
     var watched by remember { mutableStateOf<Boolean?>(null) }
@@ -82,5 +83,5 @@ fun TitleMenu(
         addAll(extra)
         add(DialogChoice("Cancel") {})
     }
-    ChoiceDialog(title = card.title, choices = choices, onDismiss = onDismiss)
+    ChoiceDialog(title = card.title, message = sourceHint?.description(), choices = choices, onDismiss = onDismiss)
 }

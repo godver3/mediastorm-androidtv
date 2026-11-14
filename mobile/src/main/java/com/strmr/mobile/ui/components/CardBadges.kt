@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.strmr.tv.home.CardBadge
+import com.strmr.tv.ui.SourceHintBadge
+import com.strmr.tv.home.SourceHint
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.home.NewEpisodeBadge
 import com.strmr.tv.ui.settings.BadgeSettings
@@ -59,11 +61,12 @@ fun CardBadgeView(badge: CardBadge, modifier: Modifier = Modifier, wide: Boolean
 
 /** A card's badges stacked in a corner, following Settings › Card Badges. */
 @Composable
-fun CardBadges(card: HomeCard, modifier: Modifier = Modifier, wide: Boolean = false) {
+fun CardBadges(card: HomeCard, modifier: Modifier = Modifier, wide: Boolean = false, sourceHint: SourceHint? = null) {
     val badges = card.visibleBadges(BadgeSettings.visibility)
     val new = card.newEpisode
-    if (badges.isEmpty() && new == null) return
+    if (badges.isEmpty() && new == null && sourceHint == null) return
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        sourceHint?.let { SourceHintBadge(it) }
         new?.let { NewBadge(it) }
         badges.forEach { CardBadgeView(it, wide = wide) }
     }

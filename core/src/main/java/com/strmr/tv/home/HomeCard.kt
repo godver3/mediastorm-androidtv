@@ -84,6 +84,7 @@ data class HomeCard(
     /** A hub card's preview of its list: four titles' art, drawn 2×2 in place of artwork. */
     val collageUrls: List<String> = emptyList(),
     val forceTitleOverlay: Boolean = false,
+    val sourceAvailability: com.strmr.tv.api.SourceAvailability? = null,
 ) {
     val target: DetailsTarget? get() = (link as? HomeLink.Details)?.target
 
@@ -156,7 +157,9 @@ data class HomeCard(
                 ),
             ),
             title = item.name,
-            subtitle = kindLine(item.year, item.isMovie),
+            subtitle = SourceHint.contextSubtitle(item.cardSubtitle, item.sourceAvailability, kindLine(item.year, item.isMovie)),
+            forceTitleOverlay = item.forceTitleOverlay,
+            sourceAvailability = item.sourceAvailability,
             overview = item.overview,
             backdropUrl = item.backdropUrl,
             logoUrl = item.logoUrl,
@@ -172,7 +175,8 @@ data class HomeCard(
             id = title.id,
             link = HomeLink.Details(DetailsTarget.from(title)),
             title = title.name,
-            subtitle = title.cardSubtitle?.trim()?.takeIf { it.isNotEmpty() } ?: kindLine(title.year, title.isMovie),
+            subtitle = SourceHint.contextSubtitle(title.cardSubtitle, title.sourceAvailability, kindLine(title.year, title.isMovie)),
+            sourceAvailability = title.sourceAvailability,
             forceTitleOverlay = title.forceTitleOverlay,
             overview = title.overview,
             backdropUrl = title.backdrop?.url,
