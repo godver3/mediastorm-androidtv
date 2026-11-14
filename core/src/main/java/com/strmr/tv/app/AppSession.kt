@@ -64,7 +64,7 @@ object AppSession {
 
     val username: String? get() = api.session?.username
     val lastProfileId: String? get() = SessionPrefs.lastProfileId
-    /** "Use this profile automatically": opened at launch without the picker (or its PIN). */
+    /** Only PIN-free profiles may bypass the picker on launch. */
     val autoProfileId: String? get() = SessionPrefs.autoProfileId
     /** Switching from Settings (rather than first pick) can be cancelled. */
     val canCancelProfilePick: Boolean get() = profile.value != null && !ResumeLock.pickRequired
@@ -133,15 +133,8 @@ object AppSession {
             return
         }
         val list = profiles.value
-        val auto = list.firstOrNull { it.id == autoProfileId }
-        // Opened from a home screen row: that row's profile, when it needs no PIN.
-        val linked = DeepLinkRouter.pendingProfileId?.let { id -> list.firstOrNull { it.id == id && !it.requiresPin } }
-        when {
-            linked != null -> activate(linked)
-            auto != null -> activate(auto)
-            list.size == 1 && !list[0].requiresPin -> activate(list[0])
-            else -> _phase.value = Phase.Profiles
-        }
+        val selected = ProfileSelectionPolicy.startup(list, autoProfileId, DeepLinkRouter.pendingProfileId)
+        if (selected != null) activate(selected) else _phase.value = Phase.Profiles
     }
 
     // Server ([ServerSetup])
@@ -233,12 +226,14 @@ object AppSession {
      */
     suspend fun select(candidate: Profile, pin: String? = null, automatic: Boolean = false): Boolean {
         if (candidate.requiresPin && (pin.isNullOrEmpty() || !api.verifyPin(pin, candidate.id))) return false
-        setAutoProfile(if (automatic) candidate.id else null)
+        setAutoProfile(if (automatic && ProfileSelectionPolicy.canOpenAutomatically(candidate)) candidate.id else null)
         activate(candidate)
         return true
     }
 
-    fun setAutoProfile(id: String?) = SessionPrefs.saveAutoProfile(id)
+    fun setAutoProfile(id: String?) = SessionPrefs.saveAutoProfile(
+        id?.takeIf { selected -> profiles.value.any { it.id == selected && ProfileSelectionPolicy.canOpenAutomatically(it) } }
+    )
 
     suspend fun switchProfile() {
         // As on tvOS: the rows go while the picker is up; cancelling writes them again.
