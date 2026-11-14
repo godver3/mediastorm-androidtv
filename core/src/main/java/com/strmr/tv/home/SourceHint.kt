@@ -15,7 +15,7 @@ data class SourceHint(
     val checkedAt: Instant?,
     val expiresAt: Instant?,
 ) {
-    enum class Kind { CANDIDATE, MISSING, UNKNOWN }
+    enum class Kind { CANDIDATE, LOCAL, MISSING, UNKNOWN }
     val dimArtwork: Boolean get() = kind == Kind.MISSING
 
     fun checkedLabel(locale: Locale = Locale.getDefault(), zone: ZoneId = ZoneId.systemDefault()): String? =
@@ -24,6 +24,7 @@ data class SourceHint(
     fun description(locale: Locale = Locale.getDefault(), zone: ZoneId = ZoneId.systemDefault()): String =
         listOfNotNull(label, checkedLabel(locale, zone), when (kind) {
             Kind.CANDIDATE -> "A search candidate is not proof of playback."
+            Kind.LOCAL -> "The local file and requested audio were checked. Playback can still fail."
             Kind.MISSING -> "No matching source was found in the completed check. Open details for other options."
             Kind.UNKNOWN -> "A missing source has not been established. Open details to choose a source."
         }).joinToString(". ")
@@ -36,6 +37,8 @@ data class SourceHint(
             val valid = checked != null && expiry != null && !checked.isAfter(now) && expiry.isAfter(checked) && expiry.isAfter(now) && Duration.between(checked, expiry) <= Duration.ofHours(24)
             val kind = when {
                 !valid -> Kind.UNKNOWN
+                value.sourceType != null || value.reason == "local_file_checked" ->
+                    if (value.state == "found" && value.sourceType == "local" && value.reason == "local_file_checked" && value.providers.isEmpty() && Duration.between(checked, expiry) <= Duration.ofMinutes(2)) Kind.LOCAL else Kind.UNKNOWN
                 value.state == "not_found" && value.complete && value.reason in setOf("no_matching_candidates", "reported_candidates") -> Kind.MISSING
                 value.state == "found" -> Kind.CANDIDATE
                 else -> Kind.UNKNOWN
@@ -43,11 +46,14 @@ data class SourceHint(
             val label = when (kind) {
                 Kind.MISSING -> "No matching source"
                 Kind.CANDIDATE -> "Source candidate found"
+                Kind.LOCAL -> "Local file checked"
                 Kind.UNKNOWN -> when {
                     expiry != null && !expiry.isAfter(now) -> "Source check expired"
                     value.reason == "audio_track_unverified" -> "Audio track needs checking"
                     value.reason == "audio_not_confirmed" -> "Audio language unconfirmed"
                     value.reason == "not_checked" -> "Source not checked"
+                    value.reason == "local_source_unconfirmed" -> "Local source needs checking"
+                    value.reason == "catalogue_refresh_required" -> "Reload catalogue to check"
                     else -> "Source status unknown"
                 }
             }

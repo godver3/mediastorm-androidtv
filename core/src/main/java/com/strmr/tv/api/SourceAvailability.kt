@@ -24,6 +24,7 @@ data class SourceAvailability(
     val providers: List<String> = emptyList(),
     val complete: Boolean = false,
     val reason: String? = null,
+    val sourceType: String? = null,
 )
 
 /** A malformed optional hint must not discard its otherwise usable catalogue title. */
@@ -37,7 +38,7 @@ object SourceAvailabilitySerializer : KSerializer<SourceAvailability> {
         return SourceAvailability(
             state = text("state") ?: "unknown", checkedAt = text("checkedAt"), expiresAt = text("expiresAt"),
             providers = (obj["providers"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull } ?: emptyList(),
-            complete = complete, reason = text("reason"),
+            complete = complete, reason = text("reason"), sourceType = text("sourceType"),
         )
     }
     override fun serialize(encoder: Encoder, value: SourceAvailability) {
@@ -48,6 +49,7 @@ object SourceAvailabilitySerializer : KSerializer<SourceAvailability> {
             put("providers", JsonArray(value.providers.map(::JsonPrimitive)))
             put("complete", value.complete)
             value.reason?.let { put("reason", it) }
+            value.sourceType?.let { put("sourceType", it) }
         })
     }
 }
