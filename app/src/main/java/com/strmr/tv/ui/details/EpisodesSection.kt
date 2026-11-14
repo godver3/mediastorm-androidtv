@@ -26,6 +26,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import com.strmr.tv.ui.launchSourceRecheck
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -89,11 +91,15 @@ fun EpisodesSection(
     onToggleWatched: (Episode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
+    var menuSource by remember { mutableStateOf<SourceAvailability?>(null) }
     var menuFor by remember { mutableStateOf<Episode?>(null) }
     menuFor?.let { ep ->
         ChoiceDialog(
             title = "${ep.code} · ${ep.name}",
+            message = rememberSourceHint(menuSource)?.description(),
             choices = listOfNotNull(
+                DialogChoice("Check sources again") { launchSourceRecheck(scope, model.target, ep) }.takeIf { menuSource != null && ep.numbering != null },
                 DialogChoice("Choose Version") { onChooseVersion(ep) }.takeIf { model.libraryVersions(ep).isNotEmpty() },
                 DialogChoice("Choose Source") { onChooseSource(ep) },
                 DialogChoice(if (model.isWatched(ep)) "Mark as Unwatched" else "Mark as Watched") { onToggleWatched(ep) },
@@ -162,7 +168,7 @@ fun EpisodesSection(
                         // Marking an episode watched or unwatched clears its progress on the server.
                         progress = if (model.isWatched(ep) == (ep.watched == true)) ep.resume?.takeIf { it.eligible }?.fraction ?: 0f else 0f,
                         onClick = { onPlay(ep) },
-                        onLongClick = { menuFor = ep },
+                        onLongClick = { menuSource = sourceHints[episodeSourceKey(ep)]; menuFor = ep },
                         modifier = Modifier
                             .then(if (hasSeasonRow) Modifier.focusProperties { up = seasonRow } else Modifier)
                             .then(if (current.episodes.indexOf(ep) == entryIndex) Modifier.focusRequester(entry) else Modifier),

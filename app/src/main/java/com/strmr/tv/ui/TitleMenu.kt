@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.isEpisodeWatched
 import com.strmr.tv.api.isMovieWatched
+import com.strmr.tv.home.titleSourceCoordinate
 import com.strmr.tv.home.HomeCard
 import com.strmr.tv.library.CustomListsStore
 import com.strmr.tv.library.HiddenItemsStore
@@ -53,6 +54,9 @@ fun TitleMenu(
     fun act(action: suspend () -> Unit) = scope.launch { action() }
 
     val choices = buildList {
+        if (card.titleSourceCoordinate() != null && sourceHint != null) {
+            add(DialogChoice("Check sources again") { launchSourceRecheck(scope, target, onError = onError) })
+        }
         if (continueWatching) {
             add(DialogChoice("Hide from Continue Watching") { act { TitleActions.hideFromContinueWatching(target) } })
             add(DialogChoice("Set Aside") { act { TitleActions.setAside(target) } })

@@ -84,7 +84,7 @@ class EpisodeSourceObserver(
                     }
                 }
                 emit(values)
-                val pending = values.size < episodes.size || values.values.any { it.reason in setOf("not_checked", "expired", "evidence_not_recorded", "prepared_source_requires_recheck") }
+                val pending = values.size < episodes.size || values.values.any { it.reason in setOf("recheck_queued", "not_checked", "expired", "evidence_not_recorded", "prepared_source_requires_recheck") }
                 delay(if (pending && pendingPolls++ < 15) 1_000 else 15_000)
             }
         } catch (cancel: CancellationException) {

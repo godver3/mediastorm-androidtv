@@ -10,14 +10,24 @@ import kotlinx.coroutines.launch
 
 /** All visible card instances share one bounded view, including duplicate shelves. */
 @OptIn(FlowPreview::class)
-class TitleSourceCoordinator(scope: CoroutineScope, private val gateway: TitleSourceGateway) {
+class TitleSourceCoordinator(scope: CoroutineScope, private val gateway: TitleSourceGateway, refreshes: StateFlow<Long> = SourceRecheckEvents.generation) {
     private val demands = MutableStateFlow<Map<String, TitleSourceCoordinate>>(emptyMap())
     private val _hints = MutableStateFlow<Map<String, SourceAvailability>>(emptyMap())
     val hints: StateFlow<Map<String, SourceAvailability>> = _hints.asStateFlow()
+    private val _lastKnown = MutableStateFlow<Map<String, SourceAvailability>>(emptyMap())
+    val lastKnown: StateFlow<Map<String, SourceAvailability>> = _lastKnown.asStateFlow()
     private val observer = TitleSourceObserver(gateway)
     private val job: Job = scope.launch {
-        demands.map { it.values.distinct().take(24) }.distinctUntilChanged().debounce(150).collectLatest { titles ->
-            observer.states(titles).collect { _hints.value = it }
+        combine(demands,refreshes) { owners, generation -> owners.values.distinct().take(24) to generation }
+            .distinctUntilChanged().debounce(150).collectLatest { (titles,_) ->
+            observer.states(titles).collect { values ->
+                _hints.value = values
+                if (values.isNotEmpty()) _lastKnown.update { old ->
+                    val next = LinkedHashMap(old)
+                    values.forEach { (key,value) -> next.remove(key); next[key] = value }
+                    next.entries.toList().takeLast(500).associate { it.toPair() }
+                }
+            }
         }
     }
     fun isCurrent() = gateway.isCurrent()
@@ -28,7 +38,7 @@ class TitleSourceCoordinator(scope: CoroutineScope, private val gateway: TitleSo
             else old
         }
     }
-    fun close() { _hints.value = emptyMap(); job.cancel() }
+    fun close() { _hints.value = emptyMap(); _lastKnown.value = emptyMap(); job.cancel() }
 }
 
 /** Visibility is demand only while the active window can actually show the card. */

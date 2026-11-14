@@ -33,6 +33,7 @@ class DetailsPageState(val model: DetailsModel) {
     var versionsFor by mutableStateOf<EpisodeTarget?>(null)
     var pendingSource by mutableStateOf<PendingSource?>(null)
     var pendingVersion by mutableStateOf<PendingVersion?>(null)
+    var episodeSourceHint by mutableStateOf<com.strmr.tv.api.SourceAvailability?>(null)
     var episodeMenu by mutableStateOf<Episode?>(null)
     var more by mutableStateOf(false)
     var watchState by mutableStateOf(false)

@@ -16,6 +16,9 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkRemove
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Refresh
+import com.strmr.tv.home.titleSourceCoordinate
+import com.strmr.tv.ui.launchSourceRecheck
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -104,6 +107,9 @@ internal fun TitleMenuSheet(
             add(SheetAction(if (library.entry.group.isShow) "Open" else "Play", Icons.Outlined.PlayArrow) { openLibrary(library.entry) })
         }
         if (target == null) return@buildList
+        if (card.titleSourceCoordinate() != null && sourceHint != null) {
+            add(SheetAction("Check sources again", Icons.Outlined.Refresh) { launchSourceRecheck(scope, target) })
+        }
         if (continueWatching) {
             add(SheetAction("Hide from Continue Watching", Icons.Outlined.RemoveCircleOutline) { act { TitleActions.hideFromContinueWatching(target) } })
             add(SheetAction("Set Aside", Icons.Outlined.PauseCircle) { act { TitleActions.setAside(target) } })

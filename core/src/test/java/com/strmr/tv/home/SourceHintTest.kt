@@ -24,6 +24,13 @@ class SourceHintTest {
     private fun missing() = SourceAvailability("not_found", now.minusSeconds(60).toString(), now.plusSeconds(3600).toString(), listOf("Synthetic indexer"), true, "reported_candidates")
     private fun hint(value: SourceAvailability) = SourceHint.from(value, now)!!
 
+    @Test fun manualCheckStatesRemainUnknownAndReadableWithExpiredPreviousEvidence() {
+        val labels = mapOf("recheck_queued" to "Checking sources", "recheck_budget_exhausted" to "Source check limit reached", "recheck_timed_out" to "Source check timed out", "recheck_no_sources" to "No source checker available", "recheck_failed" to "Source check needs retry", "recheck_context_changed" to "Source check needs retry")
+        for ((reason,label) in labels) for (state in listOf("unknown","found","not_found")) {
+            val result=hint(missing().copy(state=state,reason=reason,expiresAt=now.minusSeconds(1).toString()))
+            assertEquals(SourceHint.Kind.UNKNOWN,result.kind);assertFalse(result.dimArtwork);assertEquals(label,result.label)
+        }
+    }
     @Test fun completeFreshNegativeDimsOnlyArtwork() {
         for (reason in listOf("no_matching_candidates", "reported_candidates")) {
             val result = hint(missing().copy(reason = reason))

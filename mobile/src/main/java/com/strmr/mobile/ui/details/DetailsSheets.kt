@@ -1,5 +1,14 @@
 package com.strmr.mobile.ui.details
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.strmr.tv.ui.rememberSourceHint
+import com.strmr.tv.ui.launchSourceRecheck
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -89,6 +98,7 @@ fun DetailsMoreSheet(state: DetailsPageState, warm: WarmPrequeue?, scope: Corout
 @Composable
 fun EpisodeMenuSheet(state: DetailsPageState, episode: Episode, scope: CoroutineScope, extras: DetailsActionContext) {
     val model = state.model
+    val sourceHint = rememberSourceHint(state.episodeSourceHint)
     val resumeAt = model.resumePoint(episode)
     val watched = model.isWatched(episode)
     val actions = buildList {
@@ -96,6 +106,7 @@ fun EpisodeMenuSheet(state: DetailsPageState, episode: Episode, scope: Coroutine
         if (resumeAt != null) add(SheetAction("Start Over", Icons.Outlined.Replay) { state.play(episode, null) })
         if (model.libraryVersions(episode).isNotEmpty()) add(SheetAction("Choose Version", Icons.Outlined.Storage) { state.versionsFor = EpisodeTarget(episode) })
         add(SheetAction("Choose Source", Icons.Outlined.Search) { state.sourcesFor = EpisodeTarget(episode) })
+        if (sourceHint != null && episode.numbering != null) add(SheetAction("Check sources again", Icons.Outlined.Refresh) { launchSourceRecheck(scope, model.target, episode) })
         DetailsExtras.providers.forEach { addAll(it.episodeActions(extras, episode)) }
         add(SheetAction(if (watched) "Mark as Unwatched" else "Mark as Watched", Icons.Outlined.CheckCircle) {
             scope.launch { model.toggleWatched(episode) }
@@ -103,7 +114,10 @@ fun EpisodeMenuSheet(state: DetailsPageState, episode: Episode, scope: Coroutine
     }
     ActionSheet(
         { state.episodeMenu = null },
-        header = { SheetHeader("${episode.code} · ${episode.name}", model.target.name, null) },
+        header = { Column {
+            SheetHeader("${episode.code} · ${episode.name}", model.target.name, null)
+            sourceHint?.let { Text(it.description(), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall) }
+        } },
         actions = actions,
     )
 }

@@ -11,6 +11,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalView
+import android.view.ViewTreeObserver
+import com.strmr.tv.home.SourceRecheckEvents
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -34,22 +36,27 @@ fun rememberEpisodeSourceHints(target: DetailsTarget, episodes: List<Episode>, l
     val server by AppSession.serverUrl.collectAsState()
     val phase by AppSession.phase.collectAsState()
     val wakes by AppSession.wakes.collectAsState()
+    val rechecks by SourceRecheckEvents.generation.collectAsState()
     val playerOpen by PlaybackCoordinator.playerVisibility.collectAsState()
     val resolving by PlaybackCoordinator.resolving.collectAsState()
     val uncovered = !playerOpen && resolving == null
     val view = LocalView.current
     var resumed by remember(view) { mutableStateOf(false) }
+    var focused by remember(view) { mutableStateOf(view.hasWindowFocus()) }
     DisposableEffect(view) {
         val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
         val observer = LifecycleEventObserver { _, _ -> resumed = lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true }
         resumed = lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true
         lifecycle?.addObserver(observer)
-        onDispose { lifecycle?.removeObserver(observer) }
+        val tree = view.viewTreeObserver
+        val focus = ViewTreeObserver.OnWindowFocusChangeListener { focused = it }
+        tree.addOnWindowFocusChangeListener(focus)
+        onDispose { lifecycle?.removeObserver(observer); if (tree.isAlive) tree.removeOnWindowFocusChangeListener(focus) }
     }
     val observer = remember(target, list, profile?.id, server, phase) { EpisodeSourceObserver(ServerEpisodeSourceGateway(), target) }
     val results = remember(observer) { mutableStateOf<Map<String, SourceAvailability>>(emptyMap()) }
-    LaunchedEffect(observer, episodes, inWindow, resumed, wakes, phase, uncovered) {
-        if (!inWindow || !resumed || !uncovered || phase != AppSession.Phase.Ready) { results.value = emptyMap(); return@LaunchedEffect }
+    LaunchedEffect(observer, episodes, inWindow, resumed, wakes, phase, uncovered, focused, rechecks) {
+        if (!inWindow || !resumed || !focused || !uncovered || phase != AppSession.Phase.Ready) { results.value = emptyMap(); return@LaunchedEffect }
         snapshotFlow {
             val info = list.layoutInfo
             info.visibleItemsInfo.filter { it.offset < info.viewportEndOffset && it.offset + it.size > info.viewportStartOffset }
@@ -58,5 +65,5 @@ fun rememberEpisodeSourceHints(target: DetailsTarget, episodes: List<Episode>, l
             observer.states(visible).collect { results.value = it }
         }
     }
-    return if (inWindow && resumed && uncovered && phase == AppSession.Phase.Ready) results.value else emptyMap()
+    return if (inWindow && resumed && focused && uncovered && phase == AppSession.Phase.Ready) results.value else emptyMap()
 }

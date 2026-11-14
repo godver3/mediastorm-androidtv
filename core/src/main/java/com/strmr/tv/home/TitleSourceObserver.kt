@@ -61,9 +61,10 @@ class TitleSourceObserver(
     private suspend fun clear(batch: Long) {
         val clearVersion = synchronized(lock) { if (owner != batch || !dirty) null else ++version } ?: return
         if (!gateway.isCurrent()) return
-        withContext(NonCancellable) {
-            withTimeoutOrNull(2_000) { runCatching { gateway.update(viewId, TitleSourceDemand(clearVersion)) } }
+        val cleared = withContext(NonCancellable) {
+            withTimeoutOrNull(2_000) { runCatching { gateway.update(viewId, TitleSourceDemand(clearVersion)) }.isSuccess } == true
         }
+        if (cleared) synchronized(lock) { if (owner == batch && version == clearVersion) dirty = false }
     }
     fun states(visible: List<TitleSourceCoordinate>): Flow<Map<String, SourceAvailability>> = flow {
         val batch = claim()
@@ -87,7 +88,7 @@ class TitleSourceObserver(
                     }
                 }
                 emit(values)
-                val pending = values.size < titles.size || values.values.any { it.reason in setOf("not_checked", "expired", "evidence_not_recorded", "prepared_source_requires_recheck") }
+                val pending = values.size < titles.size || values.values.any { it.reason in setOf("recheck_queued", "not_checked", "expired", "evidence_not_recorded", "prepared_source_requires_recheck") }
                 delay(if (pending && pendingPolls++ < 15) 1_000 else 15_000)
             }
         } catch (cancel: CancellationException) {

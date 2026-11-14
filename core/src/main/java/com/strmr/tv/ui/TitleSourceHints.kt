@@ -70,6 +70,6 @@ fun rememberVisibleTitleSource(card: HomeCard): VisibleTitleSource {
 /** Menus read the shared evidence without creating a second visible demand. */
 @Composable
 fun rememberTitleSourceEvidence(card: HomeCard): SourceAvailability? {
-    val hints by VisibleTitleSources.current().hints.collectAsState()
+    val hints by VisibleTitleSources.current().lastKnown.collectAsState()
     return card.titleSourceCoordinate()?.let { hints[titleSourceKey(it)] }
 }

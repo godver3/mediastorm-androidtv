@@ -98,6 +98,20 @@ class TitleSourceObserverTest {
         val before = g.calls.size; coordinator.setVisible("row-a",null); advanceTimeBy(200); runCurrent(); assertEquals(before,g.calls.size)
         coordinator.setVisible("row-b",null); advanceTimeBy(151); runCurrent(); assertTrue(g.calls.last().second.titles.isEmpty()); assertTrue(coordinator.hints.value.isEmpty()); coordinator.close()
     }
+    @Test fun menuRetainsLastEvidenceWithoutKeepingAHiddenViewAlive() = runTest {
+        val g=Gateway();val refresh=kotlinx.coroutines.flow.MutableStateFlow(0L);val c=TitleSourceCoordinator(backgroundScope,g,refresh)
+        c.setVisible("card",title(1));advanceTimeBy(151);runCurrent();assertFalse(c.lastKnown.value.isEmpty())
+        c.setVisible("card",null);advanceTimeBy(151);runCurrent();assertTrue(c.hints.value.isEmpty());assertFalse(c.lastKnown.value.isEmpty())
+        val before=g.calls.size;refresh.value++;advanceTimeBy(20_000);runCurrent();assertEquals(before,g.calls.size)
+        c.close();assertTrue(c.lastKnown.value.isEmpty())
+    }
+    @Test fun explicitCheckRefreshesCurrentViewWithOrderedCleanup() = runTest {
+        val g=Gateway();val refresh=kotlinx.coroutines.flow.MutableStateFlow(0L);val c=TitleSourceCoordinator(backgroundScope,g,refresh)
+        c.setVisible("card",title(1));advanceTimeBy(151);runCurrent();val before=g.calls.size
+        refresh.value++;advanceTimeBy(151);runCurrent();assertEquals(before+2,g.calls.size)
+        assertTrue(g.calls[g.calls.lastIndex-1].second.titles.isEmpty());assertEquals(listOf(title(1)),g.calls.last().second.titles)
+        assertEquals(1,g.calls.map{it.first}.distinct().size);assertTrue(g.calls.zipWithNext().all{(a,b)->a.second.version<b.second.version});c.close()
+    }
     @Test fun coordinatorBoundsVisibleOwnersAndRequests() = runTest {
         val g = Gateway(); val coordinator = TitleSourceCoordinator(backgroundScope,g)
         for (n in 1..300) coordinator.setVisible("owner-$n",title(n))

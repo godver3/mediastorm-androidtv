@@ -36,6 +36,7 @@ data class SourceHint(
             val expiry = parse(value.expiresAt)
             val valid = checked != null && expiry != null && !checked.isAfter(now) && expiry.isAfter(checked) && expiry.isAfter(now) && Duration.between(checked, expiry) <= Duration.ofHours(24)
             val kind = when {
+                value.reason?.startsWith("recheck_") == true -> Kind.UNKNOWN
                 !valid -> Kind.UNKNOWN
                 value.sourceType != null || value.reason == "local_file_checked" ->
                     if (value.state == "found" && value.sourceType == "local" && value.reason == "local_file_checked" && value.providers.isEmpty() && Duration.between(checked, expiry) <= Duration.ofMinutes(2)) Kind.LOCAL else Kind.UNKNOWN
@@ -48,10 +49,15 @@ data class SourceHint(
                 Kind.CANDIDATE -> "Source candidate found"
                 Kind.LOCAL -> "Local file checked"
                 Kind.UNKNOWN -> when {
-                    expiry != null && !expiry.isAfter(now) -> "Source check expired"
                     value.reason == "audio_track_unverified" -> "Audio track needs checking"
                     value.reason == "audio_not_confirmed" -> "Audio language unconfirmed"
                     value.reason == "not_checked" -> "Source not checked"
+                    value.reason == "recheck_queued" -> "Checking sources"
+                    value.reason == "recheck_budget_exhausted" -> "Source check limit reached"
+                    value.reason == "recheck_timed_out" -> "Source check timed out"
+                    value.reason == "recheck_no_sources" -> "No source checker available"
+                    value.reason in setOf("recheck_failed", "recheck_context_changed") -> "Source check needs retry"
+                    expiry != null && !expiry.isAfter(now) -> "Source check expired"
                     value.reason == "local_source_unconfirmed" -> "Local source needs checking"
                     value.reason == "catalogue_refresh_required" -> "Reload catalogue to check"
                     else -> "Source status unknown"

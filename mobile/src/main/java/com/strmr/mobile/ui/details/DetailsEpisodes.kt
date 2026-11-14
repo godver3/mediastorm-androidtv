@@ -121,7 +121,7 @@ fun EpisodesSection(state: DetailsPageState) {
                         inLibrary = model.libraryVersions(ep).isNotEmpty(),
                         progress = episodeProgress(model, ep),
                         onClick = { state.tapEpisode(ep) },
-                        onLongClick = { state.episodeMenu = ep },
+                        onLongClick = { state.episodeSourceHint = sourceHints[episodeSourceKey(ep)]; state.episodeMenu = ep },
                     )
                 }
             }
