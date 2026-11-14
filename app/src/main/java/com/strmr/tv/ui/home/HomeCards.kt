@@ -46,6 +46,7 @@ import com.strmr.tv.home.CardText
 import com.strmr.tv.home.ExploreCard
 import com.strmr.tv.home.HomeSlot
 import com.strmr.tv.home.HomeLayoutStore
+import com.strmr.tv.ui.rememberVisibleTitleSource
 import com.strmr.tv.ui.rememberSourceHint
 import com.strmr.tv.ui.sourceHintArtwork
 import com.strmr.tv.home.HomeCard
@@ -125,16 +126,19 @@ fun HomeCardView(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val visibleSource = rememberVisibleTitleSource(card)
+    val observedCard = card.copy(sourceAvailability = visibleSource.source)
+
     Column(Modifier.openWidth(metrics, open), verticalArrangement = Arrangement.spacedBy(metrics.captionGap)) {
         Card(
             onClick = onClick,
             onLongClick = onLongClick,
             scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(),
-            modifier = modifier.fillMaxWidth().height(metrics.height).onFocusChanged {
+            modifier = modifier.then(visibleSource.modifier).fillMaxWidth().height(metrics.height).onFocusChanged {
                 if (it.isFocused) onFocus()
             },
         ) {
-            CardArt(card, metrics, open, forceOverlay = card.forceTitleOverlay && !showTitle)
+            CardArt(observedCard, metrics, open, forceOverlay = card.forceTitleOverlay && !showTitle)
         }
         if (showTitle) CardTitle(card.title, card.subtitle)
     }

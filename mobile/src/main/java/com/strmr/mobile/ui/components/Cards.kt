@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.strmr.tv.api.Artwork
+import com.strmr.tv.ui.rememberVisibleTitleSource
 import com.strmr.tv.ui.rememberSourceHint
 import com.strmr.tv.ui.sourceHintArtwork
 import com.strmr.tv.home.HomeCard
@@ -79,12 +80,14 @@ fun PosterCard(
     modifier: Modifier = Modifier,
     showTitle: Boolean = true,
 ) {
-    Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val visibleSource = rememberVisibleTitleSource(card)
+    val observedCard = card.copy(sourceAvailability = visibleSource.source)
+    Column(modifier.then(visibleSource.modifier).width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(CardShape).background(Placeholder)
                 .cardClicks(onClick, onLongClick),
         ) {
-            CardArt(card, wide = false, forceOverlay = card.forceTitleOverlay && !showTitle)
+            CardArt(observedCard, wide = false, forceOverlay = card.forceTitleOverlay && !showTitle)
         }
         if (showTitle) CardText(card.title, card.subtitle)
     }
@@ -100,12 +103,14 @@ fun LandscapeCard(
     modifier: Modifier = Modifier,
     showTitle: Boolean = true,
 ) {
-    Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val visibleSource = rememberVisibleTitleSource(card)
+    val observedCard = card.copy(sourceAvailability = visibleSource.source)
+    Column(modifier.then(visibleSource.modifier).width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(CardShape).background(Placeholder)
                 .cardClicks(onClick, onLongClick),
         ) {
-            CardArt(card, wide = true, forceOverlay = card.forceTitleOverlay && !showTitle)
+            CardArt(observedCard, wide = true, forceOverlay = card.forceTitleOverlay && !showTitle)
         }
         if (showTitle && card.drawable == null) CardText(card.title, card.subtitle)
     }

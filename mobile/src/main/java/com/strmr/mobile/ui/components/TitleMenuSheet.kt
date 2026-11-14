@@ -82,7 +82,7 @@ internal fun TitleMenuSheet(
     onDismiss: () -> Unit,
 ) {
     val navigator = LocalNavigator.current
-    val sourceHint = rememberSourceHint(card.sourceAvailability)
+    val sourceHint = rememberSourceHint(com.strmr.tv.ui.rememberTitleSourceEvidence(card))
     val target = card.target
     var watched by remember { mutableStateOf<Boolean?>(null) }
     val episode = card.episode

@@ -36,7 +36,7 @@ fun TitleMenu(
     onDismiss: () -> Unit,
 ) {
     val target = card.target ?: return
-    val sourceHint = rememberSourceHint(card.sourceAvailability)
+    val sourceHint = rememberSourceHint(com.strmr.tv.ui.rememberTitleSourceEvidence(card))
     val navigator = LocalNavigator.current
     val inWatchlist = WatchlistStore.contains(target)
     var watched by remember { mutableStateOf<Boolean?>(null) }

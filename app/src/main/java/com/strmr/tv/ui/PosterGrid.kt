@@ -154,13 +154,14 @@ fun PosterCard(
     /** Room for the focus scale over the title: more for a grid's bigger card sizes. */
     captionGap: Dp = POSTER_CAPTION_GAP,
 ) {
-    val sourceHint = rememberSourceHint(card.sourceAvailability)
+    val visibleSource = rememberVisibleTitleSource(card)
+    val sourceHint = rememberSourceHint(visibleSource.source)
     Column(verticalArrangement = Arrangement.spacedBy(captionGap)) {
         Card(
             onClick = onClick,
             onLongClick = onLongClick,
             scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(),
-            modifier = modifier.fillMaxWidth().aspectRatio(2f / 3f),
+            modifier = modifier.then(visibleSource.modifier).fillMaxWidth().aspectRatio(2f / 3f),
         ) {
             Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
                 AsyncImage(
