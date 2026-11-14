@@ -27,11 +27,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -44,6 +50,13 @@ import com.strmr.mobile.ui.components.cardClicks
 import com.strmr.mobile.ui.components.showsProgress
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.api.Episode
+import com.strmr.tv.api.SourceAvailability
+import com.strmr.tv.home.episodeSourceKey
+import com.strmr.tv.ui.rememberEpisodeSourceHints
+import com.strmr.tv.ui.rememberSourceHint
+import com.strmr.tv.ui.SourceHintBadge
+import com.strmr.tv.ui.sourceHintArtwork
+import com.strmr.tv.home.episodeSourcePresentation
 import com.strmr.tv.api.formatRuntime
 import com.strmr.tv.home.ReleaseBadge
 import com.strmr.tv.ui.details.DetailsModel
@@ -89,12 +102,15 @@ fun EpisodesSection(state: DetailsPageState) {
             val start = current.episodes.indexOfFirst { it.id == active?.id }.coerceAtLeast(0)
             val list = rememberLazyListState(initialFirstVisibleItemIndex = start)
             LaunchedEffect(Unit) { list.scrollToItem(start) }
+            var rowInWindow by remember { mutableStateOf(false) }
+            val sourceHints = rememberEpisodeSourceHints(model.target, current.episodes, list, rowInWindow)
             val privacy = SpoilerSettings.effective
-            LazyRow(state = list, contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(state = list, modifier = Modifier.onGloballyPositioned { val bounds = it.boundsInWindow(); rowInWindow = bounds.width > 0 && bounds.height > 0 }, contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(current.episodes, key = { "${it.seasonNumber}x${it.episodeNumber}:${it.id}" }) { ep ->
                     val watched = model.isWatched(ep)
                     EpisodeCard(
                         ep,
+                        sourceAvailability = sourceHints[episodeSourceKey(ep)],
                         fallbackImage = model.title?.backdrop?.url ?: model.target.backdropUrl,
                         watched = watched,
                         selected = ep.id == active?.id,
@@ -120,6 +136,7 @@ fun episodeProgress(model: DetailsModel, ep: Episode): Float =
 @Composable
 private fun EpisodeCard(
     episode: Episode,
+    sourceAvailability: SourceAvailability?,
     fallbackImage: String?,
     watched: Boolean,
     selected: Boolean,
@@ -130,6 +147,9 @@ private fun EpisodeCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val rawHint = rememberSourceHint(sourceAvailability)
+    val sourceHint = episodeSourcePresentation(rawHint, inLibrary)
+
     Column(
         Modifier.width(EPISODE_WIDTH).clip(StillShape).cardClicks(onClick, onLongClick).semantics { this.selected = selected },
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -143,8 +163,9 @@ private fun EpisodeCard(
                 model = if (blurStill) blurredStillRequest(still) else still,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().then(if (blurStill) Modifier.blurredStill() else Modifier),
+                modifier = Modifier.fillMaxSize().then(if (blurStill) Modifier.blurredStill() else Modifier).sourceHintArtwork(sourceHint),
             )
+            sourceHint?.let { SourceHintBadge(it, Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = if (showsProgress(progress)) 16.dp else 8.dp)) }
             Text(
                 "${episode.episodeNumber}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White,
                 modifier = Modifier.align(Alignment.TopStart).padding(8.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(6.dp))

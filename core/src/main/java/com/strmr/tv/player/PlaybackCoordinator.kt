@@ -47,7 +47,11 @@ object PlaybackCoordinator {
     /** Bumped whenever a playback session ends, so screens can refresh progress. */
     val sessionsEnded = MutableStateFlow(0)
     /** The player is on screen (log uploads hold off). */
-    @Volatile var playerOpen = false
+    private val _playerOpen = MutableStateFlow(false)
+    val playerVisibility: StateFlow<Boolean> = _playerOpen
+    var playerOpen: Boolean
+        get() = _playerOpen.value
+        set(value) { _playerOpen.value = value }
 
     /**
      * Offered every resolved title stream before the player opens; true takes it (the phone's

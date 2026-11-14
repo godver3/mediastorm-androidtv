@@ -35,6 +35,8 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +52,13 @@ import coil.compose.AsyncImage
 import com.strmr.tv.ui.cardFocusBorder
 import com.strmr.tv.api.Artwork
 import com.strmr.tv.api.Episode
+import com.strmr.tv.api.SourceAvailability
+import com.strmr.tv.home.episodeSourceKey
+import com.strmr.tv.ui.rememberEpisodeSourceHints
+import com.strmr.tv.ui.rememberSourceHint
+import com.strmr.tv.ui.SourceHintBadge
+import com.strmr.tv.ui.sourceHintArtwork
+import com.strmr.tv.home.episodeSourcePresentation
 import com.strmr.tv.api.formatRuntime
 import com.strmr.tv.home.ReleaseBadge
 import com.strmr.tv.ui.CardFocusScale
@@ -127,19 +136,22 @@ fun EpisodesSection(
         key(current.number) {
             val entryIndex = current.episodes.indexOfFirst { it.id == model.primaryEpisode?.id }.coerceAtLeast(0)
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
+            var rowInWindow by remember { mutableStateOf(false) }
+            val sourceHints = rememberEpisodeSourceHints(model.target, current.episodes, listState, rowInWindow)
             val entry = remember { FocusRequester() }
             LaunchedEffect(Unit) { listState.scrollToItem(entryIndex) }
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = ContentMargin, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.focusRestorer(entry),
+                modifier = Modifier.focusRestorer(entry).onGloballyPositioned { val bounds = it.boundsInWindow(); rowInWindow = bounds.width > 0 && bounds.height > 0 },
             ) {
                 items(current.episodes, key = { "${it.seasonNumber}x${it.episodeNumber}:${it.id}" }) { ep ->
                     val watched = model.isWatched(ep)
                     val privacyEpisode = model.privacyEpisode
                     EpisodeCard(
                         ep,
+                        sourceAvailability = sourceHints[episodeSourceKey(ep)],
                         fallbackImage = model.title?.backdrop?.url ?: model.target.backdropUrl,
                         watched = watched,
                         blurStill = EpisodePrivacy.shouldBlur(ep, privacyEpisode, privacy.blurThumbnails, privacy.blurThumbnailsIncludeCurrent, watched) &&
@@ -164,6 +176,7 @@ fun EpisodesSection(
 @Composable
 private fun EpisodeCard(
     episode: Episode,
+    sourceAvailability: SourceAvailability?,
     fallbackImage: String?,
     watched: Boolean,
     /** Spoiler hiding (Settings › Spoilers). */
@@ -176,6 +189,9 @@ private fun EpisodeCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val rawHint = rememberSourceHint(sourceAvailability)
+    val sourceHint = episodeSourcePresentation(rawHint, inLibrary)
+
     Column(Modifier.width(EPISODE_WIDTH), verticalArrangement = Arrangement.spacedBy(captionGap(EPISODE_WIDTH * 9f / 16f))) {
         Card(
             onClick = onClick,
@@ -189,8 +205,9 @@ private fun EpisodeCard(
                     model = if (blurStill) blurredStillRequest(still) else still,
                     contentDescription = episode.name + (episode.runtimeMinutes?.takeIf { it > 0 }?.let { ", $it minutes" } ?: ""),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E)).then(if (blurStill) Modifier.blurredStill() else Modifier),
+                    modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E)).then(if (blurStill) Modifier.blurredStill() else Modifier).sourceHintArtwork(sourceHint),
                 )
+                sourceHint?.let { SourceHintBadge(it, Modifier.align(Alignment.TopStart).padding(8.dp)) }
                 if (watched) {
                     Box(
                         Modifier.align(Alignment.TopEnd).padding(8.dp).size(22.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape),
