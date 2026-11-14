@@ -1,12 +1,15 @@
 package com.strmr.tv.player
 
-/** Credits with a following episode use UpNext's cancellable countdown. */
+/**
+ * Which segments jump ahead by themselves. Credits never do: with a following
+ * episode they get UpNext's cancellable countdown, and on a final episode or a
+ * movie they play out.
+ */
 internal object ProfileSkipPolicy {
-    fun enabled(type: String, intro: Boolean, recap: Boolean, credits: Boolean, hasNext: Boolean): Boolean =
+    fun enabled(type: String, intro: Boolean, recap: Boolean): Boolean =
         when (type) {
             "intro" -> intro
             "recap" -> recap
-            "outro" -> credits && !hasNext
             else -> false
         }
 }

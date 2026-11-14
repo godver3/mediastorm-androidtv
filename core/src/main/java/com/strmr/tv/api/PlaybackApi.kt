@@ -136,9 +136,10 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
     PlaybackSettings(
         prequeueOnOpen = !(d?.disablePrequeue ?: u?.disablePrequeue ?: false),
         autoPlayTrailers = d?.autoPlayTrailersTV ?: u?.autoPlayTrailersTV ?: false,
-        // Segment skipping follows the profile across devices. Device-local
-        // settings must not override another family member's preferences.
-        creditsAutoSkip = u?.autoSkip ?: false,
+        // `d` is the admin's per-device setting on the server (not storage on
+        // this device); it still decides the credits countdown, as on tvOS and
+        // Expo. Intro and recap have no per-device setting and follow the profile.
+        creditsAutoSkip = d?.autoSkip ?: u?.autoSkip ?: false,
         introAutoSkip = u?.introAutoSkip ?: false,
         recapAutoSkip = u?.recapAutoSkip ?: false,
         creditsDetection = d?.creditsDetectionEnabled ?: u?.creditsDetectionEnabled ?: false,

@@ -5,21 +5,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProfileSkipPolicyTest {
-    @Test fun `one profile's intro choice never enables recap or credits`() {
-        assertTrue(ProfileSkipPolicy.enabled("intro", true, false, false, false))
-        assertFalse(ProfileSkipPolicy.enabled("recap", true, false, false, false))
-        assertFalse(ProfileSkipPolicy.enabled("outro", true, false, false, false))
+    @Test fun `intro and recap follow their own profile choice`() {
+        assertTrue(ProfileSkipPolicy.enabled("intro", intro = true, recap = false))
+        assertFalse(ProfileSkipPolicy.enabled("recap", intro = true, recap = false))
+        assertTrue(ProfileSkipPolicy.enabled("recap", intro = false, recap = true))
     }
 
-    @Test fun `credits countdown is retained when another episode exists`() {
-        assertTrue(ProfileSkipPolicy.enabled("outro", false, false, true, false))
-        assertFalse(ProfileSkipPolicy.enabled("outro", false, false, true, true))
+    @Test fun `credits never jump by themselves`() {
+        assertFalse(ProfileSkipPolicy.enabled("outro", intro = true, recap = true))
     }
 
     @Test fun `unknown segments and an unconfigured profile never skip`() {
-        assertFalse(ProfileSkipPolicy.enabled("preview", true, true, true, false))
+        assertFalse(ProfileSkipPolicy.enabled("preview", intro = true, recap = true))
         for (type in listOf("intro", "recap", "outro")) {
-            assertFalse(ProfileSkipPolicy.enabled(type, false, false, false, false))
+            assertFalse(ProfileSkipPolicy.enabled(type, intro = false, recap = false))
         }
     }
 }
