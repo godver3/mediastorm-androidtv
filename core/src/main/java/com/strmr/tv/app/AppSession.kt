@@ -64,7 +64,7 @@ object AppSession {
 
     val username: String? get() = api.session?.username
     val lastProfileId: String? get() = SessionPrefs.lastProfileId
-    /** Only PIN-free profiles may bypass the picker on launch. */
+    /** "Use this profile automatically": opened at launch without the picker (or its PIN). */
     val autoProfileId: String? get() = SessionPrefs.autoProfileId
     /** Switching from Settings (rather than first pick) can be cancelled. */
     val canCancelProfilePick: Boolean get() = profile.value != null && !ResumeLock.pickRequired
@@ -226,13 +226,14 @@ object AppSession {
      */
     suspend fun select(candidate: Profile, pin: String? = null, automatic: Boolean = false): Boolean {
         if (candidate.requiresPin && (pin.isNullOrEmpty() || !api.verifyPin(pin, candidate.id))) return false
-        setAutoProfile(if (automatic && ProfileSelectionPolicy.canOpenAutomatically(candidate)) candidate.id else null)
+        setAutoProfile(if (automatic) candidate.id else null)
         activate(candidate)
         return true
     }
 
+    /** Saves only a profile of the signed-in account; anything else clears the choice. */
     fun setAutoProfile(id: String?) = SessionPrefs.saveAutoProfile(
-        id?.takeIf { selected -> profiles.value.any { it.id == selected && ProfileSelectionPolicy.canOpenAutomatically(it) } }
+        id?.takeIf { selected -> profiles.value.any { it.id == selected } }
     )
 
     suspend fun switchProfile() {

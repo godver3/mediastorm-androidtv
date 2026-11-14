@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 /**
  * Coming back from the background, as the Expo app does: the profile picker comes up again
  * (server setting `display.alwaysShowProfileSelector`, on by default), and with it off a PIN
- * profile asks for its PIN again after five minutes away. Neither happens for a PIN-free "Use this
+ * profile asks for its PIN again after five minutes away. Neither happens for the "Use this
  * profile automatically" profile, when the app comes back to the player, or after a moment
  * away (under 2 s). "Background" is the whole app: no activity started (the player is an
  * activity of its own, so opening it doesn't count). Main thread only.
@@ -73,7 +73,7 @@ internal object ResumeLock {
         val onPlayer = activity.javaClass == App.platform.playerActivity ||
             activity.javaClass == App.platform.multiscreenActivity
         if (AppSession.phase.value != AppSession.Phase.Ready || current == null || onPlayer ||
-            (current.id == AppSession.autoProfileId && ProfileSelectionPolicy.canOpenAutomatically(current)) || ProfileUnlock.pinChallenge.value != null
+            current.id == AppSession.autoProfileId || ProfileUnlock.pinChallenge.value != null
         ) return
 
         if (alwaysShowProfileSelector && AppSession.profiles.value.size > 1 && away > PICKER_MIN_AWAY_MS) {
