@@ -37,6 +37,7 @@ fun TitleMenu(
     onDismiss: () -> Unit,
 ) {
     val target = card.target ?: return
+    val rate = rememberRatingAction(target)
     val sourceHint = rememberSourceHint(com.strmr.tv.ui.rememberTitleSourceEvidence(card))
     val navigator = LocalNavigator.current
     val inWatchlist = WatchlistStore.contains(target)
@@ -54,6 +55,7 @@ fun TitleMenu(
     fun act(action: suspend () -> Unit) = scope.launch { action() }
 
     val choices = buildList {
+        if (!target.fromLibrary) add(DialogChoice("Rate for this profile…") { rate() })
         if (card.titleSourceCoordinate() != null && sourceHint != null) {
             add(DialogChoice("Check sources again") { launchSourceRecheck(scope, target, onError = onError) })
         }

@@ -15,6 +15,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -69,6 +71,14 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
     private var calendarRetry: Job? = null
 
     init {
+        scope.launch {
+            com.strmr.tv.ratings.TitleRatingChanges.generation.drop(1).collectLatest {
+                // A shelf requested before the vote may still be loading.
+                // Refresh after it settles instead of losing this invalidation.
+                while (loadsRunning > 0 || checksRunning > 0) delay(50)
+                refreshIfStale()
+            }
+        }
         // Hiding, showing or reordering a row in Settings › Home Layout republishes.
         scope.launch { snapshotFlow { HomeLayoutStore.hiddenShelves to HomeLayoutStore.shelfOrder }.collect { publish() } }
         // Hiding or unhiding a title drops it from, or returns it to, every row.

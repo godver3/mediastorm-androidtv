@@ -89,6 +89,7 @@ data class Title(
     val backdrops: List<ImageRef>? = null,
     val logo: ImageRef? = null,
     val mediaType: String = "movie",
+    val personalRating: String? = null,
     val imdbId: String? = null,
     val tmdbId: Long? = null,
     val tvdbId: Long? = null,

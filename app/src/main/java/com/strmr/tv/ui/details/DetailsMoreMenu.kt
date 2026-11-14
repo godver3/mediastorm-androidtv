@@ -47,12 +47,14 @@ fun DetailsMoreMenu(
     onHidden: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val rate = com.strmr.tv.ui.rememberRatingAction(target)
     var inContinueWatching by remember { mutableStateOf(false) }
     LaunchedEffect(target.titleId) {
         SetAsideStore.refresh()
         inContinueWatching = runCatching { ApiClient.continueWatching() }.getOrNull().orEmpty().any { it.isTitle(target) }
     }
     val choices = buildList {
+        if (!target.fromLibrary) add(DialogChoice("Rate for this profile…") { rate() })
         addAll(moved)
         if (inContinueWatching) {
             add(DialogChoice("Set Aside") { scope.launch { TitleActions.setAside(target) } })

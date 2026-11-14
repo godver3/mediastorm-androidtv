@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.strmr.tv.ui.rememberSourceHint
 import com.strmr.tv.ui.launchSourceRecheck
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
@@ -54,12 +55,14 @@ import kotlinx.coroutines.launch
 fun DetailsMoreSheet(state: DetailsPageState, warm: WarmPrequeue?, scope: CoroutineScope, extras: DetailsActionContext, onHidden: () -> Unit) {
     val model = state.model
     val target = model.target
+    val rate = com.strmr.tv.ui.rememberRatingAction(target)
     var inContinueWatching by remember { mutableStateOf(false) }
     LaunchedEffect(target.titleId) {
         SetAsideStore.refresh()
         inContinueWatching = runCatching { ApiClient.continueWatching() }.getOrNull().orEmpty().any { it.isTitle(target) }
     }
     val actions = buildList {
+        if (!target.fromLibrary) add(SheetAction("Rate for this profile…", Icons.Outlined.Star) { rate() })
         if (state.prequeueTracks.visible(warm)?.tracks != null) add(SheetAction("Audio & Subtitles", AppIcons.Waveform) { state.prequeueTracks.open = true })
         if (target.isMovie || state.activeEpisode != null) add(SheetAction("Choose Source", Icons.Outlined.Search) { state.sourcesFor = EpisodeTarget(state.activeEpisode) })
         if (model.libraryVersions(state.activeEpisode).isNotEmpty()) {

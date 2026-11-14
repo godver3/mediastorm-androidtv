@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkRemove
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Refresh
 import com.strmr.tv.home.titleSourceCoordinate
 import com.strmr.tv.ui.launchSourceRecheck
@@ -87,6 +88,7 @@ internal fun TitleMenuSheet(
     val navigator = LocalNavigator.current
     val sourceHint = rememberSourceHint(com.strmr.tv.ui.rememberTitleSourceEvidence(card))
     val target = card.target
+    val rate = target?.let { com.strmr.tv.ui.rememberRatingAction(it) }
     var watched by remember { mutableStateOf<Boolean?>(null) }
     val episode = card.episode
     LaunchedEffect(card.id) {
@@ -107,6 +109,7 @@ internal fun TitleMenuSheet(
             add(SheetAction(if (library.entry.group.isShow) "Open" else "Play", Icons.Outlined.PlayArrow) { openLibrary(library.entry) })
         }
         if (target == null) return@buildList
+        if (!target.fromLibrary && rate != null) add(SheetAction("Rate for this profile…", Icons.Outlined.Star) { rate() })
         if (card.titleSourceCoordinate() != null && sourceHint != null) {
             add(SheetAction("Check sources again", Icons.Outlined.Refresh) { launchSourceRecheck(scope, target) })
         }

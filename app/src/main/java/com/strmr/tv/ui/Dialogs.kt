@@ -1,5 +1,9 @@
 package com.strmr.tv.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,7 +76,7 @@ fun ChoiceDialog(title: String, message: String? = null, choices: List<DialogCho
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().ignoreHeldSelect().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
             Column(
-                Modifier.width(420.dp).background(Color(0xFF1C1C1E), RoundedCornerShape(20.dp)).padding(28.dp),
+                Modifier.width(420.dp).heightIn(max = (LocalConfiguration.current.screenHeightDp - 48).coerceAtLeast(200).dp).verticalScroll(rememberScrollState()).background(Color(0xFF1C1C1E), RoundedCornerShape(20.dp)).padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
