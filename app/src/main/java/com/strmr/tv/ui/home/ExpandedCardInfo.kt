@@ -66,7 +66,7 @@ fun ExpandedCardInfo(card: HomeCard, cardHeight: Dp, progress: Boolean, modifier
         }
         metaLine(card).takeIf { it.isNotEmpty() }?.let {
             Text(it, fontSize = (9.5f * scale).sp, lineHeight = (12 * scale).sp, fontWeight = FontWeight.SemiBold,
-                 color = Color.White.copy(alpha = 0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 color = Color.White.copy(alpha = 0.9f), maxLines = if (card.forceTitleOverlay) 3 else 1, overflow = TextOverflow.Ellipsis)
         }
         card.overview?.takeIf { it.isNotBlank() }?.let {
             Text(it, fontSize = (8.5f * scale).sp, lineHeight = (11 * scale).sp, color = Color.White.copy(alpha = 0.8f),

@@ -112,6 +112,11 @@ data class Title(
     val unwatchedCount: Int? = null,
     /** Multi-source ratings (IMDb, Rotten Tomatoes, …), hydrated from MDBList when enabled. */
     val ratings: List<Rating>? = null,
+    /** Shelf-specific provenance, such as a chart's country, week and season. */
+    val cardSubtitle: String? = null,
+    val cardImage: ImageRef? = null,
+    /** Keep shelf context readable when the layout normally hides card text. */
+    val forceTitleOverlay: Boolean = false,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
 }

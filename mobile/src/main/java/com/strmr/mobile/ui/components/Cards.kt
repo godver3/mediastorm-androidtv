@@ -82,7 +82,7 @@ fun PosterCard(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(CardShape).background(Placeholder)
                 .cardClicks(onClick, onLongClick),
         ) {
-            CardArt(card, wide = false)
+            CardArt(card, wide = false, forceOverlay = card.forceTitleOverlay && !showTitle)
         }
         if (showTitle) CardText(card.title, card.subtitle)
     }
@@ -103,14 +103,14 @@ fun LandscapeCard(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(CardShape).background(Placeholder)
                 .cardClicks(onClick, onLongClick),
         ) {
-            CardArt(card, wide = true)
+            CardArt(card, wide = true, forceOverlay = card.forceTitleOverlay && !showTitle)
         }
         if (showTitle && card.drawable == null) CardText(card.title, card.subtitle)
     }
 }
 
 @Composable
-private fun CardArt(card: HomeCard, wide: Boolean) {
+private fun CardArt(card: HomeCard, wide: Boolean, forceOverlay: Boolean) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
             card.drawable != null -> Image(painterResource(card.drawable!!), card.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -126,6 +126,16 @@ private fun CardArt(card: HomeCard, wide: Boolean) {
                 card.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White,
                 modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
             )
+        }
+        if (forceOverlay && card.drawable == null && !card.logoTile) {
+            Column(
+                Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                    .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.8f), 1f to Color.Black.copy(alpha = 0.95f)))
+                    .padding(8.dp),
+            ) {
+                Text(card.title, style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(card.subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
         }
         CardBadges(card, Modifier.align(Alignment.TopStart).padding(6.dp), wide = wide)
         if (showsProgress(card.progress)) ProgressLine(card.progress, Modifier.align(Alignment.BottomStart).padding(6.dp))

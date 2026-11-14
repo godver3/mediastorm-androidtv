@@ -132,7 +132,7 @@ fun HomeCardView(
                 if (it.isFocused) onFocus()
             },
         ) {
-            CardArt(card, metrics, open)
+            CardArt(card, metrics, open, forceOverlay = card.forceTitleOverlay && !showTitle)
         }
         if (showTitle) CardTitle(card.title, card.subtitle)
     }
@@ -162,7 +162,7 @@ private fun openPast(open: () -> Float, test: (Float) -> Boolean): Boolean {
  * swapping art the moment focus moves.
  */
 @Composable
-private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
+private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float, forceOverlay: Boolean) {
     val opening = openPast(open) { it > 0f }
     val folded = openPast(open) { it < 1f }
     val wide = metrics.showsArtwork16x9 || openPast(open) { it > 0.5f }
@@ -197,8 +197,8 @@ private fun CardArt(card: HomeCard, metrics: CardMetrics, open: () -> Float) {
         val info = metrics.expandedInfo && wide && card.target != null && card.drawable == null && !card.logoTile
         if (info) {
             ExpandedCardInfo(card, metrics.height, progress, Modifier.align(Alignment.BottomStart))
-        } else if (metrics.text.overlays(wide) && card.drawable == null && !card.logoTile) {
-            CardOverlay(card.title, card.subtitle, inset, progress, Modifier.align(Alignment.BottomStart))
+        } else if ((metrics.text.overlays(wide) || forceOverlay) && card.drawable == null && !card.logoTile) {
+            CardOverlay(card.title, card.subtitle, inset, progress, Modifier.align(Alignment.BottomStart), subtitleLines = if (forceOverlay) 3 else 1)
         }
         // A poster's "New" sits above its other badge; a 16:9 card's at the top right (as Expo).
         val new = card.newEpisode
@@ -254,7 +254,7 @@ private fun CardTitle(title: String, subtitle: String) {
  * year / episode line, on a gradient to near black, clear of the progress line.
  */
 @Composable
-private fun CardOverlay(title: String, subtitle: String, inset: Dp, progress: Boolean, modifier: Modifier = Modifier) {
+private fun CardOverlay(title: String, subtitle: String, inset: Dp, progress: Boolean, modifier: Modifier = Modifier, subtitleLines: Int = 1) {
     Column(
         modifier.fillMaxWidth()
             .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to Color.Black.copy(alpha = 0.7f), 1f to Color.Black.copy(alpha = 0.95f)))
@@ -262,7 +262,7 @@ private fun CardOverlay(title: String, subtitle: String, inset: Dp, progress: Bo
     ) {
         Text(title, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle.isNotEmpty()) {
-            Text(subtitle, fontSize = 11.sp, lineHeight = 13.sp, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, fontSize = 11.sp, lineHeight = 13.sp, color = Color.White.copy(alpha = 0.7f), maxLines = subtitleLines, overflow = TextOverflow.Ellipsis)
         }
     }
 }

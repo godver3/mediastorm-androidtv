@@ -83,6 +83,7 @@ data class HomeCard(
     val episode: CardEpisode? = null,
     /** A hub card's preview of its list: four titles' art, drawn 2×2 in place of artwork. */
     val collageUrls: List<String> = emptyList(),
+    val forceTitleOverlay: Boolean = false,
 ) {
     val target: DetailsTarget? get() = (link as? HomeLink.Details)?.target
 
@@ -171,11 +172,12 @@ data class HomeCard(
             id = title.id,
             link = HomeLink.Details(DetailsTarget.from(title)),
             title = title.name,
-            subtitle = kindLine(title.year, title.isMovie),
+            subtitle = title.cardSubtitle?.trim()?.takeIf { it.isNotEmpty() } ?: kindLine(title.year, title.isMovie),
+            forceTitleOverlay = title.forceTitleOverlay,
             overview = title.overview,
             backdropUrl = title.backdrop?.url,
             logoUrl = title.logo?.url,
-            artworkUrl = title.backdrop?.url ?: title.poster?.url,
+            artworkUrl = title.cardImage?.url ?: title.backdrop?.url ?: title.poster?.url,
             posterUrl = title.textPoster?.url ?: title.poster?.url,
             badge = rank?.let { CardBadge("#$it") },
             releaseBadge = if (rank == null) ReleaseBadge.forTitle(title.availability, title.status, title.releaseDate) else null,
