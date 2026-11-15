@@ -76,7 +76,7 @@ class ProgressReporter(
             withContext(NonCancellable) {
                 try {
                     ProfileDataContext.requireCurrent(context)
-                    val reply = ApiClient.reportProgress(body)
+                    val reply = ApiClient.reportProgress(body, expectedContext = context)
                     ProfileDataContext.requireCurrent(context)
                     lastStoredItemId = reply.itemId?.takeIf { it.isNotBlank() } ?: lastStoredItemId
                     log.saved(kind, position, duration, reply)

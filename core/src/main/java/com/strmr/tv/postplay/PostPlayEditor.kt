@@ -37,10 +37,10 @@ class ServerPostPlayGateway(private val target: DetailsTarget, private val itemI
     override fun isCurrent() = epoch == ProfileDataContext.current
     private fun checkCurrent() { if (!isCurrent()) throw CancellationException("Post-play profile changed") }
     override suspend fun context(): PostPlayReply {
-        checkCurrent(); val reply = ApiClient.send<PostPlayReply>("GET", path, query, promptOnLock = false, timeoutMs = 5_000); checkCurrent(); return reply
+        checkCurrent(); val reply = ApiClient.send<PostPlayReply>("GET", path, query, promptOnLock = false, timeoutMs = 5_000, expectedContext = epoch); checkCurrent(); return reply
     }
     override suspend fun suggestions(): PostPlaySuggestions {
-        checkCurrent(); val reply = ApiClient.send<PostPlaySuggestions>("GET", "$path/recommendations", query, promptOnLock = false, timeoutMs = 5_000); checkCurrent(); return reply
+        checkCurrent(); val reply = ApiClient.send<PostPlaySuggestions>("GET", "$path/recommendations", query, promptOnLock = false, timeoutMs = 5_000, expectedContext = epoch); checkCurrent(); return reply
     }
     override suspend fun rate(target: DetailsTarget, value: PersonalRating): String {
         checkCurrent(); val reply = ratings.write(target,value); checkCurrent(); return reply.rating

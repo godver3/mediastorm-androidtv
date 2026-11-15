@@ -1,5 +1,8 @@
 package com.strmr.tv.app
 
+import com.strmr.tv.library.ProfileDataContext
+import kotlinx.coroutines.CancellationException
+
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.logout
 import com.strmr.tv.launcher.LauncherSync
@@ -31,9 +34,15 @@ internal object RemoteSession {
     suspend fun start() {
         AppSession.moveTo(AppSession.Phase.Starting)
         enter()
+        val expectedContext = ProfileDataContext.current
         try {
-            AppSession.useServer(RemoteAccess.connect())
+            val url = RemoteAccess.connect()
+            ProfileDataContext.requireCurrent(expectedContext)
+            AppSession.useServer(url)
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: Exception) {
+            ProfileDataContext.requireCurrent(expectedContext)
             AppSession.moveTo(AppSession.Phase.Unavailable(e.message ?: "Couldn't reach the server over remote access."))
             return
         }
@@ -41,8 +50,9 @@ internal object RemoteSession {
     }
 
     /** The proxy again after sleep or a failure; its port can change, so the base URL follows. */
-    suspend fun reconnectOrThrow() {
+    suspend fun reconnectOrThrow(expectedContext: Long = ProfileDataContext.current) {
         val url = RemoteAccess.connect()
+        ProfileDataContext.requireCurrent(expectedContext)
         if (url != AppSession.serverUrl.value) {
             AppSession.serverUrl.value = url
             ApiClient.baseUrl = url

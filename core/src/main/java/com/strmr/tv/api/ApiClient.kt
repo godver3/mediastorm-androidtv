@@ -5,20 +5,13 @@ import com.strmr.tv.library.ProfileDataContext
 import com.strmr.tv.auth.AuthSession
 import com.strmr.tv.auth.ProfileUnlockStore
 import java.io.IOException
-import java.net.ConnectException
-import java.net.NoRouteToHostException
-import java.net.SocketException
-import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
@@ -46,11 +39,15 @@ val ApiJson = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInpu
  * Calls suspend and run their I/O on OkHttp's threads.
  */
 object ApiClient {
+    private val requestContexts = RequestContext()
     /** Server origin (plus any reverse-proxy path), without `/api`. */
     @Volatile var baseUrl: HttpUrl = "http://127.0.0.1:7777/".toHttpUrl()
         set(value) {
-            if (field != value) ProfileDataContext.invalidate()
-            field = value
+            requestContexts.changeAuthentication(change = {
+                val changed = field != value
+                field = value
+                changed
+            })
         }
     /**
      * Over iroh remote access: the pairing credential, sent with every request
@@ -58,26 +55,32 @@ object ApiClient {
      */
     @Volatile var remoteCredential: String? = null
         set(value) {
-            if (field != value) ProfileDataContext.invalidate()
-            field = value
+            requestContexts.changeAuthentication(change = {
+                val changed = field != value
+                field = value
+                changed
+            })
         }
     /**
      * Over remote access: brings the tunnel back after a transport failure and returns its
      * base URL (the proxy's port can change). Set by AppSession.
      */
-    @Volatile var recoverTransport: (suspend () -> HttpUrl?)? = null
+    @Volatile var recoverTransport: (suspend (Long) -> HttpUrl?)? = null
     /**
      * Told (on an I/O thread) about every request that failed in transport (no answer at all),
      * so the phone app can check whether the server is still there. The TV app leaves it unset.
      */
     @Volatile var onTransportFailure: ((IOException) -> Unit)? = null
     /** Persisted to [com.strmr.tv.auth.SecureStore] whenever it changes (login, refresh). */
-    @Volatile var session: AuthSession? = null
+    @Volatile private var storedSession: AuthSession? = null
+    var session: AuthSession?
+        get() = storedSession
         set(value) {
-            val old = field
-            if (old?.accountId != value?.accountId) ProfileDataContext.invalidate()
-            field = value
-            if (value != null && value != old) value.save()
+            requestContexts.changeAuthentication(change = {
+                val changed = storedSession != value
+                storedSession = value
+                changed
+            }, afterChange = { value?.save() })
         }
     @Volatile var profileId: String = "default"
         private set
@@ -114,10 +117,43 @@ object ApiClient {
     val profilePath: String get() = "/api/users/${segment(profileId)}"
 
     fun activate(profileId: String, profileName: String? = null) {
-        ProfileDataContext.invalidate()
-        this.profileId = profileId
-        this.profileName = profileName
-        unlocks.keepOnly(profileId)
+        requestContexts.changeProfile {
+            this.profileId = profileId
+            this.profileName = profileName
+            unlocks.keepOnly(profileId)
+        }
+    }
+
+    /** Publish a server and its stored session as one identity transition. */
+    fun configureServer(url: HttpUrl, account: AuthSession?) = requestContexts.serialized {
+        baseUrl = url
+        session = account
+    }
+
+    /** Commit a parsed reply only while its original profile/server identity remains active. */
+    fun <T> inContext(expectedContext: Long, block: () -> T): T =
+        requestContexts.capture(expectedContext).use(block)
+
+    /** Best-effort remote logout cannot clear a replacement account after an await. */
+    suspend fun revokeSession() {
+        val context = requestContexts.captureAuthentication()
+        val request = context.use {
+            storedSession?.let { account ->
+                Prepared("POST", url("/api/auth/logout"), null, 5_000, context).apply {
+                    headers["X-Client-ID"] = Config.clientId
+                    headers["Authorization"] = "Bearer ${account.token}"
+                    remoteCredential?.let { headers["X-Remote-Access-Credential"] = it }
+                }
+            }
+        }
+        if (request != null) try {
+            perform(request, recoverConnection = false)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            context.check()
+        }
+        context.use { forgetSession() }
     }
 
     /** RFC 3986 unreserved characters; everything else is escaped in segments and query values. */
@@ -160,9 +196,13 @@ object ApiClient {
         body: JsonElement? = null,
         promptOnLock: Boolean = true,
         timeoutMs: Long = 30_000,
+        expectedContext: Long? = null,
     ): List<T> {
-        val raw = sendRaw(method, path, query, body, promptOnLock = promptOnLock, timeoutMs = timeoutMs)
-        return withContext(Dispatchers.Default) { LossyList.decode(json, serializer<T>(), raw) }
+        val captured = expectedContext ?: ProfileDataContext.current
+        val raw = sendRaw(method, path, query, body, promptOnLock = promptOnLock, timeoutMs = timeoutMs, expectedContext = captured)
+        val decoded = withContext(Dispatchers.Default) { LossyList.decode(json, serializer<T>(), raw) }
+        ProfileDataContext.requireCurrent(captured)
+        return decoded
     }
 
     suspend inline fun <reified T> send(
@@ -173,9 +213,13 @@ object ApiClient {
         promptOnLock: Boolean = true,
         timeoutMs: Long = 30_000,
         headers: Map<String, String> = emptyMap(),
+        expectedContext: Long? = null,
     ): T {
-        val raw = sendRaw(method, path, query, body, authorized, promptOnLock, timeoutMs, headers = headers)
-        return withContext(Dispatchers.Default) { json.decodeFromString(raw) }
+        val captured = expectedContext ?: ProfileDataContext.current
+        val raw = sendRaw(method, path, query, body, authorized, promptOnLock, timeoutMs, headers = headers, expectedContext = captured)
+        val decoded = withContext(Dispatchers.Default) { json.decodeFromString<T>(raw) }
+        ProfileDataContext.requireCurrent(captured)
+        return decoded
     }
 
     /**
@@ -197,56 +241,47 @@ object ApiClient {
         timeoutMs: Long = 30_000,
         encodedQuery: String? = null,
         headers: Map<String, String> = emptyMap(),
+        expectedContext: Long? = null,
     ): String {
-        if (method == "GET") SportsFixtures.response(path)?.let { return it }
-        val prepared = Prepared(method, url(path, query, encodedQuery), body?.toString(), timeoutMs)
-        prepared.headers.putAll(headers)
-        prepared.headers["X-Client-ID"] = Config.clientId
-        remoteCredential?.let { prepared.headers["X-Remote-Access-Credential"] = it }
+        val context = requestContexts.capture(expectedContext)
+        if (method == "GET") SportsFixtures.response(path)?.let { context.check(); return it }
+        val prepared = context.use {
+            Prepared(method, url(path, query, encodedQuery), body?.toString(), timeoutMs, context).apply {
+                this.headers.putAll(headers)
+                this.headers["X-Client-ID"] = Config.clientId
+                remoteCredential?.let { this.headers["X-Remote-Access-Credential"] = it }
+            }
+        }
         if (!authorized) return perform(prepared)
 
         val named = profileIds(path, query, body as? JsonObject)
-        applyUnlocks(prepared, named)
+        context.use { applyUnlocks(prepared, named) }
         try {
             return performAuthorized(prepared)
         } catch (e: ApiError) {
+            context.check()
             if (!e.isProfileLocked) throw e
-            val locked = e.failure?.profileId ?: named.firstOrNull() ?: profileId
-            unlocks.remove(locked) // missing, expired or revoked
-            val prompt = onProfileLocked
-            if (!promptOnLock || prompt == null || !prompt(locked)) throw e
-            applyUnlocks(prepared, if (locked in named) named else named + locked)
+            val locked = context.use { e.failure?.profileId ?: named.firstOrNull() ?: profileId }
+            val prompt = context.use { unlocks.remove(locked); onProfileLocked }
+            if (!promptOnLock || prompt == null || !prompt(locked)) { context.check(); throw e }
+            context.use { applyUnlocks(prepared, if (locked in named) named else named + locked) }
             return performAuthorized(prepared)
         }
     }
 
-    /** A request that can be re-sent with new headers or a new host. */
-    private class Prepared(val method: String, var url: HttpUrl, val body: String?, val timeoutMs: Long) {
+    /** A request retains the identity under which its URL and headers were prepared. */
+    private class Prepared(val method: String, var url: HttpUrl, val body: String?, val timeoutMs: Long, val context: RequestContext.Scope) {
         val headers = mutableMapOf<String, String>()
     }
 
-    private suspend fun performAuthorized(req: Prepared): String {
-        if (session?.needsRefresh == true && refreshSession() == RefreshOutcome.REJECTED) {
-            signOutLocally()
-            throw ApiError.SignedOut()
-        }
-        req.headers["Authorization"] = "Bearer ${token ?: throw ApiError.SignedOut()}"
-        try {
-            return perform(req)
-        } catch (e: ApiError) {
-            if (!e.invalidatesSession) throw e
-            when (refreshSession()) {
-                RefreshOutcome.REFRESHED -> Unit
-                RefreshOutcome.FAILED -> throw e
-                RefreshOutcome.REJECTED -> {
-                    signOutLocally()
-                    throw ApiError.SignedOut()
-                }
-            }
-            req.headers["Authorization"] = "Bearer ${token ?: throw ApiError.SignedOut()}"
-            return perform(req)
-        }
-    }
+    private suspend fun performAuthorized(req: Prepared): String = RequestAuthorization(
+        req.context,
+        token = { storedSession?.token },
+        needsRefresh = { storedSession?.needsRefresh == true },
+        refresh = { refreshSession(req.context.authenticationVersion) },
+        signOut = { signOutLocally() },
+        send = { value -> req.headers["Authorization"] = "Bearer $value"; perform(req) },
+    ).execute()
 
     /** `X-Profile-Unlock` with every stored token for the profiles a request names. */
     private fun applyUnlocks(req: Prepared, profiles: List<String>) {
@@ -276,80 +311,89 @@ object ApiClient {
         return ids
     }
 
-    private suspend fun perform(req: Prepared, retried: Boolean = false): String {
+    private suspend fun perform(req: Prepared, recoverConnection: Boolean = true): String {
+        req.context.check()
         val request = Request.Builder().url(req.url).apply {
             req.headers.forEach { (k, v) -> header(k, v) }
             val body = req.body?.toRequestBody(jsonType)
             method(req.method, body ?: if (req.method == "POST" || req.method == "PUT") ByteArray(0).toRequestBody() else null)
         }.build()
-        val response = try {
+        val response = ContextBoundTransport(
+            req.context,
+            remote = recoverConnection && req.headers.containsKey("X-Remote-Access-Credential"),
+            recover = {
+                val callback = req.context.use { recoverTransport }
+                val expected = req.context.use { req.context.profileEpoch ?: ProfileDataContext.current }
+                val base = callback?.invoke(expected)
+                if (base == null) false else {
+                    req.context.use { if (base != baseUrl) throw CancellationException("Request route changed") }
+                    true
+                }
+            },
+            onFailure = { error -> if (recoverConnection) onTransportFailure?.invoke(error) },
+        ).execute {
             http.newCall(request).apply { timeout().timeout(req.timeoutMs, TimeUnit.MILLISECONDS) }.await()
-        } catch (e: IOException) {
-            if (retried || remoteCredential == null || !isTransportFailure(e)) onTransportFailure?.invoke(e)
-            // Through the iroh proxy, the first request after a sleep or a path change can fail
-            // while the connection is re-established: reconnect, then retry once.
-            if (retried || remoteCredential == null || !isTransportFailure(e)) throw e
-            val base = recoverTransport?.invoke() ?: throw e
-            req.url = req.url.newBuilder().scheme(base.scheme).host(base.host).port(base.port).build()
-            return perform(req, retried = true)
         }
         if (!response.isSuccessful) throw ApiError.Http(HttpFailure(response.code, response.text, response.retryAfter))
         return response.text
     }
 
-    /** Failures a reconnect can fix, as tvOS counts them: refused, lost, timed out (a whole-call timeout too). */
-    private fun isTransportFailure(e: IOException) =
-        e is ConnectException || e is SocketTimeoutException || e is NoRouteToHostException || e is SocketException ||
-            (e is java.io.InterruptedIOException && e.message == "timeout") ||
-            e.message?.contains("unexpected end of stream", ignoreCase = true) == true
-
     enum class RefreshOutcome { REFRESHED, REJECTED, FAILED }
 
-    private val refreshLock = Mutex()
-    private var refreshing: Deferred<RefreshOutcome>? = null
+    private val rotations = ScopedRefresh<RefreshOutcome>(scope)
 
-    /**
-     * `POST /api/auth/refresh`, coalesced so concurrent 401s share one rotation.
-     * REJECTED means the server refused the session; FAILED (network) keeps it.
-     */
-    suspend fun refreshSession(): RefreshOutcome {
-        val job = refreshLock.withLock {
-            refreshing ?: scope.async { doRefresh() }.also { refreshing = it }
-        }
-        val outcome = job.await()
-        refreshLock.withLock { if (refreshing === job) refreshing = null }
-        return outcome
+    /** Rotations coalesce only within the captured account/server identity. */
+    suspend fun refreshSession(): RefreshOutcome = refreshSession(null)
+
+    private suspend fun refreshSession(expectedVersion: Long?): RefreshOutcome {
+        val context = requestContexts.captureAuthentication(expectedVersion)
+        return rotations.run(context) { doRefresh(context) }
     }
 
-    private suspend fun doRefresh(): RefreshOutcome {
-        val current = session ?: return RefreshOutcome.REJECTED
-        val req = Prepared("POST", url("/api/auth/refresh"), null, 20_000).apply {
-            headers["X-Client-ID"] = Config.clientId
-            headers["Authorization"] = "Bearer ${current.token}"
-            remoteCredential?.let { headers["X-Remote-Access-Credential"] = it }
+    private suspend fun doRefresh(context: RequestContext.Scope): RefreshOutcome {
+        val current = context.use { storedSession } ?: return RefreshOutcome.REJECTED
+        val req = context.use {
+            Prepared("POST", url("/api/auth/refresh"), null, 20_000, context).apply {
+                headers["X-Client-ID"] = Config.clientId
+                headers["Authorization"] = "Bearer ${current.token}"
+                remoteCredential?.let { headers["X-Remote-Access-Credential"] = it }
+            }
         }
         return try {
-            session = AuthSession.from(json.decodeFromString<LoginResponse>(perform(req)))
+            val refreshed = AuthSession.from(json.decodeFromString<LoginResponse>(perform(req)))
+            context.use {
+                check(refreshed.accountId == current.accountId) { "Unexpected refresh account" }
+                // Ordinary rotation preserves profile identity and in-flight peers.
+                storedSession = refreshed
+                refreshed.save()
+            }
             RefreshOutcome.REFRESHED
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: ApiError) {
+            context.check()
             if (e.invalidatesSession || e.statusCode in setOf(403, 404)) RefreshOutcome.REJECTED else RefreshOutcome.FAILED
         } catch (e: Exception) {
+            context.check()
             RefreshOutcome.FAILED
         }
     }
 
-    fun signOutLocally() {
-        if (session == null) return
-        forgetSession()
-        onSignedOut?.invoke()
+    fun signOutLocally() = requestContexts.serialized {
+        if (session != null) {
+            forgetSession()
+            onSignedOut?.invoke()
+        }
     }
 
     /** Drops the session and the profile unlocks bound to it. */
-    fun forgetSession() {
-        session = null
+    fun forgetSession() = requestContexts.changeAuthentication(change = {
+        storedSession = null
+        true // Explicit logout also invalidates a login that has not returned yet.
+    }, afterChange = {
         AuthSession.clear()
         unlocks.removeAll()
-    }
+    })
 }
 
 /** A finished response, its body already read off the main thread. */

@@ -63,7 +63,7 @@ object WatchlistStore {
         val context = ProfileDataContext.current
         overrides[target.titleId] = true
         try {
-            ApiClient.sendRaw("POST", "${ApiClient.profilePath}/watchlist", body = upsert(target))
+            ApiClient.sendRaw("POST", "${ApiClient.profilePath}/watchlist", body = upsert(target), expectedContext = context)
         } catch (e: Exception) {
             ProfileDataContext.requireCurrent(context)
             overrides.remove(target.titleId)
@@ -84,6 +84,7 @@ object WatchlistStore {
             ApiClient.sendRaw(
                 "DELETE",
                 "${ApiClient.profilePath}/watchlist/${if (target.isMovie) "movie" else "series"}/${ApiClient.segment(target.titleId)}",
+                expectedContext = context,
             )
         } catch (e: Exception) {
             ProfileDataContext.requireCurrent(context)

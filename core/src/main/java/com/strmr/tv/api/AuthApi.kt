@@ -1,5 +1,7 @@
 package com.strmr.tv.api
 
+import com.strmr.tv.library.ProfileDataContext
+
 import com.strmr.tv.app.Config
 import com.strmr.tv.auth.AuthSession
 import java.io.IOException
@@ -75,32 +77,24 @@ suspend fun ApiClient.publicBranding(): PublicBranding? =
         .getOrNull()?.branding
 
 suspend fun ApiClient.login(username: String, password: String): AuthSession {
+    val context = ProfileDataContext.current
     val body = buildJsonObject {
         put("username", username)
         put("password", password)
         put("rememberMe", true)
     }
-    val text = sendRaw("POST", "/api/auth/login", body = body, authorized = false)
+    val text = sendRaw("POST", "/api/auth/login", body = body, authorized = false, expectedContext = context)
     val fresh = AuthSession.from(json.decodeFromString<LoginResponse>(text))
     // Unlocks belong to the previous session; the server no longer honours them.
-    unlocks.removeAll()
-    session = fresh
+    inContext(context) {
+        unlocks.removeAll()
+        session = fresh
+    }
     return fresh
 }
 
 /** Revokes the session on the server (best effort) and forgets it locally. */
-suspend fun ApiClient.logout() {
-    token?.let { token ->
-        val request = Request.Builder().url(url("/api/auth/logout"))
-            .post(ByteArray(0).toRequestBody())
-            .header("X-Client-ID", Config.clientId)
-            .header("Authorization", "Bearer $token")
-            .apply { remoteCredential?.let { header("X-Remote-Access-Credential", it) } }
-            .build()
-        runCatching { http.newCall(request).apply { timeout().timeout(5, TimeUnit.SECONDS) }.await() }
-    }
-    forgetSession()
-}
+suspend fun ApiClient.logout() = revokeSession()
 
 suspend fun ApiClient.profiles(): List<Profile> = send("GET", "/api/users")
 
@@ -109,12 +103,15 @@ suspend fun ApiClient.profiles(): List<Profile> = send("GET", "/api/users")
  * token current servers return (older ones only answer `valid`).
  */
 suspend fun ApiClient.verifyPin(pin: String, profileId: String): Boolean {
+    val context = ProfileDataContext.current
     return try {
         val result = send<Verified>(
             "POST", "/api/users/${segment(profileId)}/pin/verify",
-            body = buildJsonObject { put("pin", pin) }, promptOnLock = false,
+            body = buildJsonObject { put("pin", pin) }, promptOnLock = false, expectedContext = context,
         )
-        if (result.valid && !result.unlockToken.isNullOrEmpty()) unlocks.set(result.unlockToken, result.expiresAt, profileId)
+        inContext(context) {
+            if (result.valid && !result.unlockToken.isNullOrEmpty()) unlocks.set(result.unlockToken, result.expiresAt, profileId)
+        }
         result.valid
     } catch (e: ApiError) {
         if (e.isWrongPin) false else throw e

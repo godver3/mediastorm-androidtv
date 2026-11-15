@@ -1,5 +1,8 @@
 package com.strmr.tv.app
 
+import com.strmr.tv.library.ProfileDataContext
+import kotlinx.coroutines.CancellationException
+
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.remote.RemoteAccess
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,9 +44,13 @@ object NetworkRoutes {
         isHomeDirect.value = false
         RemoteSession.isRemote.value = true
         ApiClient.remoteCredential = RemoteAccess.pairing?.credential
+        val expectedContext = ProfileDataContext.current
         try {
-            RemoteSession.reconnectOrThrow()
+            RemoteSession.reconnectOrThrow(expectedContext)
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: Exception) {
+            ProfileDataContext.requireCurrent(expectedContext)
             if (AppSession.serverUrl.value?.host != "127.0.0.1") use(unreachableLoopback)
             throw e
         }

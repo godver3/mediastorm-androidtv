@@ -1,5 +1,9 @@
 package com.strmr.tv.app
 
+import kotlinx.coroutines.CancellationException
+
+import com.strmr.tv.library.ProfileDataContext
+
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
 import com.strmr.tv.api.Profile
@@ -75,16 +79,26 @@ object AppSession {
         if (started) return
         started = true
         api.onSignedOut = {
+            val signedOutContext = ProfileDataContext.current
             scope.launch {
+                if (ProfileDataContext.current != signedOutContext) return@launch
                 LauncherSync.clear("session expired")
+                if (ProfileDataContext.current != signedOutContext) return@launch
                 loginNotice.value = "Your session expired. Sign in again."
                 _phase.value = Phase.Login
             }
         }
         api.onProfileLocked = { id -> withContext(Dispatchers.Main) { unlockLockedProfile(id) } }
-        api.recoverTransport = {
+        api.recoverTransport = { expectedContext ->
             withContext(Dispatchers.Main) {
-                if (isRemote.value) runCatching { RemoteSession.reconnectOrThrow() }
+                ProfileDataContext.requireCurrent(expectedContext)
+                if (isRemote.value) try {
+                    RemoteSession.reconnectOrThrow(expectedContext)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    ProfileDataContext.requireCurrent(expectedContext)
+                }
                 serverUrl.value
             }
         }
@@ -119,6 +133,8 @@ object AppSession {
         if (isRemote.value) {
             try {
                 RemoteSession.reconnectOrThrow()
+            } catch (error: CancellationException) {
+                throw error
             } catch (e: Exception) {
                 _phase.value = Phase.Unavailable(e.message ?: "Couldn't reach the server over remote access.")
                 return
@@ -126,6 +142,8 @@ object AppSession {
         }
         try {
             loadProfiles()
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: ApiError.SignedOut) {
             return // onSignedOut moved us to Login
         } catch (e: Exception) {

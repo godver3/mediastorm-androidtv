@@ -46,8 +46,7 @@ internal object ServerSetup {
     /** Points the API at `url` with its stored session; its version and branding load in `scope`. */
     fun use(url: HttpUrl, scope: CoroutineScope) = with(AppSession) {
         serverUrl.value = url
-        api.baseUrl = url
-        api.session = AuthSession.load()
+        api.configureServer(url, AuthSession.load())
         branding.value = null
         scope.launch { serverVersion.value = api.serverVersion() }
         scope.launch {

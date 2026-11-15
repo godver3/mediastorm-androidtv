@@ -31,8 +31,8 @@ data class ProgressReply(
 )
 
 /** Throws on failure; the caller logs it, and the next report retries. */
-suspend fun ApiClient.reportProgress(body: JsonObject): ProgressReply =
-    send("POST", "$profilePath/history/progress", body = body, promptOnLock = false)
+suspend fun ApiClient.reportProgress(body: JsonObject, expectedContext: Long? = null): ProgressReply =
+    send("POST", "$profilePath/history/progress", body = body, promptOnLock = false, expectedContext = expectedContext)
 
 /**
  * Raw-file stream URL for the player. transmux=0 keeps the backend from remuxing: ExoPlayer
