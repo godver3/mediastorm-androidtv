@@ -27,7 +27,7 @@ interface TitleRatingGateway {
     suspend fun write(target: DetailsTarget, rating: PersonalRating): TitleRatingReply
 }
 
-class ServerTitleRatingGateway : TitleRatingGateway {
+class ServerTitleRatingGateway(private val promptOnLock: Boolean = true) : TitleRatingGateway {
     private val profile = ApiClient.profileId
     private val server = ApiClient.baseUrl
     private val account = ApiClient.session?.accountId
@@ -37,11 +37,11 @@ class ServerTitleRatingGateway : TitleRatingGateway {
     private fun route(target: DetailsTarget) = "$path/ratings/${if (target.isMovie) "movie" else "series"}/${ApiClient.segment(target.titleId)}"
     override suspend fun read(target: DetailsTarget): TitleRatingReply {
         if (!isCurrent()) throw CancellationException("Rating context changed")
-        return ApiClient.send("GET", route(target), timeoutMs = 5_000)
+        return ApiClient.send("GET", route(target), promptOnLock = promptOnLock, timeoutMs = 5_000)
     }
     override suspend fun write(target: DetailsTarget, rating: PersonalRating): TitleRatingReply {
         if (!isCurrent()) throw CancellationException("Rating context changed")
-        return ApiClient.send("PUT", route(target), body = buildJsonObject { put("rating", rating.wire) }, timeoutMs = 5_000)
+        return ApiClient.send("PUT", route(target), body = buildJsonObject { put("rating", rating.wire) }, promptOnLock = promptOnLock, timeoutMs = 5_000)
     }
 }
 

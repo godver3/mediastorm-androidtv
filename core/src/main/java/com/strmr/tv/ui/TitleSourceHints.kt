@@ -33,7 +33,7 @@ data class VisibleTitleSource(val modifier: Modifier, val source: SourceAvailabi
 
 /** A composed/preloaded card is not demand until its clipped bounds intersect the window. */
 @Composable
-fun rememberVisibleTitleSource(card: HomeCard): VisibleTitleSource {
+fun rememberVisibleTitleSource(card: HomeCard, completedPlayback: Boolean = false): VisibleTitleSource {
     val profile by AppSession.profile.collectAsState()
     val server by AppSession.serverUrl.collectAsState()
     val phase by AppSession.phase.collectAsState()
@@ -58,7 +58,7 @@ fun rememberVisibleTitleSource(card: HomeCard): VisibleTitleSource {
         tree.addOnWindowFocusChangeListener(focus)
         onDispose { lifecycle?.removeObserver(observer); if (tree.isAlive) tree.removeOnWindowFocusChangeListener(focus) }
     }
-    val active = titleSourceActive(inWindow, resumed, focused, playerOpen, resolving != null, phase == AppSession.Phase.Ready)
+    val active = titleSourceActive(inWindow, resumed, focused, playerOpen, resolving != null, phase == AppSession.Phase.Ready, completedPlayback)
     DisposableEffect(coordinator, owner, title, active) {
         coordinator.setVisible(owner, title.takeIf { active })
         onDispose { coordinator.setVisible(owner, null) }

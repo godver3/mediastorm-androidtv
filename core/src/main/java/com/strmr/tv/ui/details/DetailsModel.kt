@@ -301,6 +301,7 @@ class DetailsModel(val target: DetailsTarget) {
             backdrops = listOfNotNull(episode?.image?.url) + art,
             logoUrl = title?.logo?.url ?: target.logoUrl,
             following = episode?.let { airedEpisodes(it) }.orEmpty(),
+            episodeOrderKnown = episode != null && seasons.any { season -> season.number > 0 && season.episodes.any { it.id == episode.id } },
             library = library,
         )
     }

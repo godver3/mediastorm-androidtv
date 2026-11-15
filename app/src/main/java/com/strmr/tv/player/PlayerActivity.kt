@@ -54,6 +54,8 @@ class PlayerActivity : ComponentActivity() {
         controller = c
         setContent {
             StrmrTheme {
+                val postPlay by c.postPlay.collectAsState()
+                LaunchedEffect(postPlay) { if (postPlay != null) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
                 val ended by c.ended.collectAsState()
                 val next by c.advanceTo.collectAsState()
                 val switch by c.switchTo.collectAsState()
@@ -73,7 +75,8 @@ class PlayerActivity : ComponentActivity() {
                         PlaybackCoordinator.play(it.request, it.source, carried = it.carried, resolved = it.resolved, prepared = it.prepared)
                     }
                 }
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                if (postPlay != null) PostPlayScreen(c) { finish() }
+                else Box(Modifier.fillMaxSize().background(Color.Black)) {
                     AndroidView(
                         factory = { context ->
                             PlayerView(context).apply {

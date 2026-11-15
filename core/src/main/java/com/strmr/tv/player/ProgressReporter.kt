@@ -5,6 +5,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.reportProgress
+import com.strmr.tv.library.ProfileDataContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -21,10 +23,14 @@ class ProgressReporter(
     private val player: ExoPlayer,
     private val session: PlayerSession,
     private val scope: CoroutineScope,
+    private val context: Long = ProfileDataContext.current,
     private val onMigration: (reason: String) -> Unit,
 ) {
     private val request = session.request
     private var discarded = false
+    val acceptsCompletion get() = !discarded && context == ProfileDataContext.current
+    var lastStoredItemId: String? = null
+        private set
     private var periodic: Job? = null
     /** The latest report in flight, which pages reloading after playback wait on. */
     var lastReport: Job? = null
@@ -56,7 +62,7 @@ class ProgressReporter(
     }
 
     fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) {
-        if (!session.reportsProgress || discarded) return
+        if (!session.reportsProgress || !acceptsCompletion) return
         val (position, duration) = times() ?: return
         val body = request.progressReport(position, duration, paused, ended, sourcePath = session.streamPath, stream = streamHealth())
         val kind = when {
@@ -69,11 +75,15 @@ class ProgressReporter(
         lastReport = scope.launch {
             withContext(NonCancellable) {
                 try {
+                    ProfileDataContext.requireCurrent(context)
                     val reply = ApiClient.reportProgress(body)
+                    ProfileDataContext.requireCurrent(context)
+                    lastStoredItemId = reply.itemId?.takeIf { it.isNotBlank() } ?: lastStoredItemId
                     log.saved(kind, position, duration, reply)
                     if (reply.migrationRequested && !ended && !closing) {
                         onMigration("server: ${reply.migrationReason ?: "migration requested"}")
                     }
+                } catch (error: CancellationException) { throw error
                 } catch (e: Exception) {
                     log.failed(kind, position, duration, e)
                     session.progressSink?.undelivered(body)

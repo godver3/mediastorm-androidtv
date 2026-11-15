@@ -20,6 +20,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.strmr.tv.library.ProfileDataContext
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.StartPoint
@@ -34,6 +35,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * One playback: ExoPlayer on the raw stream (platform decoders first, the FFmpeg extension
@@ -43,6 +45,8 @@ import kotlinx.coroutines.launch
 @OptIn(UnstableApi::class)
 class PlayerController(context: Context, val session: PlayerSession, private val onVideoFormat: (Format) -> Unit) {
     val request = session.request
+    val dataContext = ProfileDataContext.current
+    val profileId = ApiClient.profileId
     val player: ExoPlayer
     val isPlaying = MutableStateFlow(false)
     val buffering = MutableStateFlow(true)
@@ -158,6 +162,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** A live channel with provider catch-up: rewinding past what the player holds plays the archive. */
     var catchup: CatchupJoin? = null
         private set
+    val postPlay = MutableStateFlow<PlaybackRequest?>(null)
+    private val postPlayOffer = PostPlayOffer(dataContext)
+
     val upNext: UpNext? = if (session.reportsProgress && !session.isLive) {
         UpNext(request, session.streamPath?.takeIf { !session.localFile }, scope, { videoSurface }, onSkip = { seekTo(it) }) { next ->
             report(ended = true)
@@ -181,6 +188,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             if (state == Player.STATE_READY) applyPercentStart()
             if (state == Player.STATE_BUFFERING) liveRetune?.buffering()
             if (state == Player.STATE_ENDED && advanceTo.value == null) {
+                if (postPlay.value != null) return
                 if (catchup?.ended() == true) return
                 recordingHls?.let { hls ->
                     hls.ended { ended.value = true }
@@ -193,6 +201,14 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 val genuine = EpisodeAdvancePolicy.genuineEnd(player.currentPosition, player.duration, player.playerError != null)
                 if (genuine) report(ended = true)
                 if (upNext?.ended(player.currentPosition, player.duration, player.playerError != null) == true) return
+                if (postPlayOffer.offer(request, session.reportsProgress, session.isLive, !progress.acceptsCompletion,
+                        player.currentPosition, player.duration, player.playerError != null || switchTo.value != null || audioRecovery.active || autoSwitch.preparing || releaseReportOpen)) {
+                    player.pause()
+                    upNext?.cancel()
+                    progress.stop()
+                    postPlay.value = request
+                    return
+                }
                 ended.value = true
             }
         }
@@ -287,7 +303,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             .build()
         player.addListener(listener)
         player.addListener(stallLog)
-        progress = ProgressReporter(player, session, scope) { autoSwitch.trigger(it) }
+        progress = ProgressReporter(player, session, scope, context = dataContext) { autoSwitch.trigger(it) }
         recordingHls = session.growingRestart?.let { RecordingHls(player, scope, session.liveSessionId, it) }
         liveRetune = session.retuneLive?.let {
             LiveRetune(player, scope, session.liveSessionId, session.liveChannel, it, ::liveGaveUp, session.liveStream) { next ->
@@ -318,6 +334,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     /** Position for the chrome, skip segments and up next. */
     private val clock: Job = scope.launch {
         while (isActive) {
+            if (postPlay.value != null) { delay(250); continue }
             position.value = player.currentPosition
             duration.value = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
             if (timeshift.value && catchup?.inArchive?.value != true) behindLive.value = Timeshift.behindLiveMs(player)
@@ -382,6 +399,13 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     fun report(paused: Boolean = false, ended: Boolean = false, closing: Boolean = false) =
         progress.report(paused, ended, closing)
 
+    /** Wait for the final report, including its canonical server item identity. */
+    val storedCompletedItemId: String? get() = progress.lastStoredItemId ?: request.progressItemId
+    suspend fun completedItemId(): String? {
+        withTimeoutOrNull(2_000) { progress.lastReport?.join() }
+        return storedCompletedItemId
+    }
+
     /**
      * Switch Source: the position and the playing audio / subtitle languages go with the
      * request; the activity closes this playback (saving the position) and starts the other.
@@ -396,7 +420,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
 
     /** Saves the position and lets go of the player; returns the last report, still finishing. */
     fun release(): Job? {
-        if (!ended.value && advanceTo.value == null) report(paused = true, closing = true)
+        if (!ended.value && advanceTo.value == null && postPlay.value == null) report(paused = true, closing = true)
         closeReleaseReports()
         clock.cancel()
         online.cancel()

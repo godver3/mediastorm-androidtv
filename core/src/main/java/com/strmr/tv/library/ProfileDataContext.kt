@@ -1,14 +1,18 @@
 package com.strmr.tv.library
 
-import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 
 /** An ephemeral boundary, never a credential or a persisted cache key. */
 object ProfileDataContext {
-    private val epoch = AtomicLong()
-    val current: Long get() = epoch.get()
-    fun invalidate() { epoch.incrementAndGet() }
+    private val epoch = MutableStateFlow(0L)
+    val changes: StateFlow<Long> = epoch.asStateFlow()
+    val current: Long get() = epoch.value
+    fun invalidate() { epoch.update { it + 1 } }
     fun requireCurrent(captured: Long) {
         if (captured != current) throw CancellationException("Profile data context changed")
     }

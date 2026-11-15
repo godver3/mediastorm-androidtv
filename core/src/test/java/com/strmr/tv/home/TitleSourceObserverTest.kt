@@ -134,4 +134,13 @@ class TitleSourceObserverTest {
             assertFalse(titleSourceActive(states[0],states[1],states[2],states[3],states[4],states[5]))
         }
     }
+    @Test fun completedPlaybackAllowsOnlyVisibleActiveEndViewCards() {
+        assertTrue(titleSourceActive(true,true,true,true,false,true,completedPlayback = true))
+        assertFalse(titleSourceActive(true,true,true,true,false,true))
+        for (index in listOf(0,1,2,4,5)) {
+            val states = mutableListOf(true,true,true,true,false,true)
+            states[index] = !states[index]
+            assertFalse(titleSourceActive(states[0],states[1],states[2],states[3],states[4],states[5],completedPlayback = true))
+        }
+    }
 }

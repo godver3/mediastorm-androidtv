@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
 import com.strmr.mobile.player.ui.PlayerScreen
+import com.strmr.mobile.player.ui.PostPlayScreen
 import com.strmr.mobile.ui.theme.MediaStormTheme
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.playbackSettings
@@ -87,6 +88,8 @@ class MobilePlayerActivity : ComponentActivity() {
         }
         setContent {
             MediaStormTheme {
+                val postPlay by c.postPlay.collectAsState()
+                LaunchedEffect(postPlay) { if (postPlay != null) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
                 val ended by c.ended.collectAsState()
                 val next by c.advanceTo.collectAsState()
                 val switch by c.switchTo.collectAsState()
@@ -106,7 +109,8 @@ class MobilePlayerActivity : ComponentActivity() {
                         PlaybackCoordinator.play(it.request, it.source, carried = it.carried, resolved = it.resolved, prepared = it.prepared)
                     }
                 }
-                PlayerScreen(
+                if (postPlay != null && !inPip.value) PostPlayScreen(c) { finish() }
+                else PlayerScreen(
                     controller = c,
                     inPip = inPip.value,
                     tablet = tablet,

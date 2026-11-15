@@ -39,6 +39,8 @@ data class PlaybackRequest(
     val audioRecoveryCount: Int = 0,
     /** The playback speed picked in the player, carried into Up Next and a source switch (a new playback starts at 1x). */
     val speed: Float = 1f,
+    /** Catalogue ordering contains this episode; an empty local folder is not evidence of a series ending. */
+    val episodeOrderKnown: Boolean = false,
 ) {
     data class EpisodeInfo(
         val season: Int,

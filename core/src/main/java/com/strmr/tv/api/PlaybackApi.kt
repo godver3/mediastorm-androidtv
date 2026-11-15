@@ -27,6 +27,7 @@ data class ProgressReply(
     val resume: ResumeState? = null,
     val migrationRequested: Boolean = false,
     val migrationReason: String? = null,
+    val itemId: String? = null,
 )
 
 /** Throws on failure; the caller logs it, and the next report retries. */

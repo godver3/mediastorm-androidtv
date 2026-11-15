@@ -1,0 +1,14 @@
+{
+  "component": "Playback completion panel",
+  "reuse_cached_project_preflight": "../preflight.json",
+  "genre": "atmospheric",
+  "theme": "Existing Mediastorm Compose Material theme",
+  "preserve_fonts_palette_spacing_routes_and_component_ownership": true,
+  "native_css_inapplicable": true,
+  "new_navigation_surface": "Existing player activities, with existing internal details/play routing",
+  "first_focus": "Stable Close action; recommendation loading never requests focus",
+  "poster_loading": "Lazy visible cards, existing cached catalogue artwork",
+  "new_custom_animation": false,
+  "files_to_delete": [],
+  "native_device_rendering_focus_audio_accessibility_pending": true
+}

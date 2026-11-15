@@ -42,5 +42,5 @@ class TitleSourceCoordinator(scope: CoroutineScope, private val gateway: TitleSo
 }
 
 /** Visibility is demand only while the active window can actually show the card. */
-fun titleSourceActive(inWindow: Boolean, resumed: Boolean, focused: Boolean, playerOpen: Boolean, resolving: Boolean, ready: Boolean): Boolean =
-    inWindow && resumed && focused && !playerOpen && !resolving && ready
+fun titleSourceActive(inWindow: Boolean, resumed: Boolean, focused: Boolean, playerOpen: Boolean, resolving: Boolean, ready: Boolean, completedPlayback: Boolean = false): Boolean =
+    inWindow && resumed && focused && (!playerOpen || completedPlayback) && !resolving && ready
