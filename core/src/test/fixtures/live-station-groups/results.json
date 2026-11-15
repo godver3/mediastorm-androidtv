@@ -1,0 +1,55 @@
+{
+  "unit_source_head": "f4b8387768003b8ad6c72488c427ccaa20558a3f",
+  "apk_source_head": "f4b8387768003b8ad6c72488c427ccaa20558a3f",
+  "product_source_matches_tested_commit": true,
+  "tests": {
+    "core": {
+      "tests": 749,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "app": {
+      "tests": 44,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "mobile": {
+      "tests": 89,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "total_tests": 882,
+  "new_main_tests": 29,
+  "apks": {
+    "app": {
+      "bytes": 70404380,
+      "sha256": "19d9d52a21d39e2ee81ccbb510f67fe465d26c57397c3aab471e5b855fb58b0c"
+    },
+    "mobile": {
+      "bytes": 78963377,
+      "sha256": "ce732988d68ca9a15435c5f59b8da8ee24740c004fdcccb874e9876c2b2d5307"
+    }
+  },
+  "debug_prefill_all_empty": true,
+  "private_properties_absent": true,
+  "native_device_acceptance": false,
+  "production_kotlin_model_snapshots": 16,
+  "html_reference_only": true,
+  "native_ui_rendered": false,
+  "actual_provider_or_private_playlist_used": false,
+  "private_preview_url": "http://100.68.37.82:18917/reference.html",
+  "paired_backend_unchanged": true,
+  "paired_backend_previously_passed_cases": 8204,
+  "backend_rerun_for_this_package": false,
+  "apk_privacy": {
+    "passed": true,
+    "apk_entries_scanned": 2491,
+    "protected_values": 23,
+    "private_value_matches": 0,
+    "plaintext_saved_or_printed": false
+  }
+}
