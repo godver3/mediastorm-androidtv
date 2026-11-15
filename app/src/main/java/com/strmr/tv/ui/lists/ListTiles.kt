@@ -69,7 +69,7 @@ fun TileRow(title: String, tiles: List<TileSpec>, onNewList: (() -> Unit)? = nul
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 modifier = Modifier.focusRestorer(),
             ) {
-                itemsIndexed(tiles, key = { _, t -> t.list.toString() + (t.title ?: "") }) { index, tile ->
+                itemsIndexed(tiles, key = { _, t -> t.key }) { index, tile ->
                     ListTile(tile, index) { navigator.openList(tile.list) }
                 }
                 if (onNewList != null) item(key = "new-list") { NewListTile(onNewList) }
@@ -85,14 +85,15 @@ fun TileRow(title: String, tiles: List<TileSpec>, onNewList: (() -> Unit)? = nul
  */
 @Composable
 private fun ListTile(tile: TileSpec, position: Int, onClick: () -> Unit) {
-    var fetched by remember(tile.list) { mutableStateOf<TileArt?>(null) }
+    var fetched by remember(tile.list, tile.previewRevision) { mutableStateOf<TileArt?>(null) }
     // Keyed on the count so a list whose contents changed refetches its collage.
-    LaunchedEffect(tile.list, tile.count) {
-        if (tile.art == null && tile.logo == null) fetched = BrowsePreviews.art(tile.list, tile.count)
+    LaunchedEffect(tile.list, tile.count, tile.previewRevision) {
+        if (tile.art == null && tile.logo == null) fetched = BrowsePreviews.art(tile.list, tile.count, tile.previewRevision)
     }
     val preview = tile.art ?: fetched
     val personal = tile.list is BrowseList.Custom || tile.list == BrowseList.Watchlist ||
-        tile.list == BrowseList.PermanentPrequeue || tile.list == BrowseList.ContinueWatching
+        tile.list == BrowseList.PermanentPrequeue || tile.list == BrowseList.ContinueWatching ||
+        tile.list == com.strmr.tv.ui.lists.PersonalArea.loved
     val name = tile.title ?: tile.list.title
     Card(onClick = onClick, scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(), modifier = Modifier.size(TILE_WIDTH, TILE_HEIGHT)) {
         Box(Modifier.fillMaxSize().background(Color(0xFF2C2C2E))) {

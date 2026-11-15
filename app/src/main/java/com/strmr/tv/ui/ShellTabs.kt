@@ -14,6 +14,7 @@ import com.strmr.tv.home.HomeViews
 
 internal enum class MainTab(val title: String, val icon: ImageVector, val menu: MenuTab? = null) {
     HOME("Home", Icons.Outlined.Home),
+    MY_AREA("My Area", AppIcons.StarBorder),
     LIVE("Live", AppIcons.LiveTv, MenuTab.LIVE),
     RECORDINGS("Recordings", AppIcons.Recordings, MenuTab.RECORDINGS),
     SPORTS("Sports", AppIcons.Sports, MenuTab.SPORTS),
@@ -48,6 +49,7 @@ internal object ShellTabs {
         build(profile, viewTabs).filterNot { it.pinnedFirst || it.pinnedLast }
 
     private fun defaultOrder(profile: Profile?, viewTabs: List<String>): List<ShellTab> = MainTab.entries.filter { tab ->
+        if (tab == MainTab.MY_AREA) return@filter com.strmr.tv.ui.lists.PersonalArea.available(profile) && MenuTabs.isVisible(MenuTab.WATCHLIST)
         val menu = tab.menu ?: return@filter true
         MenuTabs.isVisible(menu) && !(menu == MenuTab.LIVE && profile?.isKidsProfile == true)
     }.flatMap { tab ->

@@ -41,6 +41,7 @@ import com.strmr.tv.library.ListsTabStore
 import com.strmr.tv.library.WatchlistStore
 import com.strmr.tv.ui.calendar.CalendarScreen
 import com.strmr.tv.ui.home.HomeScreen
+import com.strmr.tv.ui.lists.PersonalAreaScreen
 import com.strmr.tv.ui.lists.ListsScreen
 import com.strmr.tv.ui.live.LiveScreen
 import com.strmr.tv.ui.recordings.RecordingsScreen
@@ -159,6 +160,7 @@ fun MainShell() {
             when (tabs[selected].page) {
                 // While the picker is open or the switcher focused, a new view's rows don't take focus.
                 MainTab.HOME -> HomeScreen(home, tabsFocused = { menuFocused || picking || switcherFocused })
+                MainTab.MY_AREA -> PersonalAreaScreen()
                 MainTab.LIVE -> LiveScreen()
                 MainTab.WATCHLIST -> WatchlistScreen()
                 MainTab.LISTS -> ListsScreen()

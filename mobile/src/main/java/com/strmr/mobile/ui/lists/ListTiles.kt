@@ -54,7 +54,7 @@ fun TileRow(title: String, tiles: List<TileSpec>, onNewList: (() -> Unit)? = nul
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            itemsIndexed(tiles, key = { _, t -> t.list.toString() + (t.title ?: "") }) { index, tile ->
+            itemsIndexed(tiles, key = { _, t -> t.key }) { index, tile ->
                 ListTile(tile, index) { navigator.openList(tile.list) }
             }
             if (onNewList != null) item(key = "new-list") { NewListTile(onNewList) }
@@ -68,14 +68,15 @@ fun TileRow(title: String, tiles: List<TileSpec>, onNewList: (() -> Unit)? = nul
  */
 @Composable
 private fun ListTile(tile: TileSpec, position: Int, onClick: () -> Unit) {
-    var fetched by remember(tile.list) { mutableStateOf<TileArt?>(null) }
+    var fetched by remember(tile.list, tile.previewRevision) { mutableStateOf<TileArt?>(null) }
     // Keyed on the count so a list whose contents changed refetches its collage.
-    LaunchedEffect(tile.list, tile.count) {
-        if (tile.art == null && tile.logo == null) fetched = BrowsePreviews.art(tile.list, tile.count)
+    LaunchedEffect(tile.list, tile.count, tile.previewRevision) {
+        if (tile.art == null && tile.logo == null) fetched = BrowsePreviews.art(tile.list, tile.count, tile.previewRevision)
     }
     val preview = tile.art ?: fetched
     val personal = tile.list is BrowseList.Custom || tile.list == BrowseList.Watchlist ||
-        tile.list == BrowseList.PermanentPrequeue || tile.list == BrowseList.ContinueWatching
+        tile.list == BrowseList.PermanentPrequeue || tile.list == BrowseList.ContinueWatching ||
+        tile.list == com.strmr.tv.ui.lists.PersonalArea.loved
     val name = tile.title ?: tile.list.title
     Box(
         Modifier.size(TILE_WIDTH, TILE_HEIGHT).clip(CardShape).background(MaterialTheme.colorScheme.surfaceContainerHighest)

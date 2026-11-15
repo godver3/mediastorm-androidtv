@@ -7,6 +7,7 @@ import com.strmr.mobile.ui.downloads.DownloadsScreen
 import com.strmr.mobile.ui.home.HomeScreen
 import com.strmr.mobile.ui.library.LibraryShowScreen
 import com.strmr.mobile.ui.lists.ListGridScreen
+import com.strmr.mobile.ui.lists.PersonalAreaScreen
 import com.strmr.mobile.ui.lists.ListsScreen
 import com.strmr.mobile.ui.live.LiveScreen
 import com.strmr.mobile.ui.person.PersonScreen
@@ -33,6 +34,7 @@ import com.strmr.mobile.ui.watchlist.WatchlistScreen
 fun SectionRoot(section: Section, more: List<Section>, asPage: Boolean = false) {
     when (section) {
         Section.HOME -> HomeScreen()
+        Section.MY_AREA -> PersonalAreaScreen(asPage)
         Section.WATCHLIST -> WatchlistScreen(asPage)
         Section.SEARCH -> SearchScreen(asPage)
         Section.LISTS -> ListsScreen(asPage)

@@ -32,6 +32,7 @@ import com.strmr.tv.app.MenuTabs
 /** A top-level section, in the Expo mobile app's tab order (as the iPhone app). */
 enum class Section(val title: String, val icon: ImageVector, val selectedIcon: ImageVector, val menuTab: MenuTab?) {
     HOME("Home", Icons.Outlined.Home, Icons.Filled.Home, null),
+    MY_AREA("My Area", Icons.Outlined.People, Icons.Filled.People, null),
     WATCHLIST("Watchlist", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark, MenuTab.WATCHLIST),
     SEARCH("Search", Icons.Outlined.Search, Icons.Filled.Search, MenuTab.SEARCH),
     LISTS("Lists", Icons.Outlined.ViewList, Icons.Filled.ViewList, MenuTab.LISTS),
@@ -56,6 +57,7 @@ enum class Section(val title: String, val icon: ImageVector, val selectedIcon: I
         fun visible(kids: Boolean): List<Section> = MenuTabs.ordered(
             entries.filter { s ->
                 if (s == MORE) return@filter false
+                if (s == MY_AREA) return@filter !kids && MenuTabs.isVisible(MenuTab.WATCHLIST)
                 val tab = s.menuTab ?: return@filter true
                 if (s == LIVE && kids) return@filter false
                 MenuTabs.isVisible(tab)

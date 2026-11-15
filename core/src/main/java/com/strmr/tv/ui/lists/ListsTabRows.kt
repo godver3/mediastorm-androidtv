@@ -28,7 +28,13 @@ data class TileSpec(
     val logo: String? = null,
     /** Under the name when there is no count (a library's source and kind). */
     val subtitle: String? = null,
-)
+    /** A preference change refreshes its artwork without inventing a title count. */
+    val previewRevision: Long = 0,
+) {
+    /** Renaming a user list must not replace the focused tile. */
+    val key: String get() = (list as? BrowseList.Custom)?.let { "custom:${it.id}" }
+        ?: (list.toString() + (title ?: ""))
+}
 
 /** Continue Watching (when there is any), Set Aside, Watchlist, Permanent Prequeue, Hidden (when there is any, or was this visit). */
 fun personalTiles(
@@ -83,13 +89,13 @@ object BrowsePreviews {
 
     fun reset() { cache.reset() }
 
-    suspend fun art(list: BrowseList, version: Int?): TileArt = art(list, version) {
+    suspend fun art(list: BrowseList, version: Int?, revision: Long = 0): TileArt = art(list, version, revision) {
         ApiClient.browsePage(list, limit = 4, phase = ShelfPhase.CARDS)
     }
 
-    internal suspend fun art(list: BrowseList, version: Int?, load: suspend () -> com.strmr.tv.home.BrowsePage): TileArt {
+    internal suspend fun art(list: BrowseList, version: Int?, revision: Long = 0, load: suspend () -> com.strmr.tv.home.BrowsePage): TileArt {
         if (list is BrowseList.Similar) return TileArt()
-        return cache.art(list.toString(), version) {
+        return cache.art(list.toString(), version, revision) {
             val page = load()
             TileArt(page.entries.mapNotNull(::posterOf), page.entries.mapNotNull(::backdropOf))
         }

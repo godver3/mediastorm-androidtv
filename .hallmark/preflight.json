@@ -1,0 +1,39 @@
+{
+  "audience": "Individual family profiles on Android TV, phone and tablet",
+  "use_case": "Resume viewing and find saved/loved titles and own lists",
+  "tone": "Quiet cinematic utility",
+  "genre": "atmospheric",
+  "theme": "Existing Mediastorm Compose Material theme",
+  "macrostructure": "Ecosystem Index",
+  "navigation": "Existing TV tabs/rail and mobile bottom navigation/rail",
+  "footer": "No footer in native app navigation",
+  "imagery": "Existing catalogue/list previews only; no generated product artwork",
+  "motion": "Existing platform focus/press feedback; no new reveal or background motion",
+  "preserved_tokens": {
+    "tv": "app/src/main/java/com/strmr/tv/ui/Theme.kt",
+    "phone": "mobile/src/main/java/com/strmr/mobile/ui/theme/Theme.kt",
+    "tv_gutter_dp": 80,
+    "phone_gutter_dp": 16,
+    "spacing_scale_dp": 4
+  },
+  "files_to_modify": [
+    "app/src/main/java/com/strmr/tv/ui/ShellTabs.kt",
+    "app/src/main/java/com/strmr/tv/ui/MainShell.kt",
+    "mobile/src/main/java/com/strmr/mobile/ui/shell/Section.kt",
+    "mobile/src/main/java/com/strmr/mobile/ui/shell/RouteHost.kt",
+    "app/src/main/java/com/strmr/tv/ui/lists/ListTiles.kt",
+    "mobile/src/main/java/com/strmr/mobile/ui/lists/ListTiles.kt",
+    "core/src/main/java/com/strmr/tv/ui/lists/ListsTabRows.kt",
+    "core/src/main/java/com/strmr/tv/ui/lists/ProfilePreviewCache.kt"
+  ],
+  "files_to_create": [
+    "core/src/main/java/com/strmr/tv/ui/lists/PersonalArea.kt",
+    "core/src/test/java/com/strmr/tv/ui/lists/PersonalAreaTest.kt",
+    "app/src/main/java/com/strmr/tv/ui/lists/PersonalAreaScreen.kt",
+    "mobile/src/main/java/com/strmr/mobile/ui/lists/PersonalAreaScreen.kt"
+  ],
+  "files_to_delete": [],
+  "native_css_inapplicable": true,
+  "visual_device_acceptance_pending": true,
+  "physical_native_rendering_claimed": false
+}

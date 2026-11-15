@@ -10,7 +10,7 @@ internal class ProfilePreviewCache(
     private val capacity: Int = 128,
     private val maxAgeMs: Long = 300_000,
 ) {
-    private data class Key(val context: Long, val list: String, val version: Int?)
+    private data class Key(val context: Long, val list: String, val version: Int?, val revision: Long)
     private data class Entry(val art: TileArt, val created: Long)
     private val lock = Any()
     private val items = LinkedHashMap<Key, Entry>(16, 0.75f, true)
@@ -20,9 +20,9 @@ internal class ProfilePreviewCache(
 
     fun reset() = synchronized(lock) { generation++; items.clear() }
 
-    suspend fun art(list: String, version: Int?, load: suspend () -> TileArt?): TileArt {
+    suspend fun art(list: String, version: Int?, revision: Long = 0, load: suspend () -> TileArt?): TileArt {
         val captured = context()
-        val key = Key(captured, list, version)
+        val key = Key(captured, list, version, revision)
         val stamp = synchronized(lock) {
             if (context() != captured) return TileArt()
             items.entries.removeAll { it.key.context != captured || now() - it.value.created >= maxAgeMs }

@@ -1,0 +1,84 @@
+{
+  "tests": {
+    "core": {
+      "tests": 617,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "app": {
+      "tests": 44,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "mobile": {
+      "tests": 89,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "total_tests": 750,
+  "new_main_tests": 12,
+  "apks": {
+    "app": {
+      "bytes": 70256924,
+      "sha256": "a405f91a3d03b04310f7751b69cb3a914d0ac7ee0c69fda424477cc358c712fb"
+    },
+    "mobile": {
+      "bytes": 78815921,
+      "sha256": "888e466c6f3464872b40587a28500d486b7dfdf1264723903df8b7a20373f7da"
+    }
+  },
+  "debug_prefill_all_empty": true,
+  "private_properties_absent": true,
+  "native_device_acceptance": false,
+  "provider_work_added": false,
+  "personal_area_and_preference_preview_tests": true,
+  "reference_is_not_native_layout": true,
+  "private_preview_url": "http://100.68.37.82:18914/preview.html",
+  "apk_privacy": {
+    "apk_entries_scanned": 2491,
+    "protected_values": 23,
+    "encodings": [
+      "utf-8",
+      "utf-16-le"
+    ],
+    "private_value_matches": 0,
+    "passed": true,
+    "plaintext_saved_or_printed": false
+  },
+  "native_design_review": {
+    "scope": "Native personal list entry only; preserve the existing Compose Material system",
+    "macrostructure": "Ecosystem Index",
+    "theme": "Existing Mediastorm",
+    "scores": {
+      "philosophy": 4,
+      "hierarchy": 4,
+      "execution": 3,
+      "specificity": 4,
+      "restraint": 5,
+      "variety": 4
+    },
+    "static_review": {
+      "no_new_fonts_or_palette": true,
+      "no_new_decorative_motion": true,
+      "existing_platform_focus_and_press_states_reused": true,
+      "no_fabricated_counts_or_media_claims": true,
+      "no_fake_device_or_browser_chrome": true,
+      "stable_user_list_keys": true,
+      "existing_routes_and_datasets_reused": true,
+      "child_profiles_not_exposed_to_the_new_aggregate": true
+    },
+    "render_checks_pending": [
+      "Native layout at 320,375,414,768dp",
+      "Physical TV focus and focus restoration",
+      "Touch and screen-reader acceptance",
+      "Rendered contrast, text wrapping and full keyboard/remote traversal"
+    ],
+    "all_58_web_gates_claimed_passed": false,
+    "native_rendering_claimed": false,
+    "css_and_html_specific_gates_not_applicable_to_compose": true
+  }
+}
