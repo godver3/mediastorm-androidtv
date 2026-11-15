@@ -3,6 +3,8 @@ package com.strmr.tv.player
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.SkipSegment
 import com.strmr.tv.api.playbackSettings
+import com.strmr.tv.library.ProfileDataContext
+import com.strmr.tv.ui.settings.EpisodeAutoplayChanges
 import com.strmr.tv.app.AppLog
 import com.strmr.tv.ui.settings.CreditsDetectionSettings
 import kotlinx.coroutines.CoroutineScope
@@ -13,8 +15,8 @@ import kotlinx.coroutines.launch
 /**
  * Skip Intro / Skip Recap / Next Episode, and moving on to the next episode, as the tvOS
  * player does: the next episode starts resolving at 90 % (or at the credits); at the credits
- * Next Episode replaces Skip Credits, and with the profile's credits auto-skip on it counts
- * down and plays by itself. Pausing holds the countdown; seeking out of the credits cancels it.
+ * Next Episode replaces Skip Credits. Profile autoplay allows a short end countdown;
+ * credits auto-skip additionally allows it to begin at the credits marker. Pausing holds the countdown; seeking out of the credits cancels it.
  * Back over the pill dismisses it for that segment. Driven by [PlayerController]'s clock.
  * With Credits Detection on and no credits from the server, the credits come from
  * [CreditsDetector] reading the video [surface].
@@ -37,19 +39,23 @@ class UpNext(
 
     private var active: SkipSegment? = null
     private var dismissed: SkipSegment? = null
-    private var autoSkip = false
+    private val context = ProfileDataContext.current
+    private val policy = EpisodeAdvancePolicy()
+    private val initialSettingsRevision = EpisodeAutoplayChanges.changes.value?.revision ?: 0L
     private var introAutoSkip = false
     private var recapAutoSkip = false
     private val skipped = mutableSetOf<SkipSegment>()
-    private var countdown: Int? = null
-    private var countdownTickMs = 0L
     private var prefetched = false
     private var advanced = false
 
     init {
         scope.launch {
+            val before = EpisodeAutoplayChanges.changes.value
             val settings = ApiClient.playbackSettings()
-            autoSkip = settings.creditsAutoSkip
+            if (cancelled || context != ProfileDataContext.current) return@launch
+            val latest = EpisodeAutoplayChanges.changes.value
+            policy.autoplay = if (latest?.context == context && latest != before) latest.enabled else settings.nextEpisodeAutoPlay
+            policy.skipCredits = settings.creditsAutoSkip
             introAutoSkip = settings.introAutoSkip
             recapAutoSkip = settings.recapAutoSkip
             // Reading credits on screen only feeds the next-episode countdown.
@@ -57,11 +63,16 @@ class UpNext(
                 detector = CreditsDetector { start -> segments.detectedCredits(start, durationSec) }
             }
         }
+        scope.launch {
+            EpisodeAutoplayChanges.changes.collect { change ->
+                if (!cancelled && context == ProfileDataContext.current && change?.context == context && change.revision > initialSettingsRevision) policy.autoplay = change.enabled
+            }
+        }
     }
 
     /** Called about twice a second with the player's state. */
     fun tick(positionMs: Long, durationMs: Long, playing: Boolean) {
-        if (advanced || cancelled) return
+        if (advanced || cancelled || context != ProfileDataContext.current) return
         segments.refresh(scope, durationMs)
         durationSec = durationMs / 1000.0
         if (!segments.hasOutro) detector?.tick(positionMs / 1000.0, durationSec, surface())
@@ -72,52 +83,52 @@ class UpNext(
         if (playing && automatic && skipped.add(found)) {
             dismissed = found
             active = null
-            countdown = null
             _action.value = null
             onSkip((found.end * 1000).toLong())
             return
         }
-        if (found != active) {
-            active = found
-            countdown = if (found?.type == "outro" && nextEpisode != null && autoSkip) COUNTDOWN_SECONDS else null
-            countdownTickMs = System.currentTimeMillis()
-            if (countdown != null) AppLog.i(TAG, "credits: next episode in ${COUNTDOWN_SECONDS}s")
-        }
-        countdown?.let { left ->
-            val now = System.currentTimeMillis()
-            if (!playing) countdownTickMs = now
-            else if (now - countdownTickMs >= 1_000) {
-                countdownTickMs = now
-                if (left <= 1) nextEpisode?.let { advance(it); return }
-                countdown = left - 1
-            }
+        active = found
+        policy.observePosition(positionMs, durationMs)
+        if (nextEpisode != null && policy.tick(android.os.SystemClock.elapsedRealtime(), found?.type == "outro", playing)) {
+            deliverAdvance(nextEpisode)
+            return
         }
         prefetchIfNear(positionMs, durationMs)
+        if (policy.dismissed) { _action.value = null; return }
+        if (policy.mediaEnded && nextEpisode != null) {
+            _action.value = SkipAction.NextEpisode(nextEpisode, policy.seconds, policy.paused)
+            return
+        }
         _action.value = active?.let { segment ->
-            if (segment.type == "outro" && nextEpisode != null) SkipAction.NextEpisode(nextEpisode, countdown)
+            if (segment.type == "outro" && nextEpisode != null) SkipAction.NextEpisode(nextEpisode, policy.seconds, policy.paused)
             else SkipAction.Skip(segment)
         }
     }
 
     /** Back over the pill: it isn't offered again for this segment. */
     fun dismiss() {
-        val segment = active ?: return
-        AppLog.i(TAG, "skip pill dismissed (${segment.type})")
-        dismissed = segment
+        if (cancelled || context != ProfileDataContext.current) return
+        if (active?.type == "outro" || policy.mediaEnded) policy.dismiss()
+        dismissed = active
         active = null
-        countdown = null
         _action.value = null
     }
 
-    /** Playback reached its end: the next episode, when there is one, plays. */
-    fun ended(): Boolean {
-        val next = nextEpisode ?: return false
-        advance(next)
-        return true
+    fun toggleCountdownPause() { policy.togglePause() }
+
+    /** Only a genuine media end offers the next episode; errors never advance. */
+    fun ended(positionMs: Long, durationMs: Long, failed: Boolean): Boolean {
+        if (nextEpisode == null || cancelled || context != ProfileDataContext.current) return false
+        return policy.end(positionMs, durationMs, failed)
     }
 
     fun advance(next: PlaybackRequest) {
-        if (advanced) return
+        if (context != ProfileDataContext.current || next != nextEpisode || !policy.claimAdvance()) return
+        deliverAdvance(next)
+    }
+
+    private fun deliverAdvance(next: PlaybackRequest) {
+        if (advanced || cancelled || context != ProfileDataContext.current) return
         advanced = true
         _action.value = null
         AppLog.i(TAG, "playing next: ${next.episode?.code}")
@@ -126,6 +137,8 @@ class UpNext(
 
     fun cancel() {
         cancelled = true
+        policy.cancel()
+        _action.value = null
         segments.cancel()
         detector?.close()
     }
@@ -141,7 +154,6 @@ class UpNext(
 
     private companion object {
         const val TAG = "UpNext"
-        const val COUNTDOWN_SECONDS = 7
         /** Share of the runtime after which the next episode starts resolving (as the Expo player). */
         const val PREFETCH_FRACTION = 0.9
     }

@@ -231,6 +231,17 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
         spoilerSettingRows()
         item { Header("Playback") }
         item {
+            val editor = rememberEpisodeAutoplayEditor()
+            val state by editor.state.collectAsState()
+            ListItem(
+                selected = false,
+                enabled = !state.loading && !state.saving,
+                onClick = { scope.launch { state.enabled?.let { editor.save(!it) } ?: editor.load() } },
+                headlineContent = { Text("Auto-play Next Episode") },
+                supportingContent = { Text(state.description) },
+            )
+        }
+        item {
             ListItem(
                 selected = false, onClick = { navigator.open(Page.SubtitleStyle) },
                 headlineContent = { Text("Subtitle Style") },

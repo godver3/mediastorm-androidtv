@@ -61,7 +61,7 @@ fun SkipButton(action: SkipAction.Skip, modifier: Modifier = Modifier, onClick: 
  * countdown when the profile has it) and a close button that dismisses it for this segment.
  */
 @Composable
-fun UpNextCard(action: SkipAction.NextEpisode, onPlay: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun UpNextCard(action: SkipAction.NextEpisode, onPlay: () -> Unit, onDismiss: () -> Unit, onPauseCountdown: () -> Unit, modifier: Modifier = Modifier) {
     val next = action.next
     val art = next.episode?.imageUrl ?: next.backdrops.firstOrNull() ?: next.title.backdropUrl
     ElevatedCard(modifier.width(300.dp)) {
@@ -75,7 +75,12 @@ fun UpNextCard(action: SkipAction.NextEpisode, onPlay: () -> Unit, onDismiss: ()
                 Text(next.episode?.let { listOfNotNull(it.code, it.name).joinToString(" · ") } ?: next.title.name,
                      style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Close, "Dismiss") }
+            IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.Close, "Dismiss") }
+        }
+        if (action.countdown != null) {
+            TextButton(onClick = onPauseCountdown, modifier = Modifier.fillMaxWidth()) {
+                Text(if (action.countdownPaused) "Resume countdown" else "Pause countdown")
+            }
         }
         Button(onClick = onPlay, modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) {
             Icon(Icons.Filled.SkipNext, contentDescription = null)

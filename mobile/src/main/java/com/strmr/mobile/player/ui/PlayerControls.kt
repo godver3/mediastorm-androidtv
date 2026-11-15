@@ -160,6 +160,7 @@ fun PlayerControls(
                 is SkipAction.Skip -> SkipButton(action, placement) { controller.seekTo((action.segment.end * 1000).toLong()) }
                 is SkipAction.NextEpisode -> UpNextCard(
                     action, onPlay = { controller.upNext?.advance(action.next) }, onDismiss = { controller.upNext?.dismiss() },
+                    onPauseCountdown = { controller.upNext?.toggleCountdownPause() },
                     modifier = placement,
                 )
             }

@@ -4,6 +4,8 @@ import com.strmr.tv.adaptive.ThroughputStore
 import com.strmr.tv.app.Config
 import com.strmr.tv.player.ClientTrackSelector
 import com.strmr.tv.player.SubtitleStyle
+import com.strmr.tv.library.ProfileDataContext
+import com.strmr.tv.library.optionalProfileRead
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
@@ -68,6 +70,8 @@ data class PlaybackSettings(
     val autoPlayTrailers: Boolean = false,
     /** Next Episode counts down over the credits and plays by itself (`playback.creditsAutoSkip`). */
     val creditsAutoSkip: Boolean = false,
+    /** Profile choice, independent of credits and never overridden by the device. */
+    val nextEpisodeAutoPlay: Boolean = false,
     val introAutoSkip: Boolean = false,
     val recapAutoSkip: Boolean = false,
     /** Episodes with no known credits are read on screen for them (`playback.creditsDetectionEnabled`). */
@@ -85,10 +89,11 @@ data class PlaybackSettings(
 )
 
 @Serializable
-private data class PlaybackFields(
+internal data class PlaybackFields(
     val disablePrequeue: Boolean? = null,
     val autoPlayTrailersTV: Boolean? = null,
     val creditsAutoSkip: Boolean? = null,
+    val nextEpisodeAutoPlay: Boolean? = null,
     val introAutoSkip: Boolean? = null,
     val recapAutoSkip: Boolean? = null,
     /** The older name of `creditsAutoSkip`. */
@@ -120,19 +125,29 @@ private data class PlaybackFields(
 }
 
 @Serializable
-private data class UserPlayback(val playback: PlaybackFields? = null)
+internal data class UserPlayback(val playback: PlaybackFields? = null)
 
 suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
+    val captured = ProfileDataContext.current
+    val path = profilePath
+    val profile = profileId
     val user = async {
-        runCatching { send<UserPlayback>("GET", "$profilePath/settings", promptOnLock = false, timeoutMs = 10_000) }.getOrNull()?.playback
+        ProfileDataContext.requireCurrent(captured)
+        optionalProfileRead { send<UserPlayback>("GET", "$path/settings", promptOnLock = false, timeoutMs = 10_000) }?.playback
     }
     val device = async {
-        runCatching {
-            send<PlaybackFields>("GET", "/api/clients/${segment(Config.clientId)}/settings", mapOf("userId" to profileId),
+        ProfileDataContext.requireCurrent(captured)
+        optionalProfileRead {
+            send<PlaybackFields>("GET", "/api/clients/${segment(Config.clientId)}/settings", mapOf("userId" to profile),
                                  promptOnLock = false, timeoutMs = 10_000)
-        }.getOrNull()
+        }
     }
     val (u, d) = user.await() to device.await()
+    ProfileDataContext.requireCurrent(captured)
+    mergePlaybackSettings(u, d)
+}
+
+internal fun mergePlaybackSettings(u: PlaybackFields?, d: PlaybackFields?): PlaybackSettings =
     PlaybackSettings(
         prequeueOnOpen = !(d?.disablePrequeue ?: u?.disablePrequeue ?: false),
         autoPlayTrailers = d?.autoPlayTrailersTV ?: u?.autoPlayTrailersTV ?: false,
@@ -140,6 +155,7 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
         // this device); it still decides the credits countdown, as on tvOS and
         // Expo. Intro and recap have no per-device setting and follow the profile.
         creditsAutoSkip = d?.autoSkip ?: u?.autoSkip ?: false,
+        nextEpisodeAutoPlay = u?.nextEpisodeAutoPlay ?: (u != null),
         introAutoSkip = u?.introAutoSkip ?: false,
         recapAutoSkip = u?.recapAutoSkip ?: false,
         creditsDetection = d?.creditsDetectionEnabled ?: u?.creditsDetectionEnabled ?: false,
@@ -155,4 +171,3 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
         preferredAudioLanguage = (d?.preferredAudioLanguage?.ifEmpty { null } ?: u?.preferredAudioLanguage)?.ifEmpty { null },
         allowedTrackLanguages = d?.allowedTrackLanguages?.ifEmpty { null } ?: u?.allowedTrackLanguages ?: emptyList(),
     )
-}

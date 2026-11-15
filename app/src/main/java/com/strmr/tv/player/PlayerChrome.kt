@@ -135,7 +135,10 @@ fun PlayerChrome(controller: PlayerController, onExit: () -> Unit, onAddScreen: 
     }
 
     // playWhenReady, not isPlaying: a press while buffering (a live join, a seek) must pause.
-    fun togglePlay() = if (player.playWhenReady) player.pause() else player.play()
+    fun togglePlay() {
+        if (player.playbackState == androidx.media3.common.Player.STATE_ENDED && skip is SkipAction.NextEpisode) controller.upNext?.toggleCountdownPause()
+        else if (player.playWhenReady) player.pause() else player.play()
+    }
     fun show() { visible = true }
 
     fun activate(action: SkipAction) {

@@ -181,7 +181,6 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             if (state == Player.STATE_READY) applyPercentStart()
             if (state == Player.STATE_BUFFERING) liveRetune?.buffering()
             if (state == Player.STATE_ENDED && advanceTo.value == null) {
-                if (upNext?.ended() == true) return
                 if (catchup?.ended() == true) return
                 recordingHls?.let { hls ->
                     hls.ended { ended.value = true }
@@ -191,7 +190,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                     live.ended()
                     return
                 }
-                report(ended = true)
+                val genuine = EpisodeAdvancePolicy.genuineEnd(player.currentPosition, player.duration, player.playerError != null)
+                if (genuine) report(ended = true)
+                if (upNext?.ended(player.currentPosition, player.duration, player.playerError != null) == true) return
                 ended.value = true
             }
         }
@@ -322,7 +323,7 @@ class PlayerController(context: Context, val session: PlayerSession, private val
             if (timeshift.value && catchup?.inArchive?.value != true) behindLive.value = Timeshift.behindLiveMs(player)
             catchup?.tick()
             observeAudioAvailability()
-            upNext?.tick(position.value, duration.value, player.isPlaying)
+            upNext?.tick(position.value, duration.value, player.playWhenReady && (player.isPlaying || player.playbackState == Player.STATE_ENDED))
             delay(250)
         }
     }

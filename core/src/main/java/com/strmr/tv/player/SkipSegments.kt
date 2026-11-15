@@ -103,8 +103,8 @@ sealed interface SkipAction {
         }
     }
 
-    /** `countdown` is the seconds left when it will play by itself (credits auto-skip on). */
-    data class NextEpisode(val next: PlaybackRequest, val countdown: Int?) : SkipAction {
-        override val label = countdown?.let { "Next Episode in $it" } ?: "Next Episode"
+    /** `countdown` is the seconds left when it will play by itself (profile autoplay on). */
+    data class NextEpisode(val next: PlaybackRequest, val countdown: Int?, val countdownPaused: Boolean = false) : SkipAction {
+        override val label = if (countdownPaused) "Next Episode (countdown paused)" else countdown?.let { "Next Episode in $it" } ?: "Next Episode"
     }
 }

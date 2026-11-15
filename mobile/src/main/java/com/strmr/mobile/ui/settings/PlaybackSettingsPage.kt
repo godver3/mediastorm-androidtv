@@ -1,5 +1,9 @@
 package com.strmr.mobile.ui.settings
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.strmr.tv.ui.settings.rememberEpisodeAutoplayEditor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,7 +39,16 @@ fun PlaybackSettingsPage() {
         }
     }
 
+    val autoplay = rememberEpisodeAutoplayEditor()
+    val autoplayState by autoplay.state.collectAsState()
+    val scope = rememberCoroutineScope()
     SettingsPage("Playback") {
+        SettingsSection("This profile") {
+            SettingsRow("Auto-play Next Episode", autoplayState.description,
+                enabled = !autoplayState.loading && !autoplayState.saving) {
+                scope.launch { autoplayState.enabled?.let { autoplay.save(!it) } ?: autoplay.load() }
+            }
+        }
         SettingsSection(
             "Subtitles",
             "Foreign Audio shows forced subtitles for audio in your language and full ones for any other. Translation translates English subtitles when none are in your language.",
