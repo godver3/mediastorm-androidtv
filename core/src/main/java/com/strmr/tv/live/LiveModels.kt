@@ -29,6 +29,14 @@ data class LiveChannel(
     val stremioStreamIndex: Int? = null,
     /** The provider's catch-up, when it replays this channel's past programmes ([LiveCatchup]). */
     val catchup: LiveCatchup? = null,
+    /** Server-verified broadcast identity; missing on older servers. */
+    val stationId: String? = null,
+    val stationName: String? = null,
+    /** The filtered server list's count, which can exceed the entries loaded on this device. */
+    val stationVariants: Int = 0,
+    /** Provider metadata for display; it does not establish station or audio identity. */
+    val tvgCountry: String? = null,
+    val tvgLanguage: String? = null,
 ) {
     /** A Stremio addon stream resource (`…/stream/….json`), which can list several streams (Expo `isStremioStreamResourceUrl`). */
     val hasStremioSources: Boolean

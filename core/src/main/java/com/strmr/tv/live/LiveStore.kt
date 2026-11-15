@@ -1,9 +1,12 @@
 package com.strmr.tv.live
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.strmr.tv.api.ApiClient
+import com.strmr.tv.library.ProfileDataContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,8 +38,11 @@ sealed interface LiveFilter {
  * profile's settings (`liveTV`), shared with the Expo app; the category selection is kept on
  * this device, per profile, and restored on return. Guide data is [LiveGuideData]. Main thread only.
  */
-class LiveStore(private val scope: CoroutineScope) {
-    data class Query(val filter: LiveFilter, val sourceId: String?, val search: String)
+class LiveStore(private val scope: CoroutineScope, val dataContext: Long = ProfileDataContext.current) {
+    data class Query(val filter: LiveFilter, val sourceId: String?, val search: String, val groupByStation: Boolean = true, val favoriteIds: Set<String> = emptySet())
+    private val pages = LivePageGate<Query>()
+    val isContextCurrent get() = dataContext == ProfileDataContext.current
+    private fun checkContext() = ProfileDataContext.requireCurrent(dataContext)
 
     private val profileId = ApiClient.profileId
     private var filterState = mutableStateOf(LiveFilter.selecting(LivePrefs.categories(profileId)))
@@ -48,6 +54,15 @@ class LiveStore(private val scope: CoroutineScope) {
         }
     /** Where the header's star goes back to when Favorites is turned off. */
     private var filterBeforeFavorites: LiveFilter = filter
+    private val grouping = mutableStateOf(LivePrefs.groupStations(profileId))
+    var groupByStation: Boolean
+        get() = grouping.value
+        set(value) { if (isContextCurrent) { grouping.value = value; LivePrefs.saveGroupStations(profileId,value) } }
+    private var collapsedStations by mutableStateOf<Set<String>>(emptySet())
+    private val stationRows = derivedStateOf { LiveStationGroups.rows(visibleChannels,groupByStation,collapsedStations) }
+    val channelRows get() = stationRows.value
+    fun toggleStation(stationId: String) { if (isContextCurrent) collapsedStations = LiveStationGroups.toggle(collapsedStations,stationId) }
+
     var sourceId by mutableStateOf<String?>(null)
     var search by mutableStateOf("")
         private set
@@ -62,6 +77,8 @@ class LiveStore(private val scope: CoroutineScope) {
     var sources by mutableStateOf<List<LiveSource>>(emptyList())
         private set
     var loadError by mutableStateOf<String?>(null)
+        private set
+    var pageError by mutableStateOf<String?>(null)
         private set
     var actionError by mutableStateOf<String?>(null)
         private set
@@ -82,19 +99,19 @@ class LiveStore(private val scope: CoroutineScope) {
     var epgEnabled by mutableStateOf<Boolean?>(null)
         private set
     /** Now / next and guide schedules for the channels on screen. */
-    val guide = LiveGuideData(scope) { epgEnabled == true }
+    val guide = LiveGuideData(scope,epgEnabled = { epgEnabled == true },context = dataContext)
     val schedules get() = guide.schedules
 
     var hasMore = true
         private set
-    private var loadingFor: Query? = null
+    private var loadingFor by mutableStateOf<Query?>(null)
     private var loadedFor: Query? = null
     private var listsLoaded = false
     private var searchJob: Job? = null
     /** Waits out a server guide refresh, then re-fetches the guide data. */
     private var guideRefreshJob: Job? = null
 
-    val query get() = Query(filter, sourceId, search)
+    val query get() = Query(filter, sourceId, search, groupByStation,if (filter == LiveFilter.Favorites) favorites else emptySet())
     /** The channels to show: hidden ones only while [showHidden] is on. */
     val visibleChannels get() = if (showHidden || hidden.isEmpty()) channels else channels.filterNot { it.id in hidden }
     val isLoading get() = loadingFor != null
@@ -105,55 +122,73 @@ class LiveStore(private val scope: CoroutineScope) {
 
     /** First load: the profile's lists and the EPG status, then the first page. */
     suspend fun start() {
+        checkContext()
         if (!listsLoaded) {
-            runCatching { ApiClient.liveChannelLists() }.getOrNull()?.let { (fav, hid) ->
+            val lists = try { ApiClient.liveChannelLists(expectedContext = dataContext) }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { null }
+            checkContext()
+            lists?.let { (fav, hid) ->
                 favorites = fav.toSet()
                 hidden = hid.toSet()
                 listsLoaded = true
             }
-            epgEnabled = ApiClient.epgEnabled()
+            val enabled = ApiClient.epgEnabled()
+            checkContext()
+            epgEnabled = enabled
         }
         reload()
     }
 
     /** Debounced into [search] before it reaches the server. */
     fun setSearchText(text: String) {
+        if (!isContextCurrent) return
         searchJob?.cancel()
         searchJob = scope.launch {
             delay(400)
+            checkContext()
             if (text.trim() != search) search = text.trim()
         }
     }
 
     /** From the first page, unless the loaded list already matches the filters. */
     suspend fun reload(force: Boolean = false) {
+        checkContext()
         if (!force && loadedFor == query && channels.isNotEmpty()) return
+        pages.reset()
+        loadingFor = null
         channels = emptyList()
         total = null
         hasMore = true
         loadError = null
         loadedFor = null
+        pageError = null
         loadMore()
     }
 
     suspend fun loadMore() {
         val requested = query
-        if (!hasMore || loadingFor == requested) return
+        checkContext()
+        if (!hasMore) return
+        val ticket = pages.begin(requested) ?: return
         loadingFor = requested
-        val offset = if (loadedFor == requested) channels.size else 0
+        pageError = null
+        val offset = ticket.offset
         val favoritesOnly = requested.filter == LiveFilter.Favorites
         try {
             val page = ApiClient.liveChannels(
                 // Sent with any other filter, the server would list favorites first (and keep them
                 // in every category and search), so they go only with Favorites.
-                favoriteIds = if (favoritesOnly) favorites.toList() else emptyList(), favoritesOnly = favoritesOnly,
+                favoriteIds = requested.favoriteIds.sorted(), favoritesOnly = favoritesOnly,
                 offset = offset, limit = PAGE, sourceId = requested.sourceId,
                 categories = requested.filter.categories.sorted(),
                 search = requested.search,
+                groupByStation = requested.groupByStation,
+                expectedContext = dataContext,
             )
-            if (requested != query) return
-            val seen = if (offset == 0) mutableSetOf() else channels.map { it.id }.toMutableSet()
-            val fresh = page.channels.filter { seen.add(it.id) }
+            if (!isContextCurrent || !pages.commitPage(ticket,query,page.channels.size)) return
+            val seen = if (offset == 0) mutableSetOf() else channels.map(LiveStationGroups::entryKey).toMutableSet()
+            val fresh = page.channels.filter { seen.add(LiveStationGroups.entryKey(it)) }
             channels = if (offset == 0) fresh else channels + fresh
             hasMore = page.hasMore && page.channels.isNotEmpty()
             total = page.total
@@ -169,10 +204,14 @@ class LiveStore(private val scope: CoroutineScope) {
             }
             loadedFor = requested
             loadError = null
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: Exception) {
-            if (channels.isEmpty() && requested == query) loadError = e.message
+            if (pages.accepts(ticket,query) && isContextCurrent) {
+                if (channels.isEmpty()) loadError = e.message else pageError = e.message ?: "Couldn't load more channels."
+            }
         } finally {
-            if (loadingFor == requested) loadingFor = null
+            if (pages.finish(ticket)) loadingFor = null
         }
     }
 
@@ -198,15 +237,20 @@ class LiveStore(private val scope: CoroutineScope) {
     }
 
     fun toggleFavorite(channel: LiveChannel) {
+        if (!isContextCurrent) return
+        pages.reset()
+        loadingFor = null
         val previous = favorites
+        val previousChannels = channels
         favorites = if (channel.id in favorites) favorites - channel.id else favorites + channel.id
         if (filter == LiveFilter.Favorites && channel.id !in favorites) {
             channels = channels.filterNot { it.id == channel.id }
         }
-        save { favorites = previous }
+        save { favorites = previous; channels = previousChannels }
     }
 
     fun toggleHidden(channel: LiveChannel) {
+        if (!isContextCurrent) return
         val previous = hidden
         hidden = if (channel.id in hidden) hidden - channel.id else hidden + channel.id
         save { hidden = previous }
@@ -219,11 +263,14 @@ class LiveStore(private val scope: CoroutineScope) {
      * otherwise says why not, with the Expo app's wording.
      */
     fun chooseSource(channel: LiveChannel) {
+        if (!isContextCurrent) return
         if (sourceChoiceJob?.isActive == true) return
         showNotice("Loading sources…", clears = false)
         sourceChoiceJob = scope.launch {
             try {
+                checkContext()
                 val streams = ApiClient.liveStremioStreams(channel)
+                checkContext()
                 if (streams.size > 1) {
                     noticeJob?.cancel()
                     notice = null
@@ -234,6 +281,7 @@ class LiveStore(private val scope: CoroutineScope) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
+                checkContext()
                 showNotice(e.message ?: "Failed to load sources.")
             }
         }
@@ -253,9 +301,13 @@ class LiveStore(private val scope: CoroutineScope) {
         val hid = hidden.sorted()
         scope.launch {
             try {
-                ApiClient.saveLiveChannelLists(fav, hid)
+                ApiClient.saveLiveChannelLists(fav, hid, expectedContext = dataContext)
+                checkContext()
                 actionError = null
+            } catch (error: CancellationException) {
+                throw error
             } catch (e: Exception) {
+                checkContext()
                 revert()
                 actionError = e.message
             }
@@ -276,14 +328,19 @@ class LiveStore(private val scope: CoroutineScope) {
      * swapped in, so the guide doesn't blank while it waits.
      */
     suspend fun refresh() {
+        checkContext()
         guideRefreshJob?.cancel()
         ApiClient.clearLiveCache()
+        checkContext()
         val epgOn = epgEnabled == true
         var before: EpgStatus? = null
         if (epgOn) {
             before = runCatching { ApiClient.epgStatus() }.getOrNull()
+            checkContext()
             showNotice("Refreshing the guide…", clears = false)
-            if (!ApiClient.startEpgRefresh()) {
+            val started = ApiClient.startEpgRefresh()
+            checkContext()
+            if (!started) {
                 showNotice("Couldn't start a guide refresh.")
                 before = null
             }
@@ -305,14 +362,18 @@ class LiveStore(private val scope: CoroutineScope) {
         var status: EpgStatus? = null
         while (System.currentTimeMillis() - started < 600_000) {
             delay(3_000)
+            checkContext()
             val current = runCatching { ApiClient.epgStatus() }.getOrNull() ?: continue
+            checkContext()
             status = current
             if (current.refreshing) { sawRefreshing = true; continue }
             // Done once a run was seen or a new guide landed; a run too quick to see (or one that
             // never started) counts as done after a few polls.
             if (sawRefreshing || current.lastRefresh != before.lastRefresh || System.currentTimeMillis() - started > 12_000) break
         }
+        checkContext()
         guide.refetch()
+        checkContext()
         val error = status?.lastError
         if (!error.isNullOrEmpty() && status?.lastRefresh == before.lastRefresh) {
             showNotice("Guide refresh failed: $error")

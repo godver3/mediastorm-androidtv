@@ -1,5 +1,7 @@
 package com.strmr.tv.ui.live
 
+import com.strmr.tv.live.LiveStationGroups
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,7 +103,7 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                     modifier = Modifier.focusRestorer(entry),
                 ) {
-                    itemsIndexed(channels, key = { _, c -> c.id }) { index, channel ->
+                    itemsIndexed(channels, key = { _, c -> LiveStationGroups.entryKey(c) }) { index, channel ->
                         LaunchedEffect(channel.id, windowStart) { store.needSchedule(channel, windowStart, windowStart + SPAN) }
                         if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
                         val cells = GuideLayout.cells(store.schedules[channel.guideKey].orEmpty(), windowStart, windowStart + SPAN)
@@ -136,7 +138,7 @@ fun LiveGuide(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modi
                                                     // A programme that has ended plays from the provider's archive.
                                                     program != null && LiveCatchups.replaysOnSelect(channel, program) ->
                                                         PlaybackCoordinator.playCatchup(channel, program)
-                                                    else -> PlaybackCoordinator.playLive(channel, program?.takeIf { it.isAiring() }?.title)
+                                                    else -> PlaybackCoordinator.playLive(channel, program?.takeIf { it.isAiring() }?.title, expectedContext = store.dataContext)
                                                 }
                                             },
                                             onLongClick = { menuFor = channel to cell.program },

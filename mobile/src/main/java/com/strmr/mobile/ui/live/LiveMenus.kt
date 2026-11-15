@@ -74,6 +74,11 @@ fun LiveMoreMenu(store: LiveStore, onRefresh: () -> Unit, onRecordings: () -> Un
             HorizontalDivider()
         }
         DropdownMenuItem(
+            text = { Text("Group channel sources") },
+            trailingIcon = { Checkbox(checked = store.groupByStation,onCheckedChange = null) },
+            onClick = { store.groupByStation = !store.groupByStation },
+        )
+        DropdownMenuItem(
             text = { Text("Show Hidden Channels") },
             trailingIcon = { Checkbox(checked = store.showHidden, onCheckedChange = null) },
             onClick = { store.showHidden = !store.showHidden },

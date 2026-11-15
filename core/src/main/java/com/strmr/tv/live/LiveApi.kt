@@ -2,6 +2,7 @@ package com.strmr.tv.live
 
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
+import com.strmr.tv.library.ProfileDataContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -36,12 +37,12 @@ private data class LiveStart(
 )
 
 /** The profile's settings document, read raw so writes keep every field this app doesn't model. */
-private suspend fun ApiClient.userSettingsObject(): JsonObject =
-    json.parseToJsonElement(sendRaw("GET", "$profilePath/settings")) as? JsonObject ?: JsonObject(emptyMap())
+private suspend fun ApiClient.userSettingsObject(expectedContext: Long? = null): JsonObject =
+    json.parseToJsonElement(sendRaw("GET", "$profilePath/settings", expectedContext = expectedContext)) as? JsonObject ?: JsonObject(emptyMap())
 
 /** The profile's `liveTV` favorites and hidden channels, from user settings. */
-suspend fun ApiClient.liveChannelLists(): Pair<List<String>, List<String>> {
-    val live = userSettingsObject()["liveTV"] as? JsonObject
+suspend fun ApiClient.liveChannelLists(expectedContext: Long? = null): Pair<List<String>, List<String>> {
+    val live = userSettingsObject(expectedContext)["liveTV"] as? JsonObject
     fun ids(key: String) = (live?.get(key) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
     return ids("favoriteChannels") to ids("hiddenChannels")
 }
@@ -50,12 +51,13 @@ suspend fun ApiClient.liveChannelLists(): Pair<List<String>, List<String>> {
  * Writes favorites / hidden channels. The settings PUT replaces the whole document, so it is
  * re-read and only these keys change (as the Expo app does).
  */
-suspend fun ApiClient.saveLiveChannelLists(favorites: List<String>, hidden: List<String>) {
-    val settings = userSettingsObject()
+suspend fun ApiClient.saveLiveChannelLists(favorites: List<String>, hidden: List<String>, expectedContext: Long? = null) {
+    val captured = expectedContext ?: com.strmr.tv.library.ProfileDataContext.current
+    val settings = userSettingsObject(captured)
     val live = (settings["liveTV"] as? JsonObject ?: JsonObject(emptyMap())).toMutableMap()
     live["favoriteChannels"] = buildJsonArray { favorites.forEach { add(JsonPrimitive(it)) } }
     live["hiddenChannels"] = buildJsonArray { hidden.forEach { add(JsonPrimitive(it)) } }
-    sendRaw("PUT", "$profilePath/settings", body = JsonObject(settings + ("liveTV" to JsonObject(live))))
+    sendRaw("PUT", "$profilePath/settings", body = JsonObject(settings + ("liveTV" to JsonObject(live))), expectedContext = captured)
 }
 
 /**
@@ -70,18 +72,21 @@ suspend fun ApiClient.liveChannels(
     sourceId: String? = null,
     categories: List<String> = emptyList(),
     search: String = "",
+    groupByStation: Boolean? = null,
+    expectedContext: Long? = null,
 ): LiveChannelsPage {
     val body = buildJsonObject {
         put("profileId", profileId)
         put("offset", offset)
         put("limit", limit)
         put("favoritesOnly", favoritesOnly)
+        groupByStation?.let { put("groupByStation", it) }
         putJsonArray("favoriteIds") { favoriteIds.forEach { add(JsonPrimitive(it)) } }
         sourceId?.let { put("sourceId", it) }
         if (categories.isNotEmpty()) putJsonArray("categories") { categories.forEach { add(JsonPrimitive(it)) } }
         if (search.isNotEmpty()) put("filter", search)
     }
-    return send("POST", "/api/live/channels", body = body, timeoutMs = 60_000)
+    return send("POST", "/api/live/channels", body = body, timeoutMs = 60_000, expectedContext = expectedContext)
 }
 
 suspend fun ApiClient.epgStatus(): EpgStatus = send("GET", "/api/live/epg/status", mapOf("profileId" to profileId))
@@ -136,9 +141,9 @@ suspend fun ApiClient.clearLiveCache() {
  */
 suspend fun ApiClient.startLive(
     channel: LiveChannel, programTitle: String?, forceHls: Boolean = false, timeshift: Boolean = false,
-    target: String = "native",
+    target: String = "native", expectedContext: Long = ProfileDataContext.current,
 ): LiveStream {
-    val q = buildMap {
+    val q = inContext(expectedContext) { buildMap {
         if (forceHls) put("format", "hls")
         if (timeshift) put("timeshift", "1")
         put("url", channel.url)
@@ -157,12 +162,13 @@ suspend fun ApiClient.startLive(
         channel.logo?.let { put("liveChannelLogo", it) }
         channel.stremioStreamIndex?.takeIf { it >= 0 }?.let { put("stremioStreamIndex", it.toString()) }
     }
-    val start = send<LiveStart>("GET", "/api/live/hls/start", q, timeoutMs = 60_000)
+    }
+    val start = send<LiveStart>("GET", "/api/live/hls/start", q, timeoutMs = 60_000, expectedContext = expectedContext)
     val direct = start.isDirect == true
     val path = (if (direct) start.streamUrl else start.playlistUrl)?.ifEmpty { null }
         ?: throw ApiError.NotReady("The server did not return a stream for this channel")
-    return LiveStream(mediaUrl(path), if (direct) null else start.sessionId, start.stremioStreamIndex, start.stremioStreamIndexes,
-                      timeshiftWindowSeconds = if (direct) 0 else start.timeshiftWindowSeconds ?: 0)
+    return inContext(expectedContext) { LiveStream(mediaUrl(path), if (direct) null else start.sessionId, start.stremioStreamIndex, start.stremioStreamIndexes,
+                      timeshiftWindowSeconds = if (direct) 0 else start.timeshiftWindowSeconds ?: 0) }
 }
 
 @Serializable

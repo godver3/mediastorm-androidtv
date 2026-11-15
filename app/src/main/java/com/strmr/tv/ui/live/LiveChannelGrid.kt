@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Icon
@@ -42,6 +45,10 @@ import com.strmr.tv.ui.cardFocusBorder
 import com.strmr.tv.ui.CardFocusScale
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.live.LiveStationGroups
+import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.AppIcons
 import com.strmr.tv.ui.PageMargin
@@ -52,8 +59,10 @@ import com.strmr.tv.ui.PageMargin
  */
 @Composable
 fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier: Modifier = Modifier, pick: LivePick? = null) {
-    var menuFor by remember { mutableStateOf<LiveChannel?>(null) }
+    var menuFor by remember(store) { mutableStateOf<LiveChannel?>(null) }
     val channels = store.visibleChannels
+    val rows = store.channelRows
+    val scope = rememberCoroutineScope()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(168.dp),
         contentPadding = PaddingValues(horizontal = PageMargin, vertical = 16.dp),
@@ -61,43 +70,71 @@ fun LiveChannelGrid(store: LiveStore, now: Long, entry: FocusRequester, modifier
         verticalArrangement = Arrangement.spacedBy(18.dp),
         modifier = modifier.focusRestorer(entry),
     ) {
-        itemsIndexed(channels, key = { _, c -> c.id }) { index, channel ->
-            LaunchedEffect(channel.id) { store.needNowNext(channel) }
-            if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
-            val current = store.current(channel, now)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Card(
-                    onClick = { pick?.onPick?.invoke(channel) ?: PlaybackCoordinator.playLive(channel, current?.title) },
-                    onLongClick = { menuFor = channel },
-                    scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(),
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).then(if (index == 0) Modifier.focusRequester(entry) else Modifier),
-                ) {
-                    Box(
-                        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF333333), Color(0xFF1A1A1A)))),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ChannelLogo(channel, 100.dp, 52.dp, 14.sp)
-                        current?.let { AiringProgress(it.progress(now), Modifier.align(Alignment.BottomCenter).padding(8.dp).fillMaxWidth().height(3.dp)) }
-                        Row(Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            store.recordings.on(channel, now = now)?.let { RecordingBadge(it, Modifier.size(14.dp)) }
-                            if (channel.id in store.favorites) {
-                                Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A), modifier = Modifier.size(14.dp))
-                            }
+        itemsIndexed(rows,key = { _,row -> row.key },span = { _,row -> GridItemSpan(if (row is LiveStationGroups.Header) maxLineSpan else 1) }) { _,row ->
+            if (row is LiveStationGroups.Header) {
+                OutlinedButton(onClick = { store.toggleStation(row.stationId) },modifier = Modifier.fillMaxWidth().semantics {
+                    stateDescription = if (row.expanded) "Expanded" else "Collapsed"
+                }) {
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(12.dp),verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(row.name,maxLines = 1,overflow = TextOverflow.Ellipsis)
+                            if (row.scopeHint.isNotEmpty()) Text(row.scopeHint,maxLines = 1,overflow = TextOverflow.Ellipsis)
+                            Text("${row.loadedSources} sources loaded")
                         }
-                        if (pick?.marked?.let { it.id == channel.id && it.sourceId == channel.sourceId } == true) {
-                            Icon(AppIcons.Multiscreen, contentDescription = "On this screen", tint = com.strmr.tv.ui.Accent,
-                                 modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(14.dp))
-                        }
-                        if (channel.id in store.hidden) {
-                            Icon(AppIcons.Hidden, contentDescription = "Hidden", tint = Color.White.copy(alpha = 0.5f),
-                                 modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(14.dp))
-                        }
+                        Text(if (row.expanded) "Hide sources" else "Show sources")
                     }
                 }
-                Text(channel.name, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(current?.title ?: channel.group ?: "", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f),
-                     maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else if (row is LiveStationGroups.Channel) {
+                val channel = row.channel
+                val index = row.originalIndex
+                LaunchedEffect(channel.id) { store.needNowNext(channel) }
+                if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
+                val current = store.current(channel, now)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Card(
+                        onClick = { if (store.isContextCurrent) { pick?.onPick?.invoke(channel) ?: PlaybackCoordinator.playLive(channel, current?.title, expectedContext = store.dataContext) } },
+                        onLongClick = { if (store.isContextCurrent) menuFor = channel },
+                        scale = CardDefaults.scale(focusedScale = CardFocusScale), border = cardFocusBorder(),
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).then(if (index == 0) Modifier.focusRequester(entry) else Modifier),
+                    ) {
+                        Box(
+                            Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF333333), Color(0xFF1A1A1A)))),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ChannelLogo(channel, 100.dp, 52.dp, 14.sp)
+                            current?.let { AiringProgress(it.progress(now), Modifier.align(Alignment.BottomCenter).padding(8.dp).fillMaxWidth().height(3.dp)) }
+                            Row(Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                store.recordings.on(channel, now = now)?.let { RecordingBadge(it, Modifier.size(14.dp)) }
+                                if (channel.id in store.favorites) {
+                                    Icon(Icons.Filled.Star, contentDescription = "Favorite", tint = Color(0xFFFFD60A), modifier = Modifier.size(14.dp))
+                                }
+                            }
+                            if (pick?.marked?.let { it.id == channel.id && it.sourceId == channel.sourceId } == true) {
+                                Icon(AppIcons.Multiscreen, contentDescription = "On this screen", tint = com.strmr.tv.ui.Accent,
+                                     modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(14.dp))
+                            }
+                            if (channel.id in store.hidden) {
+                                Icon(AppIcons.Hidden, contentDescription = "Hidden", tint = Color.White.copy(alpha = 0.5f),
+                                     modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(14.dp))
+                            }
+                        }
+                    }
+                    Text(channel.name, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    channel.sourceName?.takeIf { it.isNotBlank() }?.let {
+                        Text(it,fontSize = 10.sp,color = Color.White.copy(alpha = 0.6f),maxLines = 1,overflow = TextOverflow.Ellipsis)
+                    }
+                    Text(current?.title ?: channel.group ?: "", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f),
+                         maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        if (store.hasMore) item(key = "live-load-more",span = { GridItemSpan(maxLineSpan) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                store.pageError?.let { Text(it,color = Color(0xFFFF6B6B)) }
+                OutlinedButton(enabled = !store.isLoading,onClick = { scope.launch { store.loadMore() } }) {
+                    Text(if (store.isLoading) "Loading channels…" else "Load more channels")
+                }
             }
         }
     }

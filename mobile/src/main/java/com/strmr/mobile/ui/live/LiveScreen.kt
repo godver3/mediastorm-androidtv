@@ -26,6 +26,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +48,8 @@ import com.strmr.mobile.ui.shell.Section
 import com.strmr.mobile.ui.shell.Route
 import com.strmr.tv.live.LiveFilter
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.live.rememberProfileLiveStore
+import com.strmr.tv.library.ProfileDataContext
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.AppToast
 import kotlinx.coroutines.delay
@@ -62,18 +66,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun LiveScreen(asPage: Boolean) {
     val scope = rememberCoroutineScope()
-    val store = remember { LiveStore(scope) }
+    val context by ProfileDataContext.changes.collectAsState()
+    val store = rememberProfileLiveStore(context)
     val navigator = LocalNavigator.current
     val prefs = LocalContext.current.getSharedPreferences("strmr", Context.MODE_PRIVATE)
     var guideMode by rememberSaveable { mutableStateOf(prefs.getBoolean("live.mobile.guide", false)) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var search by rememberSaveable { mutableStateOf("") }
-    var sheet by remember { mutableStateOf<LiveSheetTarget?>(null) }
-    var refreshing by remember { mutableStateOf(false) }
+    var search by rememberSaveable(context) { mutableStateOf("") }
+    var sheet by remember(store) { mutableStateOf<LiveSheetTarget?>(null) }
+    var refreshing by remember(store) { mutableStateOf(false) }
     val showsGuide = guideMode && store.epgEnabled == true
 
-    LaunchedEffect(store.query) { store.start() }
-    LaunchedEffect(Unit) { store.recordings.poll() }
+    LaunchedEffect(store,store.query) { store.start() }
+    LaunchedEffect(store) { store.recordings.poll() }
     LaunchedEffect(Unit) {
         while (true) {
             delay(30_000)
@@ -81,7 +86,7 @@ fun LiveScreen(asPage: Boolean) {
         }
     }
     // The store's confirmations ("Recording scheduled…") as the shell's snackbars.
-    LaunchedEffect(store.notice) { store.notice?.let { AppToast.show(it) } }
+    LaunchedEffect(store,store.notice) { store.notice?.let { AppToast.show(it) } }
 
     PageScaffold(
         "Live TV", showBack = asPage, large = false,
@@ -124,7 +129,7 @@ fun LiveScreen(asPage: Boolean) {
                 onRefresh = { scope.launch { refreshing = true; store.reload(force = true); refreshing = false } },
                 modifier = Modifier.weight(1f),
             ) {
-                when {
+                key(store.dataContext) { when {
                     store.visibleChannels.isNotEmpty() ->
                         if (showsGuide) LiveGuideGrid(store, now, onProgram = { sheet = it }, modifier = Modifier.fillMaxSize())
                         else LiveChannelList(store, now, onMenu = { sheet = it }, modifier = Modifier.fillMaxSize())
@@ -137,7 +142,7 @@ fun LiveScreen(asPage: Boolean) {
                         },
                     )
                     else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                }
+                } }
             }
         }
     }
@@ -146,8 +151,10 @@ fun LiveScreen(asPage: Boolean) {
     store.sourceChoice?.let { choice ->
         LiveSourceSheet(choice, onDismiss = { store.sourceChoice = null }) { stream ->
             store.sourceChoice = null
-            val channel = choice.channel.copy(stremioStreamIndex = stream.index)
-            PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title)
+            if (store.isContextCurrent) {
+                val channel = choice.channel.copy(stremioStreamIndex = stream.index)
+                PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title, expectedContext = store.dataContext)
+            }
         }
     }
 }

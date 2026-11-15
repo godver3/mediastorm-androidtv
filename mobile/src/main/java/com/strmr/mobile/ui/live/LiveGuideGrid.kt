@@ -1,5 +1,7 @@
 package com.strmr.mobile.ui.live
 
+import com.strmr.tv.live.LiveStationGroups
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -96,12 +98,12 @@ fun LiveGuideGrid(store: LiveStore, now: Long, onProgram: (LiveSheetTarget) -> U
             Ruler(start, end, dpPerMs, channelWidth, totalWidth, scroll)
             HorizontalDivider()
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
-                itemsIndexed(channels, key = { _, c -> c.id }) { index, channel ->
+                itemsIndexed(channels, key = { _, c -> LiveStationGroups.entryKey(c) }) { index, channel ->
                     LaunchedEffect(channel.id, leading) { store.needSchedule(channel, leading, leading + visibleMs) }
                     if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
                     Row(Modifier.height(ROW_HEIGHT)) {
                         GuideChannelCell(store, channel, channelWidth, now,
-                                         onTune = { PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title) },
+                                         onTune = { PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title, expectedContext = store.dataContext) },
                                          onMenu = { onProgram(LiveSheetTarget(channel, null)) })
                         Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(scroll)) {
                             GuideRowCells(store, channel, from, to, start, dpPerMs, totalWidth, now, scroll, onProgram)

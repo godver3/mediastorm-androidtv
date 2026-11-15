@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +49,8 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveFilter
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.live.rememberProfileLiveStore
+import com.strmr.tv.library.ProfileDataContext
 import com.strmr.tv.live.MultiscreenPrefs
 import com.strmr.tv.player.PlaybackCoordinator
 import com.strmr.tv.ui.AppIcons
@@ -80,24 +84,26 @@ class LivePick(val title: String, val marked: LiveChannel?, val error: String?, 
 @Composable
 fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
     val scope = rememberCoroutineScope()
-    val store = sharedStore ?: remember { LiveStore(scope) }
+    val context by ProfileDataContext.changes.collectAsState()
+    val store = sharedStore ?: rememberProfileLiveStore(context)
+    if (!store.isContextCurrent) { Message("Profile changed. Reopen this channel picker."); return }
     val navigator = LocalNavigator.current
     val prefs = LocalContext.current.getSharedPreferences("strmr", Context.MODE_PRIVATE)
     var guideMode by rememberSaveable { mutableStateOf(prefs.getBoolean("live.guide", true)) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var picker by remember { mutableStateOf<Picker?>(null) }
+    var picker by remember(store) { mutableStateOf<Picker?>(null) }
     // A shared store (the multiscreen picker) keeps its search between picks.
-    var search by rememberSaveable { mutableStateOf(store.search) }
-    var contentFocused by remember { mutableStateOf(false) }
+    var search by rememberSaveable(context) { mutableStateOf(store.search) }
+    var contentFocused by remember(store) { mutableStateOf(false) }
     val filterFocus = remember { FocusRequester() }
     val controlsFocus = remember { FocusRequester() }
-    val contentEntry = remember { FocusRequester() }
+    val contentEntry = remember(store) { FocusRequester() }
     val showsGuide = guideMode && store.epgEnabled == true
 
     // The first run loads favorites and the EPG status; every filter change reloads.
-    LaunchedEffect(store.query) { store.start() }
+    LaunchedEffect(store,store.query) { store.start() }
     // Scheduled / recording marks in the guide; not in the multiscreen picker.
-    LaunchedEffect(pick == null) { if (pick == null) store.recordings.poll() }
+    LaunchedEffect(store,pick == null) { if (pick == null) store.recordings.poll() }
     // Moves progress bars and the guide's now line along.
     LaunchedEffect(Unit) {
         while (true) {
@@ -172,7 +178,7 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
 
         // Down from the controls enters the content where it was left (or its top).
         val content = Modifier.weight(1f).onFocusChanged { contentFocused = it.hasFocus }
-        when {
+        key(store.dataContext) { when {
             store.visibleChannels.isNotEmpty() ->
                 if (showsGuide) LiveGuide(store, now, contentEntry, content, pick) else LiveChannelGrid(store, now, contentEntry, content, pick)
             store.loadError != null -> Message(store.loadError!!)
@@ -186,14 +192,16 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
             else -> Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 2.dp)
             }
-        }
+        } }
     }
 
     store.sourceChoice?.let { choice ->
         LiveSourceChoiceDialog(choice, onDismiss = { store.sourceChoice = null }) { stream ->
             store.sourceChoice = null
-            val channel = choice.channel.copy(stremioStreamIndex = stream.index)
-            pick?.onPick?.invoke(channel) ?: PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title)
+            if (store.isContextCurrent) {
+                val channel = choice.channel.copy(stremioStreamIndex = stream.index)
+                pick?.onPick?.invoke(channel) ?: PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title, expectedContext = store.dataContext)
+            }
         }
     }
 
@@ -226,6 +234,7 @@ fun LiveScreen(pick: LivePick? = null, sharedStore: LiveStore? = null) {
             ChoiceDialog(
                 title = "Live TV",
                 choices = listOfNotNull(
+                    DialogChoice(if (store.groupByStation) "Ungroup channel sources" else "Group channel sources") { store.groupByStation = !store.groupByStation },
                     DialogChoice(if (store.showHidden) "Hide Hidden Channels" else "Show Hidden Channels") { store.showHidden = !store.showHidden },
                     DialogChoice(if (store.epgEnabled == true) "Refresh Guide & Channels" else "Refresh Channels") { scope.launch { store.refresh() } },
                     DialogChoice("Recordings") { navigator.open(Page.Recordings) },

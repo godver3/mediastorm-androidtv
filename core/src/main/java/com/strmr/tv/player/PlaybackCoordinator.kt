@@ -12,6 +12,7 @@ import com.strmr.tv.api.resolveSource
 import com.strmr.tv.api.streamUrl
 import com.strmr.tv.app.App
 import com.strmr.tv.app.AppLog
+import com.strmr.tv.library.ProfileDataContext
 import com.strmr.tv.live.EpgProgram
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveHlsPreference
@@ -145,16 +146,16 @@ object PlaybackCoordinator {
      * it. It asks for timeshift, so with the server's window on (30 minutes by default) the channel
      * plays from an HLS session that can be paused, rewound and returned to live.
      */
-    fun playLive(channel: LiveChannel, programTitle: String?) {
-        if (_resolving.value != null) return
+    fun playLive(channel: LiveChannel, programTitle: String?, expectedContext: Long = ProfileDataContext.current) {
+        if (expectedContext != ProfileDataContext.current || _resolving.value != null) return
         val request = PlaybackRequest(DetailsTarget(channel.id, programTitle ?: channel.name, isMovie = true, backdropUrl = null, logoUrl = channel.logoUrl))
         // A source remembered as needing HLS asks for it from the first tune (LiveHlsPreference).
         // Stremio failover tunes another of the channel's streams ([LiveRetune]).
         val live: suspend (Boolean, Int?) -> LiveStream = { force, stremioIndex ->
             val tuned = stremioIndex?.let { channel.copy(stremioStreamIndex = it) } ?: channel
-            ApiClient.startLive(tuned, programTitle, forceHls = force || LiveHlsPreference.prefersHls(channel), timeshift = true)
+            ApiClient.startLive(tuned, programTitle, forceHls = force || LiveHlsPreference.prefersHls(channel), timeshift = true, expectedContext = expectedContext)
         }
-        begin(request, "Tuning…", live = live, liveChannel = channel,
+        begin(request, "Tuning…", live = live, liveChannel = channel, expectedContext = expectedContext,
               liveLabel = StreamInfo.live(channel.name))
     }
 
@@ -237,6 +238,7 @@ object PlaybackCoordinator {
         growing: Boolean = false,
         liveChannel: LiveChannel? = null,
         liveLabel: String? = null,
+        expectedContext: Long? = null,
         resolve: suspend () -> ResolvedStream = { error("no resolver") },
     ) {
         if (_resolving.value != null) return
@@ -246,7 +248,8 @@ object PlaybackCoordinator {
         detail.value = null
         resolveJob = scope.launch {
             try {
-                pending = if (live != null) {
+                expectedContext?.let(ProfileDataContext::requireCurrent)
+                val prepared = if (live != null) {
                     val stream = live(false, null)
                     PlayerSession(request, stream.url, null, reportsProgress = false, liveSessionId = stream.sessionId,
                                   liveStream = stream,
@@ -268,14 +271,22 @@ object PlaybackCoordinator {
                                   sourceLabel = StreamInfo.source(r.path, r.source, request.libraryVersion?.origin),
                                   sourceDolbyVision = r.source?.dolbyVisionProfile, sourceHdr10 = r.source?.hdr10 == true)
                 }
-                stage.value = "Starting…"
-                detail.value = null
-                launchPlayer()
+                fun publish() {
+                    pending = prepared
+                    stage.value = "Starting…"
+                    detail.value = null
+                    launchPlayer()
+                }
+                if (expectedContext == null) publish() else ApiClient.inContext(expectedContext) { publish() }
             } catch (e: CancellationException) {
+                if (_resolving.value === request) _resolving.value = null
                 throw e
             } catch (e: Exception) {
-                _resolving.value = null
-                errorMessage.value = e.message ?: "Playback failed"
+                if (_resolving.value === request) {
+                    _resolving.value = null
+                    if (expectedContext == null || expectedContext == ProfileDataContext.current)
+                        errorMessage.value = e.message ?: "Playback failed"
+                }
             }
         }
     }

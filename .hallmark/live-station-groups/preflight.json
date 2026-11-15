@@ -1,0 +1,12 @@
+{
+  "component": "Existing TV and phone live channel list",
+  "reuse_cached_project_preflight": "../preflight.json",
+  "preserve_fonts_palette_spacing_and_component_ownership": true,
+  "grouping_authority": "Server-issued station IDs only",
+  "default": "All loaded sources expanded",
+  "guide": "Existing flat time grid with stable source-aware keys",
+  "new_assets_or_animation": false,
+  "files_to_delete": [],
+  "browser_reference": "HTML over exported production Kotlin rows; not native UI",
+  "native_device_acceptance_pending": true
+}

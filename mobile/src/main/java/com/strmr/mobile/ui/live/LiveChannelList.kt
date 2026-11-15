@@ -22,9 +22,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -34,6 +36,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.strmr.tv.live.LiveChannel
 import com.strmr.tv.live.LiveStore
+import com.strmr.tv.live.LiveStationGroups
+import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.strmr.tv.player.PlaybackCoordinator
 
 /**
@@ -45,26 +51,48 @@ import com.strmr.tv.player.PlaybackCoordinator
 @Composable
 fun LiveChannelList(store: LiveStore, now: Long, onMenu: (LiveSheetTarget) -> Unit, modifier: Modifier = Modifier) {
     val channels = store.visibleChannels
+    val rows = store.channelRows
+    val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     LazyColumn(modifier, contentPadding = PaddingValues(bottom = 24.dp)) {
-        itemsIndexed(channels, key = { _, c -> c.id }) { index, channel ->
-            LaunchedEffect(channel.id) { store.needNowNext(channel) }
-            if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
-            ChannelRow(
-                store, channel, now,
-                Modifier.combinedClickable(
-                    onClick = { PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title) },
-                    onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onMenu(LiveSheetTarget(channel, null))
-                    },
-                ),
-            )
+        itemsIndexed(rows,key = { _,row -> row.key }) { _,row ->
+            if (row is LiveStationGroups.Header) {
+                OutlinedButton(onClick = { store.toggleStation(row.stationId) },modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp,vertical = 8.dp).semantics {
+                    stateDescription = if (row.expanded) "Expanded" else "Collapsed"
+                }) {
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(12.dp),verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(row.name,maxLines = 1,overflow = TextOverflow.Ellipsis)
+                            if (row.scopeHint.isNotEmpty()) Text(row.scopeHint,maxLines = 1,overflow = TextOverflow.Ellipsis)
+                            Text("${row.loadedSources} sources loaded")
+                        }
+                        Text(if (row.expanded) "Hide sources" else "Show sources")
+                    }
+                }
+            } else if (row is LiveStationGroups.Channel) {
+                val channel = row.channel
+                val index = row.originalIndex
+                LaunchedEffect(channel.id) { store.needNowNext(channel) }
+                if (index >= channels.size - 20) LaunchedEffect(channels.size) { store.loadMore() }
+                ChannelRow(
+                    store, channel, now,
+                    Modifier.combinedClickable(
+                        onClick = { if (store.isContextCurrent) PlaybackCoordinator.playLive(channel, store.current(channel, now)?.title, expectedContext = store.dataContext) },
+                        onLongClick = {
+                            if (store.isContextCurrent) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onMenu(LiveSheetTarget(channel, null))
+                            }
+                        },
+                    ),
+                )
+            }
         }
-        if (store.isLoading) {
-            item {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+        if (store.hasMore) item(key = "live-load-more") {
+            Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                store.pageError?.let { Text(it,color = MaterialTheme.colorScheme.error) }
+                OutlinedButton(enabled = !store.isLoading,onClick = { scope.launch { store.loadMore() } }) {
+                    Text(if (store.isLoading) "Loading channels…" else "Load more channels")
                 }
             }
         }
@@ -97,6 +125,9 @@ private fun ChannelRow(store: LiveStore, channel: LiveChannel, now: Long, modifi
                          modifier = Modifier.size(14.dp))
                 }
                 store.recordings.on(channel, now = now)?.let { RecordingBadge(it) }
+            }
+            channel.sourceName?.takeIf { it.isNotBlank() }?.let {
+                Text(it,style = MaterialTheme.typography.bodySmall,color = MaterialTheme.colorScheme.onSurfaceVariant,maxLines = 1,overflow = TextOverflow.Ellipsis)
             }
             if (current != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
