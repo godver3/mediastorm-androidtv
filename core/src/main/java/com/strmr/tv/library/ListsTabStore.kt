@@ -10,7 +10,6 @@ import com.strmr.tv.api.libraries
 import com.strmr.tv.home.ShelfConfig
 import com.strmr.tv.home.continueWatching
 import com.strmr.tv.home.homeSettings
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -30,38 +29,36 @@ object ListsTabStore {
     /** The local, Plex and Jellyfin libraries the profile may browse (empty until loaded). */
     var libraries by mutableStateOf<List<LibraryInfo>>(emptyList())
         private set
-    private var refreshing: CompletableDeferred<Unit>? = null
+    private val refreshes = ProfileRefresh()
 
-    /** Loads them all; concurrent callers share one request, and a failure keeps what was shown. */
-    suspend fun refresh() {
-        refreshing?.let { return it.await() }
-        val done = CompletableDeferred<Unit>()
-        refreshing = done
-        val profile = ApiClient.profileId
-        try {
-            coroutineScope {
-                val loadedShelves = async { runCatching { ApiClient.homeSettings().shelves }.getOrNull() }
-                val loadedItems = async { runCatching { ApiClient.continueWatching() }.getOrNull() }
-                val loadedLibraries = async { runCatching { ApiClient.libraries() }.getOrNull() }
-                val newShelves = loadedShelves.await()
-                val newItems = loadedItems.await()
-                val newLibraries = loadedLibraries.await()
-                // A profile switch mid-load: the old profile's rows mustn't land on the new one.
-                if (profile != ApiClient.profileId) return@coroutineScope
-                newShelves?.let { shelves = it }
-                newItems?.let { continueWatching = it }
-                newLibraries?.let { libraries = it }
-            }
-        } finally {
-            refreshing = null
-            done.complete(Unit)
+    suspend fun refresh() = refresh {
+        coroutineScope {
+            val loadedShelves = async { optionalProfileRead { ApiClient.homeSettings().shelves } }
+            val loadedItems = async { optionalProfileRead { ApiClient.continueWatching() } }
+            val loadedLibraries = async { optionalProfileRead { ApiClient.libraries() } }
+            ListsTabSnapshot(loadedShelves.await(), loadedItems.await(), loadedLibraries.await())
         }
+    }
+
+    internal suspend fun refresh(load: suspend () -> ListsTabSnapshot) {
+        refreshes.run(load, success = { snapshot ->
+            snapshot.shelves?.let { shelves = it }
+            snapshot.continueWatching?.let { continueWatching = it }
+            snapshot.libraries?.let { libraries = it }
+        })
     }
 
     /** Forgets everything (profile switch). */
     fun reset() {
+        refreshes.reset()
         shelves = null
         continueWatching = null
         libraries = emptyList()
     }
 }
+
+internal data class ListsTabSnapshot(
+    val shelves: List<ShelfConfig>? = null,
+    val continueWatching: List<ContinueWatchingItem>? = null,
+    val libraries: List<LibraryInfo>? = null,
+)

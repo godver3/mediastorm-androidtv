@@ -11,6 +11,7 @@ import com.strmr.tv.api.registerClient
 import com.strmr.tv.api.reportDisplayCapabilities
 import com.strmr.tv.diagnostics.LogUploader
 import com.strmr.tv.launcher.LauncherSync
+import com.strmr.tv.ui.lists.BrowsePreviews
 import com.strmr.tv.library.CustomListsStore
 import com.strmr.tv.library.HiddenItemsStore
 import com.strmr.tv.library.ListsTabStore
@@ -21,17 +22,16 @@ import kotlinx.coroutines.launch
 
 /** What changes around [AppSession] when a profile comes into use: stores, launcher rows, device registration. */
 internal object ProfileSetup {
-    /** Before the profile is published: the API and the app-wide stores move to it. */
-    fun beforeActivating(chosen: Profile, previousId: String?) {
-        // The library stores are app-wide; drop the previous profile's lists first.
-        if (previousId != chosen.id) {
-            WatchlistStore.reset()
-            CustomListsStore.reset()
-            HiddenItemsStore.reset()
-            SetAsideStore.reset()
-            ListsTabStore.reset()
-        }
+    /** Before the profile is published: the API and app-wide stores move to it. */
+    fun beforeActivating(chosen: Profile) {
         ApiClient.activate(chosen.id, chosen.name)
+        // Re-selecting the same ID also reloads changed profile permissions.
+        WatchlistStore.reset()
+        CustomListsStore.reset()
+        HiddenItemsStore.reset()
+        SetAsideStore.reset()
+        ListsTabStore.reset()
+        BrowsePreviews.reset()
         LauncherSync.profileActivated(chosen.id)
     }
 

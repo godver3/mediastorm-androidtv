@@ -1,0 +1,54 @@
+{
+  "tests": {
+    "core": {
+      "tests": 605,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "app": {
+      "tests": 44,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "mobile": {
+      "tests": 89,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "total_tests": 738,
+  "new_main_tests": 21,
+  "apks": {
+    "app": {
+      "bytes": 70240540,
+      "sha256": "df62dd6c95e93b4645600ef93d40158786afd6d5b261b32d7d15ee83dc49f8c5"
+    },
+    "mobile": {
+      "bytes": 78799537,
+      "sha256": "c83674fec4050f18917bec4865927e3aafbe0e7f8fe0429daffd69153ed2221a"
+    }
+  },
+  "debug_prefill_all_empty": true,
+  "private_properties_absent": true,
+  "native_device_acceptance": false,
+  "provider_work_added": false,
+  "profile_list_and_preview_isolation_tests": true,
+  "reference_is_not_native_layout": true,
+  "private_preview_url": "http://100.68.37.82:18913/preview.html",
+  "apk_privacy": {
+    "apk_entries_scanned": 2491,
+    "protected_values": 23,
+    "encodings": [
+      "utf-8",
+      "utf-16-le"
+    ],
+    "private_value_matches": 0,
+    "passed": true,
+    "plaintext_saved_or_printed": false
+  },
+  "backend_unchanged": true,
+  "physical_device_rendering_or_focus_tested": false
+}

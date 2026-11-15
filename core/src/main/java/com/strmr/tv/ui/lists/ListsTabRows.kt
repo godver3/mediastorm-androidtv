@@ -79,18 +79,20 @@ fun seeds(items: List<ContinueWatchingItem>): List<BrowseList> {
  * so scrolling back and forth or switching Movies / Shows doesn't refetch.
  */
 object BrowsePreviews {
-    // Concurrent: Home's hub cards fill it off the main thread while Lists tiles read it.
-    private val cache = java.util.concurrent.ConcurrentHashMap<String, TileArt>()
+    private val cache = ProfilePreviewCache()
 
-    suspend fun art(list: BrowseList, version: Int?): TileArt {
-        if (list is BrowseList.Similar) return TileArt() // the seed's own backdrop
-        val key = "${ApiClient.profileId}|$list|${version ?: ""}"
-        cache[key]?.let { return it }
-        // Four posters: the quick pass, not a whole remote list read and filled in first.
-        val page = runCatching { ApiClient.browsePage(list, limit = 4, phase = ShelfPhase.CARDS) }.getOrNull() ?: return TileArt()
-        val art = TileArt(page.entries.mapNotNull(::posterOf), page.entries.mapNotNull(::backdropOf))
-        cache[key] = art
-        return art
+    fun reset() { cache.reset() }
+
+    suspend fun art(list: BrowseList, version: Int?): TileArt = art(list, version) {
+        ApiClient.browsePage(list, limit = 4, phase = ShelfPhase.CARDS)
+    }
+
+    internal suspend fun art(list: BrowseList, version: Int?, load: suspend () -> com.strmr.tv.home.BrowsePage): TileArt {
+        if (list is BrowseList.Similar) return TileArt()
+        return cache.art(list.toString(), version) {
+            val page = load()
+            TileArt(page.entries.mapNotNull(::posterOf), page.entries.mapNotNull(::backdropOf))
+        }
     }
 
     private fun posterOf(e: BrowseEntry): String? = when (e) {

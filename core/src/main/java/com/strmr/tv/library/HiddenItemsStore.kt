@@ -8,7 +8,6 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.app.AppLog
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -41,26 +40,22 @@ object HiddenItemsStore {
     /** Bumped by every change, so screens showing titles can drop or restore them. */
     var revision by mutableIntStateOf(0)
         private set
-    private var refreshing: CompletableDeferred<Unit>? = null
+    private val refreshes = ProfileRefresh()
 
-    suspend fun refresh() {
-        refreshing?.let { return it.await() }
-        val done = CompletableDeferred<Unit>()
-        refreshing = done
-        try {
-            runCatching { ApiClient.sendList<HiddenItem>("GET", "${ApiClient.profilePath}/hidden-items", promptOnLock = false) }
-                .onSuccess { items = it; isLoaded = true }
-                .onFailure { AppLog.w("Hidden", "load failed: ${it.message}") }
-        } finally {
-            refreshing = null
-            done.complete(Unit)
-        }
+    suspend fun refresh() = refresh {
+        ApiClient.sendList<HiddenItem>("GET", "${ApiClient.profilePath}/hidden-items", promptOnLock = false)
+    }
+
+    internal suspend fun refresh(load: suspend () -> List<HiddenItem>) {
+        refreshes.run(load, success = { items = it; isLoaded = true },
+            failure = { AppLog.w("Hidden", "Could not load hidden titles") })
     }
 
     /** Loads once (the first screen that filters asks). */
     suspend fun ensureLoaded() { if (!isLoaded) refresh() }
 
     fun reset() {
+        refreshes.reset()
         items = emptyList()
         isLoaded = false
         revision++
@@ -78,6 +73,7 @@ object HiddenItemsStore {
     }
 
     suspend fun hide(target: DetailsTarget) {
+        val context = ProfileDataContext.current
         val body = buildJsonObject {
             put("id", target.titleId)
             put("mediaType", if (target.isMovie) "movie" else "series")
@@ -89,6 +85,7 @@ object HiddenItemsStore {
             if (ids.isNotEmpty()) putJsonObject("externalIds") { ids.forEach { (k, v) -> put(k, v) } }
         }
         val item = ApiClient.json.decodeFromString<HiddenItem>(ApiClient.sendRaw("POST", "${ApiClient.profilePath}/hidden-items", body = body))
+        ProfileDataContext.requireCurrent(context)
         items = items.filterNot { matches(it, target) } + item
         revision++
         AppLog.i("Hidden", "hid ${target.titleId} (${target.name})")
@@ -96,16 +93,19 @@ object HiddenItemsStore {
 
     /** Unhides every stored entry matching the title (its own media type and ID); a 404 counts as done. */
     suspend fun unhide(target: DetailsTarget) {
+        val context = ProfileDataContext.current
         val stored = items.filter { matches(it, target) }.ifEmpty {
             listOf(HiddenItem(target.titleId, if (target.isMovie) "movie" else "series"))
         }
         for (item in stored) {
+            ProfileDataContext.requireCurrent(context)
             try {
                 ApiClient.sendRaw("DELETE", "${ApiClient.profilePath}/hidden-items/${ApiClient.segment(item.mediaType)}/${ApiClient.segment(item.id)}")
             } catch (e: ApiError) {
                 if (e.statusCode != 404) throw e
             }
         }
+        ProfileDataContext.requireCurrent(context)
         items = items.filterNot { matches(it, target) }
         revision++
         AppLog.i("Hidden", "unhid ${target.titleId} (${target.name})")

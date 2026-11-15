@@ -1,6 +1,7 @@
 package com.strmr.tv.api
 
 import com.strmr.tv.app.Config
+import com.strmr.tv.library.ProfileDataContext
 import com.strmr.tv.auth.AuthSession
 import com.strmr.tv.auth.ProfileUnlockStore
 import java.io.IOException
@@ -47,11 +48,19 @@ val ApiJson = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInpu
 object ApiClient {
     /** Server origin (plus any reverse-proxy path), without `/api`. */
     @Volatile var baseUrl: HttpUrl = "http://127.0.0.1:7777/".toHttpUrl()
+        set(value) {
+            if (field != value) ProfileDataContext.invalidate()
+            field = value
+        }
     /**
      * Over iroh remote access: the pairing credential, sent with every request
      * (`X-Remote-Access-Credential`) beside `X-Client-ID`.
      */
     @Volatile var remoteCredential: String? = null
+        set(value) {
+            if (field != value) ProfileDataContext.invalidate()
+            field = value
+        }
     /**
      * Over remote access: brings the tunnel back after a transport failure and returns its
      * base URL (the proxy's port can change). Set by AppSession.
@@ -66,6 +75,7 @@ object ApiClient {
     @Volatile var session: AuthSession? = null
         set(value) {
             val old = field
+            if (old?.accountId != value?.accountId) ProfileDataContext.invalidate()
             field = value
             if (value != null && value != old) value.save()
         }
@@ -104,6 +114,7 @@ object ApiClient {
     val profilePath: String get() = "/api/users/${segment(profileId)}"
 
     fun activate(profileId: String, profileName: String? = null) {
+        ProfileDataContext.invalidate()
         this.profileId = profileId
         this.profileName = profileName
         unlocks.keepOnly(profileId)

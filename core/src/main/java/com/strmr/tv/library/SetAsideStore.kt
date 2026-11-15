@@ -21,35 +21,54 @@ object SetAsideStore {
     var items by mutableStateOf<List<WatchlistItem>>(emptyList())
         private set
 
+    private val refreshes = ProfileRefresh()
+
     /** Re-reads the lists first (as the Expo app's ensureList), so a list deleted or made elsewhere is seen. */
     private suspend fun listId(create: Boolean): String? {
+        val context = ProfileDataContext.current
         CustomListsStore.refresh()
+        ProfileDataContext.requireCurrent(context)
         CustomListsStore.lists?.firstOrNull { it.isSetAside }?.let { return it.id }
         if (!create) return null
         AppLog.i("SetAside", "creating the Set Aside list")
         return CustomListsStore.create(NAME).id
     }
 
-    suspend fun refresh() {
+    suspend fun refresh() = refresh {
+        val context = ProfileDataContext.current
         val id = listId(create = false)
-        items = if (id == null) emptyList() else runCatching { ApiClient.customListItems(id) }.getOrDefault(items)
+        ProfileDataContext.requireCurrent(context)
+        if (id == null) emptyList() else optionalProfileRead { ApiClient.customListItems(id) }
     }
 
-    fun reset() { items = emptyList() }
+    internal suspend fun refresh(load: suspend () -> List<WatchlistItem>?) {
+        refreshes.run(load, success = { if (it != null) items = it })
+    }
+
+    fun reset() { refreshes.reset(); items = emptyList() }
 
     fun contains(target: DetailsTarget): Boolean = items.any { WatchlistStore.matches(it, target) }
 
     suspend fun add(target: DetailsTarget) {
+        val context = ProfileDataContext.current
         val id = listId(create = true) ?: return
+        ProfileDataContext.requireCurrent(context)
         CustomListsStore.add(target, id)
+        ProfileDataContext.requireCurrent(context)
         refresh()
         AppLog.i("SetAside", "set aside ${target.titleId} (${target.name})")
     }
 
     suspend fun remove(target: DetailsTarget) {
+        val context = ProfileDataContext.current
         val id = listId(create = false) ?: return
         if (items.isEmpty()) refresh()
-        for (item in items.filter { WatchlistStore.matches(it, target) }) CustomListsStore.remove(item, id)
+        ProfileDataContext.requireCurrent(context)
+        for (item in items.filter { WatchlistStore.matches(it, target) }) {
+            ProfileDataContext.requireCurrent(context)
+            CustomListsStore.remove(item, id)
+        }
+        ProfileDataContext.requireCurrent(context)
         refresh()
         AppLog.i("SetAside", "removed ${target.titleId} (${target.name}) from Set Aside")
     }

@@ -8,7 +8,6 @@ import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.ApiError
 import com.strmr.tv.api.DetailsTarget
 import com.strmr.tv.home.WatchlistItem
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -30,28 +29,25 @@ object WatchlistStore {
      * bundle and goes stale after a toggle; this wins over it.
      */
     private val overrides = mutableStateMapOf<String, Boolean>()
-    private var refreshing: CompletableDeferred<Unit>? = null
+    private val refreshes = ProfileRefresh()
 
-    /** Loads the list; concurrent callers share one request. */
-    suspend fun refresh() {
-        refreshing?.let { return it.await() }
-        val done = CompletableDeferred<Unit>()
-        refreshing = done
-        try {
-            items = ApiClient.sendRaw("GET", "${ApiClient.profilePath}/display-list", mapOf("source" to "watchlist"))
-                .let { ApiClient.json.decodeFromString<com.strmr.tv.api.DisplayListPage<WatchlistItem>>(it).items }
-            loadError = null
-        } catch (e: Exception) {
-            if (!isLoaded || items.isEmpty()) loadError = e.message
-        } finally {
-            isLoaded = true
-            refreshing = null
-            done.complete(Unit)
-        }
+    suspend fun refresh() = refresh {
+        ApiClient.sendRaw("GET", "${ApiClient.profilePath}/display-list", mapOf("source" to "watchlist"))
+            .let { ApiClient.json.decodeFromString<com.strmr.tv.api.DisplayListPage<WatchlistItem>>(it).items }
+    }
+
+    internal suspend fun refresh(load: suspend () -> List<WatchlistItem>) {
+        refreshes.run(load,
+            success = { items = it; loadError = null },
+            failure = { if (!isLoaded || items.isEmpty()) loadError = "Could not load your watchlist. Try again." },
+            finish = { isLoaded = true },
+        )
     }
 
     /** Forgets everything (profile switch). */
     fun reset() {
+        refreshes.reset()
+        loadError = null
         items = emptyList()
         isLoaded = false
         overrides.clear()
@@ -64,18 +60,23 @@ object WatchlistStore {
     suspend fun toggle(target: DetailsTarget, server: Boolean? = null) = if (contains(target, server)) remove(target) else add(target)
 
     suspend fun add(target: DetailsTarget) {
+        val context = ProfileDataContext.current
         overrides[target.titleId] = true
         try {
             ApiClient.sendRaw("POST", "${ApiClient.profilePath}/watchlist", body = upsert(target))
         } catch (e: Exception) {
+            ProfileDataContext.requireCurrent(context)
             overrides.remove(target.titleId)
             throw e
         }
+        ProfileDataContext.requireCurrent(context)
         refresh()
+        ProfileDataContext.requireCurrent(context)
         overrides[target.titleId] = true // keep the button steady if the re-read failed
     }
 
     suspend fun remove(target: DetailsTarget) {
+        val context = ProfileDataContext.current
         overrides[target.titleId] = false
         val previous = items
         items = items.filterNot { matches(it, target) }
@@ -84,15 +85,18 @@ object WatchlistStore {
                 "DELETE",
                 "${ApiClient.profilePath}/watchlist/${if (target.isMovie) "movie" else "series"}/${ApiClient.segment(target.titleId)}",
             )
-        } catch (e: ApiError) {
+        } catch (e: Exception) {
+            ProfileDataContext.requireCurrent(context)
             // 404: already gone, which counts as removed.
-            if (e.statusCode != 404) {
+            if (e !is ApiError || e.statusCode != 404) {
                 overrides.remove(target.titleId)
                 items = previous
                 throw e
             }
         }
+        ProfileDataContext.requireCurrent(context)
         refresh()
+        ProfileDataContext.requireCurrent(context)
         overrides[target.titleId] = false
     }
 

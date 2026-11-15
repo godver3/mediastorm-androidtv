@@ -10,7 +10,6 @@ import com.strmr.tv.home.CustomList
 import com.strmr.tv.home.WatchlistItem
 import com.strmr.tv.home.customListItems
 import com.strmr.tv.home.customLists
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -37,59 +36,64 @@ object CustomListsStore {
     data class ItemChange(val listId: String, val removed: WatchlistItem? = null)
     private val _itemChanges = MutableSharedFlow<ItemChange>(extraBufferCapacity = 16)
     val itemChanges: SharedFlow<ItemChange> = _itemChanges
-    private var refreshing: CompletableDeferred<Unit>? = null
+    private val refreshes = ProfileRefresh()
 
-    /** The lists a title can be added to: all but the reserved Set Aside list, which only Continue Watching actions manage. */
+    /** The lists a title can be added to: all but the reserved Set Aside list. */
     val userLists: List<CustomList> get() = lists.orEmpty().filterNot { it.isSetAside }
 
-    /** Loads the lists; concurrent callers share one request, and a failure keeps what was shown. */
-    suspend fun refresh() {
-        refreshing?.let { return it.await() }
-        val done = CompletableDeferred<Unit>()
-        refreshing = done
-        try {
-            runCatching { ApiClient.customLists() }.getOrNull()?.let { lists = it }
-        } finally {
-            refreshing = null
-            done.complete(Unit)
-        }
+    suspend fun refresh() = refresh { ApiClient.customLists() }
+
+    internal suspend fun refresh(load: suspend () -> List<CustomList>) {
+        refreshes.run(load, success = { lists = it })
     }
 
     /** Forgets everything (profile switch). */
     fun reset() {
+        refreshes.reset()
         lists = null
         picking = null
     }
 
     /** The stored item matching the title in each list that has it, by list ID; lists that couldn't be read are left out. */
     suspend fun memberships(target: DetailsTarget): Map<String, WatchlistItem> = coroutineScope {
+        val context = ProfileDataContext.current
         userLists.filter { (it.itemCount ?: 1) > 0 }.map { list ->
             async {
-                runCatching { ApiClient.customListItems(list.id) }.getOrNull()
+                ProfileDataContext.requireCurrent(context)
+                optionalProfileRead { ApiClient.customListItems(list.id).also { ProfileDataContext.requireCurrent(context) } }
                     ?.firstOrNull { WatchlistStore.matches(it, target) }?.let { list.id to it }
             }
         }.awaitAll().filterNotNull().toMap()
     }
 
     suspend fun create(name: String): CustomList {
+        val context = ProfileDataContext.current
         val list = ApiClient.send<CustomList>("POST", "${ApiClient.profilePath}/custom-lists", body = buildJsonObject { put("name", name) })
+        ProfileDataContext.requireCurrent(context)
         refresh()
+        ProfileDataContext.requireCurrent(context)
         return list
     }
 
     suspend fun rename(id: String, name: String) {
+        val context = ProfileDataContext.current
         ApiClient.sendRaw("PATCH", "${ApiClient.profilePath}/custom-lists/${ApiClient.segment(id)}", body = buildJsonObject { put("name", name) })
+        ProfileDataContext.requireCurrent(context)
         refresh()
     }
 
     suspend fun delete(id: String) {
+        val context = ProfileDataContext.current
         ApiClient.sendRaw("DELETE", "${ApiClient.profilePath}/custom-lists/${ApiClient.segment(id)}")
+        ProfileDataContext.requireCurrent(context)
         lists = lists?.filterNot { it.id == id }
         refresh()
     }
 
     suspend fun add(target: DetailsTarget, listId: String) {
+        val context = ProfileDataContext.current
         ApiClient.sendRaw("POST", "${ApiClient.profilePath}/custom-lists/${ApiClient.segment(listId)}/items", body = WatchlistStore.upsert(target))
+        ProfileDataContext.requireCurrent(context)
         _itemChanges.tryEmit(ItemChange(listId))
         refresh()
     }
@@ -100,6 +104,7 @@ object CustomListsStore {
      * `reloadGrids = false` to keep its place.
      */
     suspend fun remove(item: WatchlistItem, listId: String, reloadGrids: Boolean = true) {
+        val context = ProfileDataContext.current
         try {
             ApiClient.sendRaw(
                 "DELETE",
@@ -109,6 +114,7 @@ object CustomListsStore {
         } catch (e: ApiError) {
             if (e.statusCode != 404) throw e
         }
+        ProfileDataContext.requireCurrent(context)
         if (reloadGrids) _itemChanges.tryEmit(ItemChange(listId, removed = item))
         refresh()
     }

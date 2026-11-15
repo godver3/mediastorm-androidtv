@@ -250,7 +250,7 @@ object AppSession {
     }
 
     private fun activate(chosen: Profile) {
-        ProfileSetup.beforeActivating(chosen, profile.value?.id)
+        ProfileSetup.beforeActivating(chosen)
         profile.value = chosen
         ResumeLock.pickRequired = false
         SessionPrefs.saveLastProfile(chosen.id)
