@@ -149,6 +149,7 @@ fun PageStack(content: @Composable () -> Unit) {
 @Composable
 private fun PickingHost() {
     TitleRatingDialog()
+    TasteSetupDialog()
     CustomListsStore.picking?.let { AddToListDialog(it) }
     UpdatePrompt()
     AppToastHost()

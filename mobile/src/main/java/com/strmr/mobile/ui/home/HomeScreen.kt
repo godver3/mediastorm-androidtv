@@ -75,6 +75,7 @@ private fun HomeContent(entry: HomeEntry, padding: PaddingValues) {
     val store = entry.store
     val scope = rememberCoroutineScope()
     val navigator = LocalNavigator.current
+    com.strmr.tv.ui.TasteSetupHomeOffer(visible = navigator.current.isEmpty() && TitleMenu.card == null && TitleMenu.watchStateFor == null)
     val list = rememberLazyListState()
     val layout = HomeLayoutStore
     val sessionsEnded by PlaybackCoordinator.sessionsEnded.collectAsState()

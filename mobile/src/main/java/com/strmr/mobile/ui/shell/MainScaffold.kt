@@ -77,6 +77,7 @@ fun MainScaffold() {
     CompositionLocalProvider(LocalNavigator provides navigator) {
         com.strmr.mobile.ui.components.TitleMenuHost()
         com.strmr.mobile.ui.components.TitleRatingSheet()
+        com.strmr.mobile.ui.components.TasteSetupSheet()
         com.strmr.mobile.ui.settings.UpdatePrompt()
         com.strmr.mobile.ui.cast.CastHost()
         if (compact) {

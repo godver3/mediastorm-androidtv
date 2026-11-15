@@ -89,6 +89,7 @@ fun SettingsScreen() {
 @Composable
 private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, checkConnection: () -> Unit, modifier: Modifier) {
     val session = AppSession
+    val tasteSetup = com.strmr.tv.ui.rememberTasteSetupAction()
     val profile by session.profile.collectAsState()
     val version by session.serverVersion.collectAsState()
     val scope = rememberCoroutineScope()
@@ -168,6 +169,11 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 supportingContent = { Text("Switch Profile") },
                 leadingContent = { profile?.let { ProfileAvatar(it, 32.dp) } },
             )
+        }
+        item {
+            ListItem(selected = false, onClick = tasteSetup,
+                headlineContent = { Text("Starting interests") },
+                supportingContent = { Text("Choose or edit the favorites used for this profile's suggestions") })
         }
         item { Header("Home") }
         item {

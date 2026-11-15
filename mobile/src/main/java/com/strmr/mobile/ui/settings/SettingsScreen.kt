@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun SettingsScreen(asPage: Boolean) {
+    val tasteSetup = com.strmr.tv.ui.rememberTasteSetupAction()
     val session = AppSession
     val profile by session.profile.collectAsState()
     val server by session.serverUrl.collectAsState()
@@ -73,6 +74,8 @@ fun SettingsScreen(asPage: Boolean) {
                 }
                 RowDivider()
                 SettingsRow("Switch Profile") { scope.launch { session.switchProfile() } }
+                RowDivider()
+                SettingsRow("Starting interests", "Saved for this profile") { tasteSetup() }
             }
         }
         SettingsSection("Preferences", "Stored on this device. Choices left at Default follow the server's settings for this profile.") {

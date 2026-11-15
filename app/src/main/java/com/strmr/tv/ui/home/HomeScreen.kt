@@ -113,6 +113,7 @@ private fun HomePage(store: HomeStore, memory: HomeFocusMemory, tabsFocused: () 
     var focusedOnce by memory::focusedOnce
     var menuFor by remember { mutableStateOf<Pair<HomeShelf, HomeCard>?>(null) }
     var menuError by remember { mutableStateOf<String?>(null) }
+    com.strmr.tv.ui.TasteSetupHomeOffer(visible = !navigator.isCovered && menuFor == null && menuError == null)
     /** Bumped after a title action reloads the rows: focus returns to the rows if the focused card left. */
     var refocus by remember { mutableIntStateOf(0) }
     /** The row shown, which sizes the rows area under hero text. */
