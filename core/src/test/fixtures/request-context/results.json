@@ -1,0 +1,81 @@
+{
+  "passed": true,
+  "native": {
+    "unit_source_head": "780c07ffa61dab28e231f882a4e5dc2dbee3bab2",
+    "apk_source_head": "780c07ffa61dab28e231f882a4e5dc2dbee3bab2",
+    "product_source_matches_tested_commit": true,
+    "tests": {
+      "core": {
+        "tests": 720,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "app": {
+        "tests": 44,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "mobile": {
+        "tests": 89,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "total_tests": 853,
+    "new_main_tests": 48,
+    "apks": {
+      "app": {
+        "bytes": 71102491,
+        "sha256": "8b953bdc493dc98e27f8ff11a99384c02f846aecc3e80f10bceb5285da983627"
+      },
+      "mobile": {
+        "bytes": 78946993,
+        "sha256": "5a25512a5c20edfc036c7b763b02a83edf5dfcc27c80748cba1c9b5ec6af4415"
+      }
+    },
+    "debug_prefill_all_empty": true,
+    "private_properties_absent": true,
+    "native_device_acceptance": false,
+    "json_identity_refresh_pin_and_proxy_tests": true,
+    "reference_is_not_native_layout": true,
+    "private_preview_url": "http://100.68.37.82:18916/preview.html",
+    "real_loopback_http_tests": 3,
+    "android_api_client_initialized_in_tests": false,
+    "actual_iroh_pairing_or_handover_tested": false,
+    "paired_backend_unchanged": true
+  },
+  "new_test_groups": {
+    "RequestContextTest": 7,
+    "RequestAuthorizationTest": 11,
+    "RequestAuthorizationHttpTest": 3,
+    "ScopedRefreshTest": 4,
+    "ContextBoundTransportTest": 7,
+    "ScopedProfileUnlockTest": 10,
+    "ScopedConnectionTest": 6
+  },
+  "apk_privacy": {
+    "passed": true,
+    "apk_entries_scanned": 2491,
+    "protected_values": 23,
+    "private_value_matches": 0,
+    "plaintext_saved_or_printed": false
+  },
+  "paired_backend_reference": {
+    "url": "https://github.com/godver3/mediastorm/pull/102",
+    "review_head": "43fae17782b56175b35c0d3668b1852a8820dd21",
+    "previous_go_passed_cases": 8204,
+    "backend_unchanged_and_not_rerun": true
+  },
+  "boundaries": {
+    "real_loopback_http_peers": true,
+    "android_api_client_not_initialized_in_jvm_tests": true,
+    "native_device_rendering_focus_audio_accessibility_pending": true,
+    "real_iroh_pairing_and_network_handover_pending": true,
+    "no_production_deployment": true,
+    "no_device_installation": true,
+    "no_private_playlist_or_credentials_published": true
+  }
+}
