@@ -46,8 +46,8 @@ fun RootScreen() {
             challenge?.let { c ->
                 PinSheet(
                     profile = c.profile,
-                    verify = { AppSession.verifyChallenge(it) },
-                    onCancel = { AppSession.cancelChallenge() },
+                    verify = { AppSession.verifyChallenge(it,c) },
+                    onCancel = { AppSession.cancelChallenge(c) },
                 )
             }
         }

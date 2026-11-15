@@ -44,9 +44,9 @@ internal object ServerSetup {
     }
 
     /** Points the API at `url` with its stored session; its version and branding load in `scope`. */
-    fun use(url: HttpUrl, scope: CoroutineScope) = with(AppSession) {
+    fun use(url: HttpUrl, scope: CoroutineScope, credential: String? = api.remoteCredential) = with(AppSession) {
         serverUrl.value = url
-        api.configureServer(url, AuthSession.load())
+        api.configureServer(url, AuthSession.load(), credential)
         branding.value = null
         scope.launch { serverVersion.value = api.serverVersion() }
         scope.launch {

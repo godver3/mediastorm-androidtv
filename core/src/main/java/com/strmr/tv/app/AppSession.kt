@@ -88,7 +88,10 @@ object AppSession {
                 _phase.value = Phase.Login
             }
         }
-        api.onProfileLocked = { id -> withContext(Dispatchers.Main) { unlockLockedProfile(id) } }
+        api.onProfileLocked = { id,expectedContext ->
+            withContext(Dispatchers.Main) { unlockLockedProfile(id,expectedContext) }
+        }
+        ProfileUnlock.install(scope)
         api.recoverTransport = { expectedContext ->
             withContext(Dispatchers.Main) {
                 ProfileDataContext.requireCurrent(expectedContext)
@@ -165,7 +168,7 @@ object AppSession {
         _phase.value = next
     }
 
-    internal fun useServer(url: HttpUrl) = ServerSetup.use(url, scope)
+    internal fun useServer(url: HttpUrl, credential: String? = api.remoteCredential) = ServerSetup.use(url, scope, credential)
 
     /**
      * Try Again on the startup error: a remote launch that never connected starts over. In the
@@ -243,6 +246,7 @@ object AppSession {
      * when [automatic]. Returns false for a wrong PIN.
      */
     suspend fun select(candidate: Profile, pin: String? = null, automatic: Boolean = false): Boolean {
+        if (api.session == null) return false
         if (candidate.requiresPin && (pin.isNullOrEmpty() || !api.verifyPin(pin, candidate.id))) return false
         setAutoProfile(if (automatic) candidate.id else null)
         activate(candidate)
@@ -289,16 +293,18 @@ object AppSession {
     // Locked profile mid-flow
 
     /** Asks for the PIN over the current screen; on cancel, goes back to the profile picker. */
-    internal suspend fun unlockLockedProfile(id: String): Boolean {
+    internal suspend fun unlockLockedProfile(id: String, expectedContext: Long = ProfileDataContext.current): Boolean {
+        ProfileDataContext.requireCurrent(expectedContext)
         // No prompt before a profile is in use: the call fails.
         val locked = (profiles.value.firstOrNull { it.id == id } ?: profile.value?.takeIf { it.id == id })
             ?.takeIf { _phase.value == Phase.Ready }
-        return ProfileUnlock.unlock(id, locked) {
+        return ProfileUnlock.unlock(id, locked, expectedContext) {
+            ProfileDataContext.requireCurrent(expectedContext)
             if (id == profile.value?.id && _phase.value == Phase.Ready) switchProfile()
         }
     }
 
-    suspend fun verifyChallenge(pin: String): PinVerification = ProfileUnlock.verify(pin)
+    suspend fun verifyChallenge(pin: String, expected: PinChallenge? = pinChallenge.value): PinVerification = ProfileUnlock.verify(pin,expected)
 
-    fun cancelChallenge() = ProfileUnlock.cancel()
+    fun cancelChallenge(expected: PinChallenge? = pinChallenge.value) = ProfileUnlock.cancel(expected)
 }

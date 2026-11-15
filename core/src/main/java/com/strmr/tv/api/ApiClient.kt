@@ -93,7 +93,7 @@ object ApiClient {
      * Asked when a request hits a locked profile (`403 profile_locked`): prompt for the PIN
      * and return true once it is unlocked, so the request is retried.
      */
-    @Volatile var onProfileLocked: (suspend (String) -> Boolean)? = null
+    @Volatile var onProfileLocked: (suspend (String, Long) -> Boolean)? = null
     /** Unlock tokens for PIN-protected profiles, sent as `X-Profile-Unlock`. */
     val unlocks by lazy { ProfileUnlockStore() }
 
@@ -125,9 +125,16 @@ object ApiClient {
     }
 
     /** Publish a server and its stored session as one identity transition. */
-    fun configureServer(url: HttpUrl, account: AuthSession?) = requestContexts.serialized {
+    fun configureServer(url: HttpUrl, account: AuthSession?, credential: String? = remoteCredential) = requestContexts.serialized {
         baseUrl = url
+        remoteCredential = credential
         session = account
+    }
+
+    /** A verified alternate route retains the account but publishes its credential atomically. */
+    fun configureRoute(url: HttpUrl, credential: String? = remoteCredential) = requestContexts.serialized {
+        baseUrl = url
+        remoteCredential = credential
     }
 
     /** Commit a parsed reply only while its original profile/server identity remains active. */
@@ -263,7 +270,7 @@ object ApiClient {
             if (!e.isProfileLocked) throw e
             val locked = context.use { e.failure?.profileId ?: named.firstOrNull() ?: profileId }
             val prompt = context.use { unlocks.remove(locked); onProfileLocked }
-            if (!promptOnLock || prompt == null || !prompt(locked)) { context.check(); throw e }
+            if (!promptOnLock || prompt == null || !prompt(locked, requireNotNull(context.profileEpoch))) { context.check(); throw e }
             context.use { applyUnlocks(prepared, if (locked in named) named else named + locked) }
             return performAuthorized(prepared)
         }

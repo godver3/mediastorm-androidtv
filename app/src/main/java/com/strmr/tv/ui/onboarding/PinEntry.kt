@@ -229,7 +229,7 @@ fun ProfileLockPrompt(challenge: AppSession.PinChallenge) {
     PinEntry(
         profile = challenge.profile,
         notice = "This profile is locked. Enter its PIN to continue.",
-        verify = { AppSession.verifyChallenge(it) },
-        onCancel = { AppSession.cancelChallenge() },
+        verify = { AppSession.verifyChallenge(it,challenge) },
+        onCancel = { AppSession.cancelChallenge(challenge) },
     )
 }

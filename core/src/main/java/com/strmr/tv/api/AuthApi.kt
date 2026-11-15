@@ -1,5 +1,7 @@
 package com.strmr.tv.api
 
+import kotlinx.coroutines.CancellationException
+
 import com.strmr.tv.library.ProfileDataContext
 
 import com.strmr.tv.app.Config
@@ -102,14 +104,15 @@ suspend fun ApiClient.profiles(): List<Profile> = send("GET", "/api/users")
  * `POST /api/users/{id}/pin/verify`; false for a wrong (or empty) PIN. Stores the unlock
  * token current servers return (older ones only answer `valid`).
  */
-suspend fun ApiClient.verifyPin(pin: String, profileId: String): Boolean {
-    val context = ProfileDataContext.current
+suspend fun ApiClient.verifyPin(pin: String, profileId: String, expectedContext: Long? = null, accept: () -> Boolean = { true }): Boolean {
+    val context = expectedContext ?: ProfileDataContext.current
     return try {
         val result = send<Verified>(
             "POST", "/api/users/${segment(profileId)}/pin/verify",
             body = buildJsonObject { put("pin", pin) }, promptOnLock = false, expectedContext = context,
         )
         inContext(context) {
+            if (!accept()) throw CancellationException("PIN prompt changed")
             if (result.valid && !result.unlockToken.isNullOrEmpty()) unlocks.set(result.unlockToken, result.expiresAt, profileId)
         }
         result.valid

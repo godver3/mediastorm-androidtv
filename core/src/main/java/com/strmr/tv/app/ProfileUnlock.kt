@@ -3,8 +3,10 @@ package com.strmr.tv.app
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.Profile
 import com.strmr.tv.api.verifyPin
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.strmr.tv.library.ProfileDataContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /** Outcome of checking an entered PIN. */
 sealed interface PinVerification {
@@ -20,41 +22,17 @@ sealed interface PinVerification {
  * Main thread only.
  */
 internal object ProfileUnlock {
-    val pinChallenge = MutableStateFlow<AppSession.PinChallenge?>(null)
-    private var challenge: Pair<String, CompletableDeferred<Boolean>>? = null
-
-    /**
-     * Prompts for `locked` (null: no prompt, the call fails) and waits. Returns true once
-     * unlocked; a request for another profile while one prompt is up fails. `onCancelled`
-     * runs once, for the request that raised the prompt.
-     */
-    suspend fun unlock(id: String, locked: Profile?, onCancelled: suspend () -> Unit): Boolean {
-        challenge?.let { (pending, deferred) -> return if (pending == id) deferred.await() else false }
-        if (locked == null) return false
-        val deferred = CompletableDeferred<Boolean>()
-        challenge = id to deferred
-        pinChallenge.value = AppSession.PinChallenge(locked)
-        val unlocked = deferred.await()
-        challenge = null
-        if (!unlocked) onCancelled()
-        return unlocked
+    private val prompts = ScopedProfileUnlock({ ProfileDataContext.current }) { pin,id,context,accept ->
+        ApiClient.verifyPin(pin,id,expectedContext = context,accept = accept)
     }
+    val pinChallenge = prompts.pinChallenge
 
-    /** Checks a PIN entered for the current challenge; on success the prompt closes and waiting requests retry. */
-    suspend fun verify(pin: String): PinVerification {
-        val current = pinChallenge.value ?: return PinVerification.Wrong
-        try {
-            if (!ApiClient.verifyPin(pin, current.profile.id)) return PinVerification.Wrong
-        } catch (e: Exception) {
-            return PinVerification.Failed(e.message ?: "Couldn't check the PIN.")
-        }
-        pinChallenge.value = null
-        challenge?.second?.complete(true)
-        return PinVerification.Unlocked
+    fun install(scope: CoroutineScope) {
+        scope.launch { ProfileDataContext.changes.collect { prompts.expire() } }
     }
+    suspend fun unlock(id: String, locked: Profile?, expectedContext: Long, onCancelled: suspend () -> Unit): Boolean =
+        prompts.unlock(id,locked,expectedContext,onCancelled)
 
-    fun cancel() {
-        pinChallenge.value = null
-        challenge?.second?.complete(false)
-    }
+    suspend fun verify(pin: String, expected: AppSession.PinChallenge?): PinVerification = prompts.verify(pin,expected)
+    fun cancel(expected: AppSession.PinChallenge?) = prompts.cancel(expected)
 }

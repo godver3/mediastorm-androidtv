@@ -20,13 +20,19 @@ internal object RemoteSession {
 
     /** Pairs with a connection code from the server's admin UI. */
     suspend fun pair(code: String) {
+        val expectedContext = ProfileDataContext.current
         val url = RemoteAccess.pair(code)
+        ProfileDataContext.requireCurrent(expectedContext)
+        val pairing = RemoteAccess.pairing
         // A new pairing is a new server as far as the session goes.
         LauncherSync.clear("paired")
+        ProfileDataContext.requireCurrent(expectedContext)
+        if (RemoteAccess.pairing !== pairing) throw CancellationException("Pairing changed")
         ApiClient.logout()
+        if (RemoteAccess.pairing !== pairing) throw CancellationException("Pairing changed")
         SessionPrefs.forgetAll()
         enter()
-        AppSession.useServer(url)
+        AppSession.useServer(url, pairing?.credential)
         AppSession.moveTo(AppSession.Phase.Login)
     }
 
@@ -35,10 +41,12 @@ internal object RemoteSession {
         AppSession.moveTo(AppSession.Phase.Starting)
         enter()
         val expectedContext = ProfileDataContext.current
+        val pairing = RemoteAccess.pairing
         try {
             val url = RemoteAccess.connect()
             ProfileDataContext.requireCurrent(expectedContext)
-            AppSession.useServer(url)
+            if (RemoteAccess.pairing !== pairing) throw CancellationException("Pairing changed")
+            AppSession.useServer(url, pairing?.credential)
         } catch (error: CancellationException) {
             throw error
         } catch (e: Exception) {
@@ -51,12 +59,12 @@ internal object RemoteSession {
 
     /** The proxy again after sleep or a failure; its port can change, so the base URL follows. */
     suspend fun reconnectOrThrow(expectedContext: Long = ProfileDataContext.current) {
+        val pairing = RemoteAccess.pairing
         val url = RemoteAccess.connect()
         ProfileDataContext.requireCurrent(expectedContext)
-        if (url != AppSession.serverUrl.value) {
-            AppSession.serverUrl.value = url
-            ApiClient.baseUrl = url
-        }
+        if (RemoteAccess.pairing !== pairing) throw CancellationException("Pairing changed")
+        AppSession.serverUrl.value = url
+        ApiClient.configureRoute(url, pairing?.credential)
     }
 
     fun leave() {
@@ -69,6 +77,5 @@ internal object RemoteSession {
     private fun enter() {
         isRemote.value = true
         NetworkRoutes.isHomeDirect.value = false
-        ApiClient.remoteCredential = RemoteAccess.pairing?.credential
     }
 }

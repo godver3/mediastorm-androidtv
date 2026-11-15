@@ -32,8 +32,8 @@ object NetworkRoutes {
     fun routeHomeDirect(url: HttpUrl) {
         RemoteSession.isRemote.value = false
         isHomeDirect.value = true
-        ApiClient.remoteCredential = null
-        use(url)
+        AppSession.serverUrl.value = url
+        ApiClient.configureRoute(url, null)
     }
 
     /**
@@ -43,7 +43,6 @@ object NetworkRoutes {
     suspend fun routeRemoteTunnel() {
         isHomeDirect.value = false
         RemoteSession.isRemote.value = true
-        ApiClient.remoteCredential = RemoteAccess.pairing?.credential
         val expectedContext = ProfileDataContext.current
         try {
             RemoteSession.reconnectOrThrow(expectedContext)
@@ -70,6 +69,6 @@ object NetworkRoutes {
 
     private fun use(url: HttpUrl) {
         AppSession.serverUrl.value = url
-        ApiClient.baseUrl = url
+        ApiClient.configureRoute(url)
     }
 }

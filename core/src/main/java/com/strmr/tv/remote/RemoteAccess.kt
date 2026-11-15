@@ -1,5 +1,7 @@
 package com.strmr.tv.remote
 
+import kotlinx.coroutines.CancellationException
+
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -14,13 +16,9 @@ import expo.modules.irohbridge.IrohBridgeNative
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -56,7 +54,7 @@ object RemoteAccess {
         val connectionCode: String,
     )
 
-    var pairing: Pairing? = load()
+    @Volatile var pairing: Pairing? = load()
         private set
 
     /** A pairing is saved but the Keystore can't read it right now (kept for a later launch). */
@@ -73,18 +71,17 @@ object RemoteAccess {
 
     private const val ACCOUNT = "remoteAccess"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val connectLock = Mutex()
-    private var connecting: Deferred<HttpUrl>? = null
+    private val connections = ScopedConnection<HttpUrl>(scope)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var logPump: kotlinx.coroutines.Job? = null
 
     // Pairing
 
     /** Pairs with the server behind `code`; returns the proxy's base URL. */
-    suspend fun pair(code: String): HttpUrl {
+    suspend fun pair(code: String): HttpUrl = connections.replace {
         val normalized = normalize(code)
             ?: throw RemoteAccessError("Enter the connection code from your server, like mshost-ABC123-DEF456-GHJ789.")
-        AppLog.i("RemoteAccess", "pairing with code ${normalized.take(13)}…")
+        AppLog.i("RemoteAccess", "pairing with requested server")
         val invite = call { IrohBridgeNative.resolveCode(normalized) }["invite"].string()
             ?: throw RemoteAccessError("No server answered for that code.")
         val base = startProxy(invite)
@@ -96,7 +93,7 @@ object RemoteAccess {
         pairing = saved
         watchNetwork()
         AppLog.i("RemoteAccess", "paired; proxy at $base")
-        return base
+        base
     }
 
     /**
@@ -105,27 +102,29 @@ object RemoteAccess {
      */
     suspend fun connect(): HttpUrl {
         val saved = pairing ?: throw RemoteAccessError("Not paired")
-        val job = connectLock.withLock {
-            connecting ?: scope.async {
-                runCatching { call { IrohBridgeNative.notifyNetworkChange() } }
-                val first = runCatching { startProxy(saved.invite).also { prime(it, saved.credential) } }
-                first.getOrElse {
-                    AppLog.w("RemoteAccess", "proxy unhealthy (${it.message}); retrying")
-                    runCatching { call { IrohBridgeNative.notifyNetworkChange() } }
-                    startProxy(saved.invite).also { base -> prime(base, saved.credential) }
-                }
-            }.also { connecting = it }
-        }
-        try {
-            return job.await().also { watchNetwork() }
-        } finally {
-            connectLock.withLock { if (connecting === job) connecting = null }
-        }
+        return connections.connect(saved, { pairing === saved }) {
+            try {
+                try { call { IrohBridgeNative.notifyNetworkChange() } }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { }
+                startProxy(saved.invite).also { prime(it, saved.credential) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (pairing !== saved) throw CancellationException("Pairing changed")
+                AppLog.w("RemoteAccess", "proxy unhealthy (${error.message}); retrying")
+                try { call { IrohBridgeNative.notifyNetworkChange() } }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { }
+                startProxy(saved.invite).also { base -> prime(base, saved.credential) }
+            }
+        }.also { watchNetwork() }
     }
 
     /** Unpairs this device (Change Server). */
     fun forget() {
         pairing = null
+        connections.cancelActive()
         SecureStore.delete(ACCOUNT)
         networkCallback?.let { runCatching { connectivity().unregisterNetworkCallback(it) } }
         networkCallback = null
