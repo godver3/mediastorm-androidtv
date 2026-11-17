@@ -110,7 +110,7 @@ fun BoxScope.DetailsHeader(
         (model.loadError ?: model.watchedError ?: trailer.errorMessage)?.let { Text(it, fontSize = 12.sp, color = Color(0xFFFF6B6B)) }
 
         // The info line takes the focus captions' place, so they hide while it shows.
-        val infoShown = DetailsInfoLine.of(DetailsInfo.settings, model, prequeueTracks, warm) != null
+        val infoShown = DetailsInfoLine.of(DetailsInfo.settings, prequeueTracks, warm) != null
         CompositionLocalProvider(LocalHidesFocusCaptions provides infoShown) {
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 PrimaryButton(primary, model, playFocus, onPlay)
@@ -147,7 +147,7 @@ fun BoxScope.DetailsHeader(
                 IconButton(onClick = onMore) { Icon(AppIcons.MoreHoriz, contentDescription = "More") }
             }
         }
-        DetailsInfoRow(model, prequeueTracks, warm, Modifier.padding(top = 4.dp))
+        DetailsInfoRow(prequeueTracks, warm, Modifier.padding(top = 4.dp))
     }
 }
 

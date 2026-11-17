@@ -1,6 +1,8 @@
 package com.strmr.tv.ui.details
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -12,52 +14,69 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.playbackSettings
 import com.strmr.tv.player.WarmPrequeue
+import com.strmr.tv.ui.AppIcons
 
 /**
- * Under the actions, when the profile turns any segment on: the prequeued release (middle-
- * truncated; "Finding a source…" while it resolves) · runtime · the tracks Play uses
- * ([DetailsInfoLine]). Styled as the metadata line.
+ * Under the actions, when the profile turns either part on: the prequeued release (middle-
+ * truncated; "Finding a source…" while it resolves), then on the next line the audio and subtitle
+ * tracks Play uses, each led by its icon ([DetailsInfoLine]). Styled as the metadata line.
  */
 @Composable
-fun DetailsInfoRow(model: DetailsModel, tracks: PrequeueTracks, warm: WarmPrequeue?, modifier: Modifier = Modifier) {
+fun DetailsInfoRow(tracks: PrequeueTracks, warm: WarmPrequeue?, modifier: Modifier = Modifier) {
     val settings = DetailsInfo.settings
     val ready = settings.showTracks && tracks.visible(warm)?.tracks != null
-    // The caption reflects this device's track overrides, as the Audio & Subtitles button's does.
+    // The tracks reflect this device's track overrides, as the Audio & Subtitles button's caption does.
     LaunchedEffect(ready) {
         if (ready && tracks.playback == null) tracks.playback = runCatching { ApiClient.playbackSettings() }.getOrNull()
     }
-    val line = DetailsInfoLine.of(settings, model, tracks, warm) ?: return
-    val separator = if (line.rest != null) Separator else ""
-    Row(modifier.widthIn(max = 760.dp), verticalAlignment = Alignment.CenterVertically) {
+    val line = DetailsInfoLine.of(settings, tracks, warm) ?: return
+    Column(modifier.widthIn(max = 760.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         if (line.findingSource) {
-            CircularProgressIndicator(Modifier.padding(end = 6.dp).size(12.dp), color = InfoColor, strokeWidth = 1.5.dp)
-            InfoText("Finding a source…$separator")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.padding(end = 6.dp).size(12.dp), color = InfoColor, strokeWidth = 1.5.dp)
+                InfoText("Finding a source…")
+            }
         }
         line.filename?.let { name ->
-            // Middle-cut to the room the rest leaves, so the release's tail (group, codec) stays
-            // readable. Cut by measuring rather than TextOverflow.MiddleEllipsis, whose text keeps
-            // the full width and leaves a gap before the separator.
-            BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+            // Middle-cut to the room, so the release's tail (group, codec) stays readable. Cut by
+            // measuring rather than TextOverflow.MiddleEllipsis, whose text keeps the full width.
+            BoxWithConstraints {
                 val measurer = rememberTextMeasurer()
                 val style = infoStyle()
                 val room = constraints.maxWidth
-                val fitted = remember(name, separator, room) {
-                    middleCut(name, separator) { measurer.measure(it, style, maxLines = 1).size.width <= room }
+                val fitted = remember(name, room) {
+                    middleCut(name, "") { measurer.measure(it, style, maxLines = 1).size.width <= room }
                 }
                 InfoText(fitted)
             }
         }
-        line.rest?.let { InfoText(it) }
+        line.tracks?.let { picked ->
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                picked.audio?.let { TrackPart(AppIcons.VolumeUp, it) }
+                TrackPart(AppIcons.Subtitles, picked.subtitle ?: "Off")
+            }
+        }
+    }
+}
+
+/** A track's icon before its name. */
+@Composable
+private fun TrackPart(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = InfoColor, modifier = Modifier.padding(end = 5.dp).size(12.dp))
+        InfoText(text)
     }
 }
 
@@ -76,7 +95,6 @@ internal fun middleCut(name: String, suffix: String, fits: (String) -> Boolean):
     return best
 }
 
-private const val Separator = " · "
 private val InfoColor = Color.White.copy(alpha = 0.65f)
 
 private fun infoStyle() = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = InfoColor)

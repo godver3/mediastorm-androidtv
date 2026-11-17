@@ -10,67 +10,50 @@ import com.strmr.tv.api.DetailsInfoSettings
 import com.strmr.tv.api.DetailsInfoServer
 import com.strmr.tv.api.detailsInfoServer
 import com.strmr.tv.app.App
-import com.strmr.tv.api.formatRuntime
 import com.strmr.tv.player.WarmPrequeue
 import com.strmr.tv.player.releaseTitle
 
 /**
- * The optional line under the details actions: FILENAME · RUNTIME · AUDIO and SUB TRACK, each
- * segment behind its own profile setting ([DetailsInfoSettings]).
+ * The optional lines under the details actions: the prequeued release's name, then the audio and
+ * subtitle tracks Play will use, each behind its own profile setting ([DetailsInfoSettings]).
  */
 data class DetailsInfoLine(
     /** The prequeue is still resolving: a spinner and "Finding a source…" in the filename's place. */
     val findingSource: Boolean,
     /** The prequeued release's name, truncated on its own. */
     val filename: String?,
-    /** Runtime and tracks, already joined. */
-    val rest: String?,
+    /** The tracks, on the next line. */
+    val tracks: SelectedTracks?,
 ) {
     companion object {
-        /** Null when every enabled segment is empty, so the line is hidden. */
-        fun build(
-            settings: DetailsInfoSettings,
-            resolving: Boolean,
-            filename: String?,
-            runtime: String?,
-            tracks: String?,
-        ): DetailsInfoLine? {
+        /** Null when every enabled part is empty, so the lines are hidden. */
+        fun build(settings: DetailsInfoSettings, resolving: Boolean, filename: String?, tracks: SelectedTracks?): DetailsInfoLine? {
             val finding = settings.showFilename && resolving
             val name = filename?.takeIf { settings.showFilename && !resolving }?.ifBlank { null }
-            val rest = listOfNotNull(runtime?.takeIf { settings.showRuntime }, tracks?.takeIf { settings.showTracks && !resolving })
-                .filter { it.isNotBlank() }.joinToString(" · ").ifEmpty { null }
-            if (!finding && name == null && rest == null) return null
-            return DetailsInfoLine(finding, name, rest)
+            val shownTracks = tracks?.takeIf { settings.showTracks && !resolving }
+            if (!finding && name == null && shownTracks == null) return null
+            return DetailsInfoLine(finding, name, shownTracks)
         }
 
-        /** The page's line from its model and warm prequeue. */
-        fun of(settings: DetailsInfoSettings, model: DetailsModel, tracks: PrequeueTracks, warm: WarmPrequeue?): DetailsInfoLine? {
+        /** The page's lines from its warm prequeue. */
+        fun of(settings: DetailsInfoSettings, tracks: PrequeueTracks, warm: WarmPrequeue?): DetailsInfoLine? {
             if (!settings.any) return null
             // Null when Play uses a library copy or the prequeue is unavailable.
             val shown = tracks.visible(warm)
             val status = shown?.tracks
-            val resolving = shown != null && status == null
-            // Episodes only: a movie's runtime is already in the metadata line.
-            val minutes = if (model.target.isMovie) null else model.primaryEpisode?.runtimeMinutes
-            return build(
-                settings,
-                resolving = resolving,
-                filename = status?.releaseTitle,
-                runtime = formatRuntime(minutes),
-                tracks = status?.let { tracks.caption(it) },
-            )
+            return build(settings, resolving = shown != null && status == null, filename = status?.releaseTitle,
+                         tracks = status?.let { tracks.selected(it) })
         }
     }
 }
 
 /**
- * The info line's settings: this device's overrides (Settings › Details Page; absent follows the
+ * The info lines' settings: this device's overrides (Settings › Details Page; absent follows the
  * server), else the server's values, read when a details page or Settings opens. Off until read.
  */
 object DetailsInfo {
     enum class Option(val key: String, val title: String, val detail: String) {
         Filename("detailsInfoFilename", "Show Source Filename", "The release Play will use, under the buttons"),
-        Runtime("detailsInfoRuntime", "Show Episode Runtime", "The selected episode's runtime, under the buttons"),
         Tracks("detailsInfoSelectedTracks", "Show Selected Tracks", "The audio and subtitle tracks Play will use"),
     }
 
@@ -94,7 +77,6 @@ object DetailsInfo {
 
     fun serverValue(option: Option): Boolean? = when (option) {
         Option.Filename -> server.showFilename
-        Option.Runtime -> server.showRuntime
         Option.Tracks -> server.showTracks
     }
 
@@ -102,7 +84,7 @@ object DetailsInfo {
 
     /** What details pages show. */
     val settings: DetailsInfoSettings
-        get() = DetailsInfoSettings(value(Option.Filename), value(Option.Runtime), value(Option.Tracks))
+        get() = DetailsInfoSettings(value(Option.Filename), value(Option.Tracks))
 
     suspend fun refresh() {
         server = ApiClient.detailsInfoServer()
