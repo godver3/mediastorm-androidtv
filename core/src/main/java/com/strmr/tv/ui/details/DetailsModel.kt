@@ -179,8 +179,8 @@ class DetailsModel(val target: DetailsTarget) {
         load()
     }
 
-    /** The top-billed cast, as many as the Expo TV row shows. */
-    val cast: List<CastMember> get() = title?.credits?.cast.orEmpty().distinctBy { it.id }.take(10)
+    /** The top-billed cast; the server already caps the list. */
+    val cast: List<CastMember> get() = title?.credits?.cast.orEmpty().distinctBy { it.id }
 
     fun isWatched(episode: Episode): Boolean = watchedOverrides[episode.id] ?: (episode.watched == true)
 
