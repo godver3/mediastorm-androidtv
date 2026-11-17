@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.strmr.tv.ui.details.DetailsInfo
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.checkHealth
 import com.strmr.tv.api.playbackSettings
@@ -61,6 +62,7 @@ fun SettingsScreen() {
     }
     LaunchedEffect(Unit) { loadTrackDefaults() }
     LaunchedEffect(Unit) { SpoilerSettings.refresh() }
+    LaunchedEffect(Unit) { runCatching { DetailsInfo.refresh() } }
     LaunchedEffect(Unit) { BadgeSettings.refresh() }
 
     var health by remember { mutableStateOf<String?>(null) }
@@ -223,6 +225,8 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
         badgeSettingRows()
         item { Header("Spoilers") }
         spoilerSettingRows()
+        item { Header("Details Page") }
+        detailsInfoSettingRows()
         item { Header("Playback") }
         item {
             ListItem(

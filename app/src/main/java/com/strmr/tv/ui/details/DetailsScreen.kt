@@ -111,6 +111,7 @@ fun DetailsScreen(target: DetailsTarget, openWatchState: Boolean = false, autopl
     }
     LaunchedEffect(model) { model.loadLibrary() }
     LaunchedEffect(model) { if (!target.isMovie) SpoilerSettings.refresh() }
+    LaunchedEffect(model) { runCatching { DetailsInfo.refresh() } }
     // A title action taken elsewhere (a menu over this page, another page): show its new state.
     LaunchedEffect(actions) { if (actions > 0) model.load() }
 
