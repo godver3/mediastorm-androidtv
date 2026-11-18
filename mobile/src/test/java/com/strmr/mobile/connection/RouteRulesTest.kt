@@ -40,6 +40,20 @@ class RouteRulesTest {
         assertFalse(RouteRules.shouldProbe(false, "Cafe", "HomeNet"))
     }
 
+    @Test fun severalHomeWifiNames() {
+        val names = "HomeNet, HomeNet-5G ,Garage"
+        assertTrue(RouteRules.isHome("homenet-5g", names))
+        assertTrue(RouteRules.isHome("Garage", names))
+        assertFalse(RouteRules.isHome("Cafe", names))
+        assertFalse(RouteRules.isHome("", names))
+        assertTrue(RouteRules.isHome("Cafe, Upstairs", "Cafe, Upstairs")) // a name with a comma
+        val multi = NetworkSettings(names, "http://192.168.1.10:7777", "https://media.example.com")
+        assertEquals(RouteRules.DirectChoice(true, home), RouteRules.direct(multi, false, "HomeNet-5G", null))
+        assertEquals(RouteRules.DirectChoice(false, away), RouteRules.direct(multi, false, "Cafe", null))
+        assertTrue(RouteRules.shouldProbe(false, "garage", names))
+        assertFalse(RouteRules.shouldProbe(false, "Cafe", names))
+    }
+
     @Test fun serverIdFromInvite() {
         val id = "ab".repeat(32)
         val payload = Base64.getUrlEncoder().withoutPadding().encodeToString("""{"id":"${id.uppercase()}","addrs":[]}""".toByteArray())

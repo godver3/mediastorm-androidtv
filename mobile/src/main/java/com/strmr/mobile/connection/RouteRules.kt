@@ -24,7 +24,7 @@ object RouteRules {
     fun direct(settings: NetworkSettings, onCellular: Boolean, ssid: String?, recentHome: Boolean?): DirectChoice = when {
         onCellular -> DirectChoice(false, settings.remoteUrl)
         ssid != null -> {
-            val home = ssid.equals(settings.homeWifiSsid, ignoreCase = true)
+            val home = isHome(ssid, settings.homeWifiSsid)
             DirectChoice(home, if (home) settings.homeUrl else settings.remoteUrl)
         }
         recentHome != null -> DirectChoice(recentHome, if (recentHome) settings.homeUrl else settings.remoteUrl)
@@ -36,7 +36,16 @@ object RouteRules {
      * name that isn't home's skips it; an unreadable one still probes (the probe decides).
      */
     fun shouldProbe(onCellular: Boolean, ssid: String?, homeSsid: String): Boolean =
-        !onCellular && (ssid == null || ssid.equals(homeSsid, ignoreCase = true))
+        !onCellular && (ssid == null || isHome(ssid, homeSsid))
+
+    /**
+     * Whether [ssid] is a home network. The setting may list several names separated by commas
+     * (all sharing the one home address); case is ignored. The whole setting also matches, for a
+     * name that itself contains a comma.
+     */
+    fun isHome(ssid: String, homeWifiSsid: String): Boolean =
+        ssid.equals(homeWifiSsid, ignoreCase = true) ||
+            homeWifiSsid.split(',').any { it.trim().equals(ssid, ignoreCase = true) }
 
     /** A saved name-based answer, if it is from the past five minutes. */
     fun recentDetection(home: Boolean?, at: Long, now: Long): Boolean? = home?.takeIf { now - at in 0 until 300_000 }
