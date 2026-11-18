@@ -79,6 +79,7 @@ suspend fun ApiClient.homeSettings(view: String = HomeViews.ALL): HomeSettings =
             disableCardExpansion = home.disableTvLandscapeCardExpansion,
             shelfScale = home.homeShelfScale,
             heroScale = home.homeHeroScale,
+            excludeUpcomingFromContinue = home.excludeUpcomingFromContinue,
         ),
         hasAI = listOf(metadata?.aiApiKey, metadata?.geminiApiKey).any { !it.isNullOrEmpty() },
         topShelfMode = TopShelfMode.from(home.tvTopShelfMode),

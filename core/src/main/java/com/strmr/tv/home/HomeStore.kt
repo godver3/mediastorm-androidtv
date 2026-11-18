@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -73,6 +74,8 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
         scope.launch { snapshotFlow { HomeLayoutStore.hiddenShelves to HomeLayoutStore.shelfOrder }.collect { publish() } }
         // Hiding or unhiding a title drops it from, or returns it to, every row.
         scope.launch { snapshotFlow { HiddenItemsStore.revision to HiddenItemsStore.items }.collect { publish() } }
+        // Showing or hiding upcoming episodes in Continue Watching (Settings › Home Layout) refills that row.
+        scope.launch { snapshotFlow { HomeLayoutStore.upcomingInContinue }.drop(1).collect { reloadContinueWatchingRow() } }
     }
 
     /** Reloads the config and every row. Rows already shown stay until their new cards arrive. */
@@ -158,6 +161,12 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
         loadRows(plan.filter { it.source == HomeSource.Watchlist }, generation)
     }
 
+    /** Reloads the Continue Watching row (this device's upcoming-episodes choice changed). */
+    suspend fun reloadContinueWatchingRow() {
+        if (settings == null || loadsRunning > 0) return
+        loadRows(plan.filter { it.source == HomeSource.ContinueWatching }, generation)
+    }
+
     private suspend fun loadRows(planned: List<PlannedShelf>, gen: Int) {
         val settings = settings ?: return
         if (planned.isEmpty()) {
@@ -166,7 +175,9 @@ class HomeStore(private val scope: CoroutineScope, val view: String = HomeViews.
             return
         }
         val loadScope = CoroutineScope(scope.coroutineContext + SupervisorJob())
-        val context = HomeContext(settings, planned, loadScope)
+        // This device's upcoming-episodes choice over the profile's.
+        val effective = settings.copy(excludeUpcomingFromContinue = HomeLayoutStore.excludesUpcoming(settings.excludeUpcomingFromContinue))
+        val context = HomeContext(effective, planned, loadScope)
         revealed = slots.isNotEmpty()
         // A row already showing cards reloads straight to its complete form.
         val phases = planned.associate { it.id to if (rows[it.id] == null) ShelfPhase.CARDS else ShelfPhase.COMPLETE }

@@ -34,6 +34,16 @@ fun HomeSettingsPage() {
                 }
             }
         }
+        SettingsSection(
+            "Continue Watching",
+            "Shown keeps a show whose next episode airs within the next 7 days in Continue Watching (it stays in My Upcoming too). " +
+                "Hidden leaves it to My Upcoming. Saved on this device only.",
+        ) {
+            OverrideRow(
+                "Upcoming Episodes in Continue Watching", listOf("Shown", "Hidden"), s.upcomingInContinue?.let { if (it) 0 else 1 },
+                if (s.profile.excludeUpcomingFromContinue) "Hidden" else "Shown",
+            ) { i -> s.chooseUpcomingInContinue(i?.let { it == 0 }) }
+        }
         SettingsSection("Rows", "Hidden rows are left off Home on this device.") {
             if (s.shelves.isEmpty()) {
                 Text(

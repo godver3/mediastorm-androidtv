@@ -128,6 +128,15 @@ fun HomeLayoutSettings() {
             if (s.usesExpandingPosters) item {
                 Choice("Show Info When Expanded", onOff(s.expandedCardInfo)) { s.chooseExpandedCardInfo(!s.expandedCardInfo) }
             }
+            item { Header("Continue Watching") }
+            item {
+                // Default → Shown → Hidden → Default.
+                val profileShows = if (profile.excludeUpcomingFromContinue) "Hidden" else "Shown"
+                Choice("Upcoming Episodes in Continue Watching", label(s.upcomingInContinue?.let(::shownHidden), profileShows)) {
+                    s.chooseUpcomingInContinue(when (s.upcomingInContinue) { null -> true; true -> false; false -> null })
+                }
+            }
+            item { Footer(UPCOMING_IN_CONTINUE_FOOTER) }
             if (s.shelves.isNotEmpty()) item { Header("Rows") }
             if (s.shelves.isNotEmpty()) item(key = "row-order") {
                 val navigator = LocalNavigator.current
@@ -160,6 +169,17 @@ private fun Choice(title: String, value: String, modifier: Modifier = Modifier, 
 private fun Header(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(top = 14.dp, start = 4.dp))
 }
+
+@Composable
+private fun Footer(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f), modifier = Modifier.padding(horizontal = 16.dp))
+}
+
+private const val UPCOMING_IN_CONTINUE_FOOTER =
+    "Shown keeps a show whose next episode airs within the next 7 days in Continue Watching (it stays in My Upcoming too). " +
+        "Hidden leaves it to My Upcoming. Saved on this device only."
+
+private fun shownHidden(value: Boolean) = if (value) "Shown" else "Hidden"
 
 /** What Default shows: Top 10, else Trending, else the first row ([com.strmr.tv.home.CarouselPick]). */
 private fun defaultCarouselRow(rows: List<ShelfLayoutInfo>): String =

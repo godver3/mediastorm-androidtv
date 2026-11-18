@@ -155,6 +155,21 @@ fun DashboardStream.card(): HomeCard? {
 /** A show whose next episode hasn't aired yet. */
 val ContinueWatchingItem.isUpcoming: Boolean get() = !isMovie && airs > System.currentTimeMillis()
 
+/**
+ * How far ahead an upcoming next episode may air and still keep its show in Continue Watching
+ * when upcoming shows are shown there (Expo's `COMING_SOON_WINDOW_DAYS`); later ones are left to My Upcoming.
+ */
+const val COMING_SOON_WINDOW_MS = 7L * 24 * 60 * 60 * 1000
+
+/**
+ * Whether Continue Watching keeps an item: everything already watchable, plus, unless
+ * [excludeUpcoming], upcoming shows whose next episode airs within [COMING_SOON_WINDOW_MS] of [now].
+ */
+fun ContinueWatchingItem.keptInContinueWatching(excludeUpcoming: Boolean, now: Long = System.currentTimeMillis()): Boolean {
+    if (isMovie || airs <= now) return true
+    return !excludeUpcoming && airs - now <= COMING_SOON_WINDOW_MS
+}
+
 /** When the next episode airs; 0 when unknown (already watchable). */
 val ContinueWatchingItem.airs: Long
     get() = nextEpisode?.let { ReleaseBadge.airTime(it.airDate, it.airDateTimeUTC) } ?: 0L

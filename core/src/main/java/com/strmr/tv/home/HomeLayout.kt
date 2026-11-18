@@ -87,15 +87,21 @@ data class ProfileHomeLayout(
     val expandPosters: Boolean = true,
     val cardScale: Double = 1.0,
     val heroScale: Double = 1.0,
+    /** `excludeUpcomingFromContinue`: Continue Watching leaves upcoming shows to My Upcoming. */
+    val excludeUpcomingFromContinue: Boolean = true,
 ) {
     val heroSize: HeroSize get() = HeroSize.fromProfile(heroScale)
 
     companion object {
-        fun from(focusModel: String?, disableCardExpansion: Boolean?, shelfScale: Double?, heroScale: Double?) = ProfileHomeLayout(
+        fun from(
+            focusModel: String?, disableCardExpansion: Boolean?, shelfScale: Double?, heroScale: Double?,
+            excludeUpcomingFromContinue: Boolean? = null,
+        ) = ProfileHomeLayout(
             focusPosition = FocusedCardPosition.entries.firstOrNull { it.name.equals(focusModel, ignoreCase = true) } ?: FocusedCardPosition.LEFT,
             expandPosters = disableCardExpansion != true,
             cardScale = clamp(shelfScale),
             heroScale = clamp(heroScale),
+            excludeUpcomingFromContinue = excludeUpcomingFromContinue ?: true,
         )
 
         /** As the Expo app reads the scales: unset or non-positive is 1, else 0.5–1. */
@@ -217,9 +223,19 @@ object HomeLayoutStore {
     /** Rows hidden from Home on this device; they still load, so showing one again is immediate. */
     var hiddenShelves by mutableStateOf(prefs.getStringSet("hiddenShelves", emptySet())!!.toSet())
         private set
+    /**
+     * "Upcoming Episodes in Continue Watching" (device only): Shown keeps a show whose next
+     * episode airs within [COMING_SOON_WINDOW_MS] in Continue Watching, Hidden leaves it to My
+     * Upcoming; null follows the profile's `excludeUpcomingFromContinue`.
+     */
+    var upcomingInContinue by mutableStateOf(if (prefs.contains(UPCOMING_IN_CONTINUE)) prefs.getBoolean(UPCOMING_IN_CONTINUE, false) else null)
+        private set
     /** This device's row order (Settings › Home Layout › Row Order), by shelf id; empty follows the profile's ([com.strmr.tv.app.DeviceOrder]). */
     var shelfOrder by mutableStateOf(com.strmr.tv.app.DeviceOrder.decode(prefs.getString(SHELF_ORDER, null)))
         private set
+
+    /** Whether Continue Watching leaves out upcoming shows, given the view's profile value. */
+    fun excludesUpcoming(profileExcludes: Boolean) = upcomingInContinue?.not() ?: profileExcludes
 
     val effectiveFocusPosition get() = focusPosition ?: profile.focusPosition
     val effectiveExpandPosters get() = expandPosters ?: profile.expandPosters
@@ -266,6 +282,10 @@ object HomeLayoutStore {
         prefs.edit().putStringSet(STYLE_CARD_SIZES, StyleCardSizes.encode(styleCardSizes)).apply()
     }
     fun chooseCardText(v: CardText) { cardText = v; putEnum("cardText", v) }
+    fun chooseUpcomingInContinue(v: Boolean?) {
+        upcomingInContinue = v
+        prefs.edit().apply { if (v == null) remove(UPCOMING_IN_CONTINUE) else putBoolean(UPCOMING_IN_CONTINUE, v) }.apply()
+    }
     fun chooseViewSwitcher(v: Boolean) { viewSwitcher = v; prefs.edit().putBoolean("viewSwitcher", v).apply() }
 
     fun defaultStyle(shelf: String): ShelfStyle = when {
@@ -321,6 +341,7 @@ object HomeLayoutStore {
     private const val SHELF_ORDER = "shelfOrder"
     private const val ANIMATE_EXPANSION = "animateExpansion"
     private const val EXPANDED_CARD_INFO = "expandedCardInfo"
+    private const val UPCOMING_IN_CONTINUE = "upcomingInContinue"
 
     private inline fun <reified E : Enum<E>> enumOrNull(key: String): E? =
         prefs.getString(key, null)?.let { name -> enumValues<E>().firstOrNull { it.name == name } }
