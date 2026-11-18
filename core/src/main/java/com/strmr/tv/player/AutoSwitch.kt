@@ -44,6 +44,9 @@ class AutoSwitch(private val controller: PlayerController) {
         }
     }
 
+    /** The display is resyncing to a new mode (Match Frame Rate): a hitch now is no stall. */
+    fun resettle() = watch.reset()
+
     fun cancel() {
         job?.cancel()
     }

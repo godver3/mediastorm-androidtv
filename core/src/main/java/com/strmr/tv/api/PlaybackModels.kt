@@ -146,6 +146,8 @@ data class PrequeueStatus(
     val dolbyVisionProfile: String? = null,
     /** The server's probe saw an HDR10 (PQ) video stream. */
     val hasHdr10: Boolean = false,
+    /** The video's frame rate as ffprobe gives it ("24000/1001"), for Match Frame Rate. */
+    val frameRate: String? = null,
 ) {
     @Serializable
     data class TargetEpisode(val seasonNumber: Int, val episodeNumber: Int)

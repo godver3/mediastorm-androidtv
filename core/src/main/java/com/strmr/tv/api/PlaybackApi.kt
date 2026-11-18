@@ -82,6 +82,8 @@ data class PlaybackSettings(
     val preferredAudioLanguage: String? = null,
     /** The languages the player's menus offer (`playback.allowedTrackLanguages`); empty allows all. */
     val allowedTrackLanguages: List<String> = emptyList(),
+    /** The TV switches its refresh rate to the video's frame rate (`playback.matchFrameRate`). */
+    val matchFrameRate: Boolean = false,
 )
 
 @Serializable
@@ -108,6 +110,7 @@ private data class PlaybackFields(
     val preferredSubtitleMode: String? = null,
     val preferredAudioLanguage: String? = null,
     val allowedTrackLanguages: List<String>? = null,
+    val matchFrameRate: Boolean? = null,
 ) {
     /** The `subtitle*` fields of the same object. */
     val style: SubtitleStyle.Server
@@ -154,5 +157,6 @@ suspend fun ApiClient.playbackSettings(): PlaybackSettings = coroutineScope {
         },
         preferredAudioLanguage = (d?.preferredAudioLanguage?.ifEmpty { null } ?: u?.preferredAudioLanguage)?.ifEmpty { null },
         allowedTrackLanguages = d?.allowedTrackLanguages?.ifEmpty { null } ?: u?.allowedTrackLanguages ?: emptyList(),
+        matchFrameRate = d?.matchFrameRate ?: u?.matchFrameRate ?: false,
     )
 }

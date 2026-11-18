@@ -34,6 +34,8 @@ data class SourceHints(
     val dolbyVisionProfile: String? = null,
     /** The server's probe saw HDR10 (PQ) video. */
     val hdr10: Boolean = false,
+    /** The server's probed frame rate (fps), for Match Frame Rate. */
+    val frameRate: Float? = null,
 )
 
 /** The Info panel's stream-details rows (File / Video / Dynamic range / Audio / Source). */

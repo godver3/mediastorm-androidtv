@@ -95,6 +95,9 @@ class PlayerController(context: Context, val session: PlayerSession, private val
     val online = OnlineSubtitles(this, scope)
     private val autoSwitch = AutoSwitch(this)
 
+    /** Match Frame Rate switched the display mode: the resync's hitch isn't counted as a stall. */
+    fun displayModeSwitched() = autoSwitch.resettle()
+
     /** Seek previews, for a resolved stream (not trailers, live or a downloaded file). */
     val thumbnails: PlaybackThumbnails? =
         session.streamPath?.takeIf { !session.isLive && session.reportsProgress && !session.localFile }?.let { PlaybackThumbnails(it, request) }

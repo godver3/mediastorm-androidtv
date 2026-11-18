@@ -57,6 +57,8 @@ data class PlayerSession(
     val sourceDolbyVision: String? = null,
     /** The server's probe saw HDR10 (PQ) video in the file. */
     val sourceHdr10: Boolean = false,
+    /** The server's probed frame rate (fps), for Match Frame Rate when the container states none. */
+    val sourceFrameRate: Float? = null,
     /**
      * A file on this device (a phone's download): no seek previews or Auto Switch, which need
      * the server; [streamPath] stays the server path it was downloaded from.

@@ -59,6 +59,7 @@ fun SettingsScreen() {
         val settings = ApiClient.playbackSettings()
         TrailerSettings.serverValue = settings.autoPlayTrailers
         CreditsDetectionSettings.serverValue = settings.creditsDetection
+        MatchFrameRateSettings.serverValue = settings.matchFrameRate
     }
     LaunchedEffect(Unit) { loadTrackDefaults() }
     LaunchedEffect(Unit) { SpoilerSettings.refresh() }
@@ -266,6 +267,23 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                         true -> "On"
                         false -> "Off"
                     } + " · finds unknown end credits on screen for Next Episode")
+                },
+            )
+        }
+        item {
+            val override = MatchFrameRateSettings.override
+            val server = MatchFrameRateSettings.serverValue
+            ListItem(
+                selected = false,
+                // Default (follows the server) → On → Off → Default.
+                onClick = { MatchFrameRateSettings.set(when (override) { null -> true; true -> false; false -> null }) },
+                headlineContent = { Text("Match Frame Rate") },
+                supportingContent = {
+                    Text(when (override) {
+                        null -> "Default" + (server?.let { if (it) " (On)" else " (Off)" } ?: "")
+                        true -> "On"
+                        false -> "Off"
+                    } + " · switches the TV's refresh rate to the video's")
                 },
             )
         }

@@ -256,7 +256,8 @@ object PlaybackCoordinator {
                                   playback = settings.await(), manualTracks = r.manualTracks, carried = carried,
                                   pickTracksOnDevice = r.pickTracksOnDevice,
                                   sourceLabel = StreamInfo.source(r.path, r.source, request.libraryVersion?.origin),
-                                  sourceDolbyVision = r.source?.dolbyVisionProfile, sourceHdr10 = r.source?.hdr10 == true)
+                                  sourceDolbyVision = r.source?.dolbyVisionProfile, sourceHdr10 = r.source?.hdr10 == true,
+                                  sourceFrameRate = r.source?.frameRate)
                 }
                 stage.value = "Starting…"
                 detail.value = null
@@ -287,6 +288,7 @@ object PlaybackCoordinator {
         attributes = s.selectedResult?.attributes.orEmpty() + s.resultAttributes.orEmpty(),
         dolbyVisionProfile = s.dolbyVisionProfile?.ifEmpty { null },
         hdr10 = s.hasHdr10,
+        frameRate = FrameRates.parse(s.frameRate),
     )
 
     /** The player is on screen: the stream-start screen hands over to it. */

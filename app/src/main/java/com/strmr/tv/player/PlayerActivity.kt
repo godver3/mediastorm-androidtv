@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -26,6 +27,8 @@ import com.strmr.tv.live.LiveStream
 import com.strmr.tv.ui.live.multiscreen.MultiscreenHandover
 import com.strmr.tv.ui.live.multiscreen.MultiscreenLauncher
 import com.strmr.tv.ui.StrmrTheme
+import com.strmr.tv.ui.settings.MatchFrameRateSettings
+import kotlinx.coroutines.launch
 
 /**
  * Full-screen playback, its own activity so the system handles it as a player: the window's
@@ -48,10 +51,12 @@ class PlayerActivity : ComponentActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         PlaybackCoordinator.playerOpen = true
-        val matcher = FrameRateMatcher(window, currentDisplay())
+        val matcher = FrameRateMatcher(window, currentDisplay()) { controller?.displayModeSwitched() }
         frameRate = matcher
-        val c = PlayerController(this, session) { format -> matcher.match(format.frameRate) }
+        val c = PlayerController(this, session) { format -> matcher.onVideoFormat(format, session.sourceFrameRate) }
         controller = c
+        c.player.setVideoFrameMetadataListener(matcher)
+        matchFrameRate(session, matcher)
         setContent {
             StrmrTheme {
                 val ended by c.ended.collectAsState()
@@ -140,6 +145,20 @@ class PlayerActivity : ComponentActivity() {
         // After the release, so a direct stream's provider connection is closed first.
         handover?.let { MultiscreenLauncher.open(it) }
         handover = null
+    }
+
+    /**
+     * Match Frame Rate: this device's setting, else the server's (the session's playback
+     * settings, read now for live TV and recordings). Trailers keep the display as it is.
+     */
+    private fun matchFrameRate(session: PlayerSession, matcher: FrameRateMatcher) {
+        if (session.request.title.titleId == "trailer") return matcher.enable(false)
+        MatchFrameRateSettings.override?.let { return matcher.enable(it) }
+        lifecycleScope.launch {
+            val server = session.playback?.matchFrameRate
+                ?: runCatching { ApiClient.playbackSettings().matchFrameRate }.getOrDefault(false)
+            matcher.enable(MatchFrameRateSettings.enabled(server))
+        }
     }
 
     private fun currentDisplay(): Display? =
