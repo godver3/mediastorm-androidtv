@@ -16,6 +16,7 @@ object SettingsKeys {
     const val ABOUT = "about"
     const val CONNECTION = "connection"
     const val DOWNLOADS = "downloads"
+    const val HIDDEN = "hidden"
 }
 
 /** A settings sub page, by its key. */
@@ -34,6 +35,7 @@ fun SettingsPageScreen(key: String, title: String) {
         SettingsKeys.ABOUT -> AboutSettingsPage()
         SettingsKeys.CONNECTION -> com.strmr.mobile.ui.connection.ConnectionSettingsPage()
         SettingsKeys.DOWNLOADS -> com.strmr.mobile.ui.downloads.DownloadSettingsPage()
+        SettingsKeys.HIDDEN -> HiddenItemsSettingsPage()
         else -> SettingsPage(title) {}
     }
 }

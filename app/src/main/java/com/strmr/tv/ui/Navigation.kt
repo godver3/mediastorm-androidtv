@@ -19,6 +19,7 @@ import com.strmr.tv.ui.library.LibraryShowScreen
 import com.strmr.tv.ui.lists.AddToListDialog
 import com.strmr.tv.ui.lists.ListGridScreen
 import com.strmr.tv.ui.recordings.RecordingsScreen
+import com.strmr.tv.ui.settings.HiddenItemsPage
 import com.strmr.tv.ui.settings.HomeLayoutSettings
 import com.strmr.tv.ui.sports.SportsCompetitionScreen
 import com.strmr.tv.ui.sports.SportsPreferencesScreen
@@ -43,6 +44,8 @@ sealed interface Page {
     data class Person(val person: PersonRef) : Page
     data object HomeLayout : Page
     data object TopMenu : Page
+    /** Settings › Hidden Items: titles hidden from Continue Watching and from this profile. */
+    data object HiddenItems : Page
     /** Settings › Home Layout › Row Order. */
     data object RowOrder : Page
     /** Settings › Menu › Tab Order. */
@@ -129,6 +132,7 @@ fun PageStack(content: @Composable () -> Unit) {
                     is Page.Person -> PersonScreen(page.person)
                     Page.HomeLayout -> HomeLayoutSettings()
                     Page.TopMenu -> TopMenuSettings()
+                    Page.HiddenItems -> HiddenItemsPage()
                     Page.RowOrder -> RowOrderSettings()
                     Page.TabOrder -> TabOrderSettings()
                     Page.SubtitleStyle -> SubtitleSettings()

@@ -8,6 +8,7 @@ import com.strmr.tv.api.ListedTitle
 import com.strmr.tv.api.LossyListSerializer
 import com.strmr.tv.api.Title
 import com.strmr.tv.app.Config
+import com.strmr.tv.library.HiddenItem
 import java.util.TimeZone
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -116,6 +117,15 @@ suspend fun ApiClient.continueWatching(): List<ContinueWatchingItem> = coroutine
 /** Drops a title from Continue Watching until it is played again. */
 suspend fun ApiClient.hideFromContinueWatching(seriesId: String) {
     sendRaw("POST", "$profilePath/history/continue/hide", body = buildJsonObject { put("seriesId", seriesId) })
+}
+
+/** The titles [hideFromContinueWatching] dropped, newest first (Settings › Hidden Items). Name and art may be missing. */
+suspend fun ApiClient.hiddenFromContinueWatching(): List<HiddenItem> =
+    sendList("GET", "$profilePath/history/continue/hidden")
+
+/** Undoes [hideFromContinueWatching]: the title returns to Continue Watching if it still qualifies. */
+suspend fun ApiClient.showInContinueWatching(seriesId: String) {
+    sendRaw("POST", "$profilePath/history/continue/unhide", body = buildJsonObject { put("seriesId", seriesId) })
 }
 
 /** The same title: its ID, or a shared provider ID. */

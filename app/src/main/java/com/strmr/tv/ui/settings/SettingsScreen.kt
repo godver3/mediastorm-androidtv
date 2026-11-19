@@ -172,6 +172,13 @@ private fun SettingsList(server: HttpUrl?, remote: Boolean, health: String?, che
                 leadingContent = { profile?.let { ProfileAvatar(it, 32.dp) } },
             )
         }
+        item {
+            ListItem(
+                selected = false, onClick = { navigator.open(Page.HiddenItems) },
+                headlineContent = { Text("Hidden Items") },
+                supportingContent = { Text("Titles hidden from Continue Watching or from this profile") },
+            )
+        }
         item { Header("Home") }
         item {
             ListItem(

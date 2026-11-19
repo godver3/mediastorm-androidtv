@@ -26,6 +26,18 @@ data class HiddenItem(
     val externalIds: Map<String, String>? = null,
 ) {
     val isMovie: Boolean get() = mediaType == "movie"
+
+    /** The name, or what it is when the server had none for it. */
+    val displayName: String get() = name.ifBlank { if (isMovie) "Unknown movie" else "Unknown show" }
+
+    /** The title as the menus and actions take it. */
+    fun toTarget(): DetailsTarget = DetailsTarget(
+        titleId = id, name = name, isMovie = isMovie, year = year,
+        tmdbId = externalIds?.get("tmdb")?.takeIf { it.isNotBlank() },
+        imdbId = externalIds?.get("imdb")?.takeIf { it.isNotBlank() },
+        tvdbId = externalIds?.get("tvdb")?.takeIf { it.isNotBlank() },
+        posterUrl = posterUrl, backdropUrl = backdropUrl,
+    )
 }
 
 /**

@@ -10,6 +10,7 @@ import com.strmr.tv.api.deleteMovieProgress
 import com.strmr.tv.api.setWatched
 import com.strmr.tv.app.AppLog
 import com.strmr.tv.home.hideFromContinueWatching
+import com.strmr.tv.home.showInContinueWatching
 import com.strmr.tv.ui.AppToast
 import kotlinx.coroutines.CancellationException
 
@@ -48,6 +49,12 @@ object TitleActions {
     suspend fun hideFromContinueWatching(target: DetailsTarget) =
         run("hide-continue-watching", target, "Removed from Continue Watching", "Failed to remove from Continue Watching") {
             ApiClient.hideFromContinueWatching(target.titleId)
+        }
+
+    /** Undoes [hideFromContinueWatching] (Settings › Hidden Items). */
+    suspend fun showInContinueWatching(target: DetailsTarget) =
+        run("show-continue-watching", target, "Back in Continue Watching", "Failed to show in Continue Watching") {
+            ApiClient.showInContinueWatching(target.titleId)
         }
 
     suspend fun hide(target: DetailsTarget) =
