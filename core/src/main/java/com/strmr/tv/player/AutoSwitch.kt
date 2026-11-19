@@ -1,5 +1,6 @@
 package com.strmr.tv.player
 
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import com.strmr.tv.api.ApiClient
 import com.strmr.tv.api.SourceResult
@@ -14,8 +15,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Moves a movie or episode to the next ranked source by itself when the server reports this one
- * broken or too slow (`migrationRequested` on a progress reply), or [StallWatch] sees playback
- * stuck or stalling again and again. The next source is resolved while this one is still up, then
+ * broken or too slow (`migrationRequested` on a progress reply), [StallWatch] sees playback
+ * stuck or stalling again and again, or the player gives up on the source with an error
+ * ([switchesOnError]) — a damaged file fails the same way on every retry. The next source is resolved while this one is still up, then
  * played from the same position with the same languages, as a Switch Source pick. Sources already
  * tried go with the request, so a switch never goes back to one; after [LIMIT] switches it stops
  * trying. Settings › Playback › Auto Switch Sources turns it off. The tvOS app's rules.
@@ -24,6 +26,8 @@ class AutoSwitch(private val controller: PlayerController) {
     private val watch = StallWatch()
     private var job: Job? = null
     private var switching = false
+    /** A player error that arrived while a switch was already being tried: shown if it gives up. */
+    private var giveUpAfterSwitch: (() -> Unit)? = null
     /** Sources that failed to resolve on an earlier try from this player. */
     private val failed = mutableSetOf<String>()
     private var sources: List<SourceResult>? = null
@@ -62,14 +66,22 @@ class AutoSwitch(private val controller: PlayerController) {
         watch.sample(position, active, System.currentTimeMillis())?.let { trigger(it.reason) }
     }
 
-    /** Resolves the next untried source and switches to it; with none left, stays put. */
-    fun trigger(reason: String) {
+    /**
+     * Resolves the next untried source and switches to it; with none left, stays put and runs
+     * [onGiveUp] (the player's error screen when the source already failed). Returns whether a try
+     * started — false means the caller handles the failure itself, right away.
+     */
+    fun trigger(reason: String, onGiveUp: (() -> Unit)? = null): Boolean {
+        if (switching && onGiveUp != null) {
+            giveUpAfterSwitch = onGiveUp
+            return true
+        }
         if (!AutoSwitchSettings.enabled || !applies || switching || controller.switchTo.value != null ||
-            controller.advanceTo.value != null || controller.ended.value) return
+            controller.advanceTo.value != null || controller.ended.value) return false
         if (request.autoSwitchCount >= LIMIT) {
             AppLog.i(TAG, "$reason; already switched ${request.autoSwitchCount} times, staying")
             watch.reset()
-            return
+            return false
         }
         switching = true
         val tried = (request.autoSwitchTried + failed + listOfNotNull(key(session.releaseName))).toMutableSet()
@@ -99,7 +111,10 @@ class AutoSwitch(private val controller: PlayerController) {
             failed += tried
             watch.reset()
             switching = false
+            onGiveUp?.invoke()
+            giveUpAfterSwitch?.also { giveUpAfterSwitch = null }?.invoke()
         }
+        return true
     }
 
     private fun switchTo(source: SourceResult, resolved: Pair<String, com.strmr.tv.api.TrackSelection?>, tried: Set<String>) {
@@ -124,5 +139,13 @@ class AutoSwitch(private val controller: PlayerController) {
         const val CANDIDATES = 5
         /** Stalls this close to the end aren't worth a switch; the credits are rolling. */
         const val END_MARGIN_MS = 60_000L
+
+        /**
+         * Player errors that mean this source can't be played — reading it ([PlaybackException]
+         * 2xxx), its container (3xxx) or decoding its frames — so another release may play where a
+         * retry of this one fails the same way. Audio output and DRM errors are the device's.
+         */
+        fun switchesOnError(errorCode: Int): Boolean =
+            errorCode in 2000..3999 || errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED
     }
 }

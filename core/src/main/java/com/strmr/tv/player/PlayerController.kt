@@ -210,6 +210,14 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 return
             }
             AppLog.e("Player", "playback error ${e.errorCodeName}: ${e.message}", e)
+            // A source that can't be read or parsed fails the same way on every retry (a release
+            // with missing Usenet articles): try the next ranked source before the error screen.
+            if (!session.isLive && AutoSwitch.switchesOnError(e.errorCode) &&
+                autoSwitch.trigger("player error ${e.errorCodeName}") { showError(e) }) return
+            showError(e)
+        }
+
+        private fun showError(e: PlaybackException) {
             thumbnails?.cancel()
             error.value = e.message ?: e.errorCodeName
         }
