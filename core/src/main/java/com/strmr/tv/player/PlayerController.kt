@@ -238,6 +238,9 @@ class PlayerController(
         }
     }
 
+    /** Set by [release]; a start the gate lets go of afterwards is dropped. */
+    private var released = false
+
     init {
         // Passthrough only where the output takes it (not Bluetooth); PCM otherwise.
         val renderers = PassthroughGuard.renderersFactory(context)
@@ -280,7 +283,7 @@ class PlayerController(
         // Buffering goes ahead while the gate holds; only the start waits for it.
         player.playWhenReady = startGate == null
         player.prepare()
-        startGate?.invoke { if (!clock.isCancelled) player.play() }
+        startGate?.invoke { if (!released) player.play() }
         autoSwitch.start()
         AppLog.i("Player", "play ${request.displayTitle} start=${request.start?.label ?: "0"}")
         thumbnails?.start(scope) {
@@ -369,6 +372,7 @@ class PlayerController(
 
     /** Saves the position and lets go of the player; returns the last report, still finishing. */
     fun release(): Job? {
+        released = true
         if (!ended.value && advanceTo.value == null) report(paused = true, closing = true)
         clock.cancel()
         online.cancel()
