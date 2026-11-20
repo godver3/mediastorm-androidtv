@@ -85,12 +85,23 @@ object RemoteAccess {
         val normalized = normalize(code)
             ?: throw RemoteAccessError("Enter the connection code from your server, like mshost-ABC123-DEF456-GHJ789.")
         AppLog.i("RemoteAccess", "pairing with code ${normalized.take(13)}…")
-        val invite = call { IrohBridgeNative.resolveCode(normalized) }["invite"].string()
-            ?: throw RemoteAccessError("No server answered for that code.")
-        val base = startProxy(invite)
+        var step = "resolve"
+        val invite: String
+        val base: HttpUrl
         val credential = makeCredential()
-        prime(base, credential)
-        claim(normalized, credential, base)
+        try {
+            invite = call { IrohBridgeNative.resolveCode(normalized) }["invite"].string()
+                ?: throw RemoteAccessError("No server answered for that code.")
+            step = "proxy"
+            base = startProxy(invite)
+            step = "health"
+            prime(base, credential)
+            step = "claim"
+            claim(normalized, credential, base)
+        } catch (e: Exception) {
+            AppLog.w("RemoteAccess", "pairing failed at $step: ${e.message}")
+            throw e
+        }
         val saved = Pairing(invite, credential, normalized)
         SecureStore.write(ACCOUNT, Json.encodeToString(saved))
         pairing = saved
