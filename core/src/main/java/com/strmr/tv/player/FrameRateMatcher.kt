@@ -26,6 +26,11 @@ class FrameRateMatcher(
     private val window: Window,
     private val display: Display?,
     private val onSwitch: () -> Unit = {},
+    /**
+     * A switch mid-playback (the rate came from the container or the frames): pauses playback
+     * and returns what resumes it, run once the display is in its new mode.
+     */
+    private val pauseForSwitch: () -> (() -> Unit) = { {} },
 ) : VideoFrameMetadataListener {
     private val main = Handler(Looper.getMainLooper())
     private val cadence = FrameCadence()
@@ -139,6 +144,10 @@ class FrameRateMatcher(
             return releaseStart(null)
         }
         AppLog.i("FrameRate", "content ${"%.3f".format(fps)} fps ($source) → mode ${best.id} ${"%.3f".format(best.refreshRate)} Hz")
+        if (heldStart == null) {
+            heldStart = pauseForSwitch()
+            main.postDelayed(startTimeout, START_HOLD_MAX_MS)
+        }
         startAfterMode(display, best.id)
         window.attributes = window.attributes.apply { preferredDisplayModeId = best.id }
         onSwitch()

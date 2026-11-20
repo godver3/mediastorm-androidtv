@@ -51,7 +51,11 @@ class PlayerActivity : ComponentActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         PlaybackCoordinator.playerOpen = true
-        val matcher = FrameRateMatcher(window, currentDisplay()) { controller?.displayModeSwitched() }
+        val matcher = FrameRateMatcher(
+            window, currentDisplay(),
+            onSwitch = { controller?.displayModeSwitched() },
+            pauseForSwitch = { controller?.pauseForSwitch() ?: {} },
+        )
         frameRate = matcher
         val c = PlayerController(this, session, startGate = { start -> matcher.holdStart(session.sourceFrameRate, start) }) { format ->
             matcher.onVideoFormat(format, session.sourceFrameRate)

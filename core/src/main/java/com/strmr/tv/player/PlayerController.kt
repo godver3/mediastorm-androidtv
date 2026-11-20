@@ -238,6 +238,13 @@ class PlayerController(
         }
     }
 
+    /** Pauses for a display mode switch; what it returns plays again if it was playing. */
+    fun pauseForSwitch(): () -> Unit {
+        val wasPlaying = player.playWhenReady
+        player.pause()
+        return { if (wasPlaying && !released) player.play() }
+    }
+
     /** Set by [release]; a start the gate lets go of afterwards is dropped. */
     private var released = false
 
