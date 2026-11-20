@@ -60,6 +60,8 @@ data class PlaybackResolution(
     val queueId: Long? = null,
     val webdavPath: String? = null,
     val trackSelection: TrackSelection? = null,
+    /** The server's probed frame rate as ffprobe gives it ("24000/1001"), for Match Frame Rate. */
+    val frameRate: String? = null,
 )
 
 // Tracks

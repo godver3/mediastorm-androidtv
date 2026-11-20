@@ -72,7 +72,11 @@ suspend fun ApiClient.sourceHealth(token: String): SourceHealthSnapshot =
  * resolution is asynchronous. The server also returns its track choice for this profile and
  * title, so manual picks get the same preference as prequeue.
  */
-suspend fun ApiClient.resolveSource(result: SourceResult, titleId: String, startOffset: Double?): Pair<String, TrackSelection?> {
+suspend fun ApiClient.resolveSource(result: SourceResult, titleId: String, startOffset: Double?): Pair<String, TrackSelection?> =
+    resolveSourceFull(result, titleId, startOffset).let { it.webdavPath!! to it.trackSelection }
+
+/** [resolveSource] with the rest of the resolution (the probed frame rate). */
+suspend fun ApiClient.resolveSourceFull(result: SourceResult, titleId: String, startOffset: Double?): PlaybackResolution {
     val body = buildJsonObject {
         put("result", result.raw)
         put("profileId", profileId)
@@ -92,5 +96,5 @@ suspend fun ApiClient.resolveSource(result: SourceResult, titleId: String, start
         val q = mapOf("includeTrackSelection" to "true", "profileId" to profileId, "titleId" to titleId, "clientId" to Config.clientId)
         resolution = json.decodeFromString(sendRaw("GET", "/api/playback/queue/$queueId", q, timeoutMs = 60_000))
     }
-    return resolution.webdavPath!! to resolution.trackSelection
+    return resolution
 }

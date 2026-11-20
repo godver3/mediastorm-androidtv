@@ -8,7 +8,7 @@ import com.strmr.tv.api.PrequeueStatus
 import com.strmr.tv.api.SourceResult
 import com.strmr.tv.api.TrackSelection
 import com.strmr.tv.api.playbackSettings
-import com.strmr.tv.api.resolveSource
+import com.strmr.tv.api.resolveSourceFull
 import com.strmr.tv.api.streamUrl
 import com.strmr.tv.app.App
 import com.strmr.tv.app.AppLog
@@ -109,9 +109,10 @@ object PlaybackCoordinator {
     ) =
         // A stream picked over a library copy (Switch Source) is no longer that copy.
         begin(request.copy(libraryVersion = null), "Preparing…", carried = carried, resolve = {
-            val (path, tracks) = resolved ?: ApiClient.resolveSource(source, request.title.titleId, request.startPosition)
+            val full = if (resolved == null) ApiClient.resolveSourceFull(source, request.title.titleId, request.startPosition) else null
+            val (path, tracks) = resolved ?: (full!!.webdavPath!! to full.trackSelection)
             val hints = SourceHints(source.serviceType.ifEmpty { null }, indexer = source.indexer.ifEmpty { null },
-                                    attributes = source.attributes)
+                                    attributes = source.attributes, frameRate = FrameRates.parse(full?.frameRate))
             if (manual == null || manual.choice.isEmpty) {
                 ResolvedStream(path, tracks, source.title, source = hints)
             } else {
