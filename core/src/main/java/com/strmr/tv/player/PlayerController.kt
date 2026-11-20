@@ -39,7 +39,16 @@ import kotlinx.coroutines.launch
  * choice applied once the tracks are known, the resume point, and progress every 10 s.
  */
 @OptIn(UnstableApi::class)
-class PlayerController(context: Context, val session: PlayerSession, private val onVideoFormat: (Format) -> Unit) {
+class PlayerController(
+    context: Context,
+    val session: PlayerSession,
+    /**
+     * Holds the start until it calls back (Match Frame Rate switching the display first, so the
+     * HDMI resync lands before playback rather than during it); null starts at once.
+     */
+    startGate: ((start: () -> Unit) -> Unit)? = null,
+    private val onVideoFormat: (Format) -> Unit,
+) {
     val request = session.request
     val player: ExoPlayer
     val isPlaying = MutableStateFlow(false)
@@ -127,6 +136,12 @@ class PlayerController(context: Context, val session: PlayerSession, private val
                 liveRetune?.playing()
                 progress.start()
             } else if (player.playbackState == Player.STATE_READY) report(paused = true)
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (!playWhenReady && reason != Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
+                AppLog.i("Player", "paused by the system (reason=$reason)")
+            }
         }
 
         override fun onPlaybackStateChanged(state: Int) {
@@ -262,8 +277,10 @@ class PlayerController(context: Context, val session: PlayerSession, private val
         request.startPosition?.let { player.seekTo((it * 1000).toLong()) }
         // Up Next / Switch Source: the previous playback's speed (live always plays at 1x).
         if (request.speed != 1f && !session.isLive) setSpeed(request.speed)
-        player.playWhenReady = true
+        // Buffering goes ahead while the gate holds; only the start waits for it.
+        player.playWhenReady = startGate == null
         player.prepare()
+        startGate?.invoke { if (!clock.isCancelled) player.play() }
         autoSwitch.start()
         AppLog.i("Player", "play ${request.displayTitle} start=${request.start?.label ?: "0"}")
         thumbnails?.start(scope) {

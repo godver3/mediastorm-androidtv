@@ -1,5 +1,6 @@
 package com.strmr.tv.player
 
+import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
@@ -16,6 +17,10 @@ import com.strmr.tv.app.AppLog
  * ([FrameRates.bestMode]) once [enable] says Match Frame Rate is on, and gives the mode back
  * when the player closes ([reset]). [onSwitch] runs after a switch: the TV takes a few seconds
  * to resync.
+ *
+ * With the probe's rate in hand, [holdStart] switches before playback starts: the HDMI resync
+ * briefly drops the audio output, which Android reports as audio becoming noisy and ExoPlayer
+ * answers by pausing. Starting once the display reports the new mode keeps that out of playback.
  */
 class FrameRateMatcher(
     private val window: Window,
@@ -30,6 +35,10 @@ class FrameRateMatcher(
     /** Set once the container and probe both came up empty: the frames are measured. */
     @Volatile private var measuring = false
     @Volatile private var done = false
+    /** The held start ([holdStart]), released once the display is in its mode or none is needed. */
+    private var heldStart: (() -> Unit)? = null
+    private var displayListener: DisplayManager.DisplayListener? = null
+    private val startTimeout = Runnable { releaseStart("display didn't report the new mode in time") }
 
     /** Whether Match Frame Rate is on; nothing switches until it is known. */
     fun enable(on: Boolean) {
@@ -37,7 +46,49 @@ class FrameRateMatcher(
         if (!on) done = true
         AppLog.i("FrameRate", "match frame rate ${if (on) "on" else "off"}")
         apply()
+        if (!on) releaseStart(null)
     }
+
+    /**
+     * Holds playback's [start] until the display is in the probed rate's mode, or at once when
+     * there's no probe (the container or the frames give the rate, mid-playback, as before).
+     */
+    fun holdStart(probed: Float?, start: () -> Unit) {
+        if (probed == null || !FrameRates.usable(probed)) return start()
+        heldStart = start
+        main.postDelayed(startTimeout, START_HOLD_MAX_MS)
+        propose(probed, "server probe")
+    }
+
+    private fun releaseStart(note: String?) {
+        val start = heldStart ?: return
+        heldStart = null
+        main.removeCallbacks(startTimeout)
+        displayListener?.let { displayManager()?.unregisterDisplayListener(it) }
+        displayListener = null
+        note?.let { AppLog.i("FrameRate", "starting playback: $it") }
+        start()
+    }
+
+    /** Releases the start once [display] reports [modeId], plus a beat for the audio output to return. */
+    private fun startAfterMode(display: Display, modeId: Int) {
+        if (heldStart == null) return
+        val listener = object : DisplayManager.DisplayListener {
+            override fun onDisplayChanged(id: Int) {
+                if (id != display.displayId || display.mode.modeId != modeId) return
+                displayManager()?.unregisterDisplayListener(this)
+                displayListener = null
+                main.removeCallbacks(startTimeout)
+                main.postDelayed({ releaseStart("display in mode $modeId") }, AUDIO_SETTLE_MS)
+            }
+            override fun onDisplayAdded(id: Int) {}
+            override fun onDisplayRemoved(id: Int) {}
+        }
+        displayListener = listener
+        displayManager()?.registerDisplayListener(listener, main) ?: releaseStart(null)
+    }
+
+    private fun displayManager() = window.context.getSystemService(DisplayManager::class.java)
 
     /** The selected video track: its frame rate, else [probed], else measure the frames. */
     fun onVideoFormat(format: Format, probed: Float?) {
@@ -76,18 +127,19 @@ class FrameRateMatcher(
         if (enabled != true || applied) return
         applied = true
         done = true
-        val display = display ?: return
+        val display = display ?: return releaseStart(null)
         val current = display.mode.toMode()
         val best = FrameRates.bestMode(fps, current, display.supportedModes.map { it.toMode() })
         if (best == null) {
             AppLog.i("FrameRate", "content ${"%.3f".format(fps)} fps ($source): no fitting mode at ${current.width}x${current.height}")
-            return
+            return releaseStart(null)
         }
         if (best.id == current.id) {
             AppLog.i("FrameRate", "content ${"%.3f".format(fps)} fps ($source): already at ${"%.3f".format(current.refreshRate)} Hz")
-            return
+            return releaseStart(null)
         }
         AppLog.i("FrameRate", "content ${"%.3f".format(fps)} fps ($source) → mode ${best.id} ${"%.3f".format(best.refreshRate)} Hz")
+        startAfterMode(display, best.id)
         window.attributes = window.attributes.apply { preferredDisplayModeId = best.id }
         onSwitch()
     }
@@ -95,9 +147,18 @@ class FrameRateMatcher(
     /** Back to the system's choice. */
     fun reset() {
         done = true
+        heldStart = null
+        main.removeCallbacks(startTimeout)
+        displayListener?.let { displayManager()?.unregisterDisplayListener(it) }
+        displayListener = null
         if (!applied) return
         window.attributes = window.attributes.apply { preferredDisplayModeId = 0 }
     }
 
     private fun Display.Mode.toMode() = FrameRates.Mode(modeId, physicalWidth, physicalHeight, refreshRate)
 }
+
+/** Longest a start waits on a display switch before playing anyway. */
+private const val START_HOLD_MAX_MS = 5_000L
+/** After the display reports its new mode, the HDMI audio output comes back a moment later. */
+private const val AUDIO_SETTLE_MS = 500L

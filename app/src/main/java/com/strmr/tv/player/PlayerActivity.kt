@@ -53,7 +53,9 @@ class PlayerActivity : ComponentActivity() {
         PlaybackCoordinator.playerOpen = true
         val matcher = FrameRateMatcher(window, currentDisplay()) { controller?.displayModeSwitched() }
         frameRate = matcher
-        val c = PlayerController(this, session) { format -> matcher.onVideoFormat(format, session.sourceFrameRate) }
+        val c = PlayerController(this, session, startGate = { start -> matcher.holdStart(session.sourceFrameRate, start) }) { format ->
+            matcher.onVideoFormat(format, session.sourceFrameRate)
+        }
         controller = c
         c.player.setVideoFrameMetadataListener(matcher)
         matchFrameRate(session, matcher)
